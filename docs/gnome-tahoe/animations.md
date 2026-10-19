@@ -207,8 +207,12 @@ it now keeps it on). 81 records.
   frame, so they are waits (GPU or a sync), not JS. Each such window counts 20 to 30 cascaded
   redraws and about 10 capture blits per frame. The before table has no menu switching to compare
   with, and the headless shell (no Vitals, no Open Bar) does not show it: quick settings ↔ calendar
-  switching there is p95 44 to 63 ms before, 9.8 to 11.5 ms after. Next: per-frame counters in the
-  probe to tie the long frames to the blits and cascades.
+  switching there is p95 44 to 63 ms before, 9.8 to 11.5 ms after, and also with Vitals, Open Bar
+  and the dock loaded (p95 11.4 ms). An A/B on the desktop (`tools/abslide.sh`: frozen, live while
+  moving, plain blur, no glass) gave nothing: the probe records no open when a menu is reached by
+  sliding from another (only quick settings, then nothing). The user then slid across Vitals, the
+  calendar, Now Playing and quick settings by eye: smooth. Left as unexplained; the probe needs to
+  record `PopupMenuManager` switches before it can measure this.
 - First open after login, dock menus and Settings drop-downs: not in this round.
 
 ### Phase 2: shared backdrop for quick settings (only if Phase 1 is not enough)
