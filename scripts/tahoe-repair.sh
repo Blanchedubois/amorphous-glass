@@ -355,6 +355,10 @@ PY
     # glass menus: live blur on each menu and each quick settings piece, the top bar's Liquid Glass
     bsg .popup blur true; bsg .popup static-blur false; bsg .popup override-background true
     bsg .popup preserve-shell-theme false
+    # popups keep their glass still while they open, close or resize (docs/gnome-tahoe/animations.md)
+    if gsettings --schemadir "$BS" list-keys org.gnome.shell.extensions.blur-my-shell.popup | grep -qx motion-freeze; then
+      bsg .popup motion-freeze true
+    fi
     if [[ "$GLASS_MODE" == light ]]; then bsg .popup style-popup 1; else bsg .popup style-popup 3; fi
     if [[ "$(gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell.popup pipeline)" != "'pipeline_glassbar_menus'" ]] \
        || ! gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell pipelines | grep -q pipeline_glassbar_menus; then

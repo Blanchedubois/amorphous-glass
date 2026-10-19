@@ -1,0 +1,41 @@
+#!/bin/bash
+# run.sh BMS_ZIP OUTDIR [RUNS]: a throwaway headless gnome-shell (own XDG dirs, keyfile settings,
+# own D-Bus session) with the user's Blur My Shell settings, the test driver and the given build.
+set -eu
+zip=$1; out=$2; runs=${3:-5}
+H=$(cd "$(dirname "$0")" && pwd)
+root=$(mktemp -d -p "$H" root.XXXX)
+mkdir -p "$out"; rm -f "$out"/*.png "$out"/log.jsonl
+export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
+export GSETTINGS_BACKEND=keyfile TAHOE_TEST_OUT=$out TAHOE_TEST_RUNS=$runs
+ext=$XDG_DATA_HOME/gnome-shell/extensions
+mkdir -p "$ext/blur-my-shell@aunetx" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
+unzip -q "$zip" -d "$ext/blur-my-shell@aunetx"
+glib-compile-schemas "$ext/blur-my-shell@aunetx/schemas"
+cp -r "$H/tahoe-motion-test@local" "$ext/"
+kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
+python3 - "$kf" <<'PY'
+import subprocess, sys
+out = []
+def dump(path):
+    txt = subprocess.run(['dconf', 'dump', path], capture_output=True, text=True).stdout
+    base = path.strip('/')
+    for line in txt.splitlines():
+        if line.startswith('[') and line.endswith(']'):
+            sub = line[1:-1].strip('/')
+            out.append(f"[{base + ('/' + sub if sub else '')}]")
+        else:
+            out.append(line)
+dump('/org/gnome/shell/extensions/blur-my-shell/')
+dump('/org/gnome/desktop/background/')
+out += ['[org/gnome/shell]',
+        "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local']",
+        'welcome-dialog-last-shown-version=\'999\'',
+        '[org/gnome/shell/extensions/user-theme]', "name='MacTahoe-Dark'",
+        '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", 'enable-animations=true']
+open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
+PY
+timeout 90 dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
+  --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
+rm -rf "$root"
+echo "done: $(grep -c . "$out/log.jsonl" 2>/dev/null || echo 0) records"

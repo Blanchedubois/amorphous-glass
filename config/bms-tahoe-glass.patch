@@ -13,7 +13,7 @@ index 67d4d97..e6c759a 100644
  .PHONY: build install pot test-shell test-prefs test-vm remove clean
  
 diff --git a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
-index d983d96..5779c0b 100644
+index d983d96..562bbba 100644
 --- a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 +++ b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 @@ -296,6 +296,11 @@
@@ -28,14 +28,19 @@ index d983d96..5779c0b 100644
          <!-- CORNER WHEN MAXIMIZED -->
          <key type="b" name="corner-when-maximized">
              <default>false</default>
-@@ -431,6 +436,11 @@
+@@ -431,6 +436,16 @@
              <default>"pipeline_default"</default>
              <summary>String, the name of the pipeline to use. It must exist, else "pipeline_default" will be used</summary>
          </key>
-+        <!-- TAHOE GLASS: QUICK SETTINGS FREEZE -->
++        <!-- TAHOE GLASS: QUICK SETTINGS FREEZE (replaced by motion-freeze, no effect) -->
 +        <key type="b" name="quick-settings-freeze">
 +            <default>true</default>
-+            <summary>Boolean, whether quick settings keep the blur they have while they move (opening, submenus), refreshing it once they settle</summary>
++            <summary>No effect: replaced by motion-freeze</summary>
++        </key>
++        <!-- TAHOE GLASS: MOTION FREEZE -->
++        <key type="b" name="motion-freeze">
++            <default>true</default>
++            <summary>Boolean, whether a popup's glass keeps its backdrop while the popup opens, closes or resizes (captured once where it comes to rest), going live when the motion is over</summary>
 +        </key>
          <!-- SIGMA -->
          <key type="i" name="sigma">
@@ -299,10 +304,89 @@ index 0ca7acc..2adcb7b 100644
          const listed = this.settings.applications.ENABLE_ALL
              ? !matches_any(wm_class, this.blacklist)
 diff --git a/src/components/popup/index.js b/src/components/popup/index.js
-index 4d16af5..bd4ca91 100644
+index 4d16af5..eed8f3d 100644
 --- a/src/components/popup/index.js
 +++ b/src/components/popup/index.js
-@@ -69,6 +69,16 @@ export const PopupBlur = class PopupBlur {
+@@ -13,6 +13,14 @@ import {
+ } from './targets.js';
+ import { PopupBlurSurface } from './surface/blur_surface.js';
+ import { PopupBlurMessageStacks } from './message_stacks.js';
++import { DynamicPipeline } from '../../render/dynamic_surface.js';
++
++// tahoe glass: Cogl builds a shader program the first time a pipeline's set of effects is drawn,
++// which made the first menu opened after login hitch (Phase 0). A tiny, nearly transparent glass
++// is drawn for a few frames under everything once the session has settled, so the programs exist.
++const WARM_UP_DELAY_S = 4;
++const WARM_UP_FRAMES = 3;
++const WARM_UP_SIZE = 48;
+ 
+ const KEYBOARD_STYLE_CLASS = 'bms-keyboard-surface';
+ const BACKGROUND_STYLE_CLASSES = [...POPUP_BACKGROUND_STYLES, ...POPUP_SURFACE_STYLES];
+@@ -33,9 +41,63 @@ export const PopupBlur = class PopupBlur {
+         this.queue_id = 0;
+         this.follow_up_queue_id = 0;
+         this.reset_id = 0;
++        this.warm_up_id = 0;
++        this.warm_up = null;
+         this.enabled = false;
+     }
+ 
++    warm_up_shaders() {
++        this.warm_up_id = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, WARM_UP_DELAY_S, () => {
++            this.warm_up_id = 0;
++            const pipelines = new Set([this.settings.popup.PIPELINE, this.settings.applications.PIPELINE]);
++            const warm = [...pipelines].map(pipeline_id => {
++                const pipeline = new DynamicPipeline(
++                    this.effects_manager,
++                    global.blur_my_shell._pipelines_manager,
++                    pipeline_id,
++                    { corner_radius: this.settings.popup[DEFAULT_CORNER_RADIUS.property] ?? 18 }
++                );
++                const actor = pipeline.create_actor('bms-popup-blurred-widget');
++                actor.set_size(WARM_UP_SIZE, WARM_UP_SIZE);
++                actor.opacity = 1;
++                Main.uiGroup.insert_child_at_index(actor, 0);
++                pipeline.attach_pipeline();
++                return pipeline;
++            });
++            let frames = 0;
++            const paint_id = global.stage.connect('after-paint', () => {
++                if (++frames < WARM_UP_FRAMES) {
++                    warm.forEach(pipeline => pipeline.actor?.queue_redraw());
++                    return;
++                }
++                this.finish_warm_up();
++            });
++            this.warm_up = { warm, paint_id };
++            warm.forEach(pipeline => pipeline.actor?.queue_redraw());
++            return GLib.SOURCE_REMOVE;
++        });
++    }
++
++    finish_warm_up() {
++        if (this.warm_up_id)
++            GLib.source_remove(this.warm_up_id);
++        this.warm_up_id = 0;
++        if (!this.warm_up)
++            return;
++        const { warm, paint_id } = this.warm_up;
++        this.warm_up = null;
++        global.stage.disconnect(paint_id);
++        // destroyed off the paint path
++        GLib.idle_add(GLib.PRIORITY_LOW, () => {
++            warm.forEach(pipeline => {
++                const actor = pipeline.actor;
++                pipeline.destroy();
++                actor?.destroy();
++            });
++            return GLib.SOURCE_REMOVE;
++        });
++    }
++
+     enable() {
+         if (this.enabled) {
+             this._log("blur already enabled");
+@@ -69,8 +131,20 @@ export const PopupBlur = class PopupBlur {
          this.track_container(Main.layoutManager.screenShieldGroup);
          this.track_container(Main.messageTray._bannerBin);
          this.track_container(Main.panel.statusArea.quickSettings.menu._overlay);
@@ -318,17 +402,22 @@ index 4d16af5..bd4ca91 100644
 +        );
          this.track_container(global.window_group);
          this.track_keyboard();
++        if (!this.settings.popup.STATIC_BLUR)
++            this.warm_up_shaders();
      }
-@@ -351,6 +361,7 @@ export const PopupBlur = class PopupBlur {
+ 
+     track_container(container) {
+@@ -351,6 +425,8 @@ export const PopupBlur = class PopupBlur {
          }
  
          this.cancel_queued_blurs();
++        this.finish_warm_up();
 +        Main.panel.statusArea.quickSettings?.menu?.disconnectObject(this);
  
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..d1b0c6d 100644
+index 5a891b9..a4709d1 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -338,44 +427,13 @@ index 5a891b9..d1b0c6d 100644
  
  import { DynamicPipeline } from '../../../render/dynamic_surface.js';
  import { has_any_style_class, has_style_class } from '../actors.js';
-@@ -10,8 +11,45 @@ import { PopupBlurSurfaceStyle } from './style.js';
+@@ -10,8 +11,14 @@ import { PopupBlurSurfaceStyle } from './style.js';
  import { PopupBlurSurfaceTransitions } from './transitions.js';
  import { PopupBlurStaticActor } from '../static_actor.js';
  import { getSurfaceSibling, registerSurface, unregisterSurface } from './stack.js';
 +import { QuickMenuToggle } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 +import { prof_begin, prof_end } from '../../../conveniences/tahoe_prof.js';
-+
-+// Quick settings pieces each have a live blur. While the panel moves (it opens, a submenu
-+// slides open and pushes the pieces below it down) every piece would blur its backdrop again
-+// at each frame: they keep the blur they have instead, the moving submenu excepted (a blur
-+// whose size changes is redone), and all refresh once nothing has moved for a moment.
-+const QUICK_SETTINGS_SETTLE_MS = 160;
-+const quick_settings_motion = {
-+    surfaces: new Set(),
-+    settle_id: 0,
-+
-+    moved(surface) {
-+        if (!surface.settings.popup.QUICK_SETTINGS_FREEZE)
-+            return;
-+        if (this.settle_id)
-+            GLib.source_remove(this.settle_id);
-+        else
-+            this.surfaces.forEach(other => other.pipeline?.set_live?.(false));
-+        this.settle_id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, QUICK_SETTINGS_SETTLE_MS, () => {
-+            this.settle_id = 0;
-+            this.surfaces.forEach(other => other.pipeline?.set_live?.(true));
-+            return GLib.SOURCE_REMOVE;
-+        });
-+    },
-+
-+    remove(surface) {
-+        this.surfaces.delete(surface);
-+        if (this.surfaces.size === 0 && this.settle_id) {
-+            GLib.source_remove(this.settle_id);
-+            this.settle_id = 0;
-+        }
-+    },
-+};
++import { join_motion_group, leave_motion_group } from './motion.js';
  
  const NOTIFICATION_STYLE_CLASSES = ['notification-banner'];
 +const QUICK_SETTINGS_PIECE_GEOMETRY_CLASSES = [
@@ -384,16 +442,82 @@ index 5a891b9..d1b0c6d 100644
  const FULL_GEOMETRY_STYLE_CLASSES = [
      'popup-menu-content', 'candidate-popup-content',
      'quick-settings', 'quick-toggle-menu', 'screenshot-ui-panel',
-@@ -60,6 +98,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -52,6 +59,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         this.pipeline = null;
+         this.blur_actor = null;
+         this.actor = null;
++        this.motion = null;
++        this.settling = false;
++        this.frozen = false;
++        this.in_quick_settings = false;
+     }
+ 
+     enable() {
+@@ -60,6 +71,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
  
          this.actor.hide();
          registerSurface(this);
-+        if (!this.static_blur && this.is_quick_settings_piece())
-+            quick_settings_motion.surfaces.add(this);
++        this.in_quick_settings = this.is_quick_settings_piece();
          this.parent.add_child(this.actor);
          if (!this.static_blur)
              this.pipeline.attach_pipeline();
-@@ -161,6 +201,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -77,11 +89,55 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         this.signals.connect_ancestors(this.root_actor);
+         if (has_style_class(this.target, 'screenshot-ui-panel'))
+             this.signals.connect_actor(this.parent);
++        this.motion = join_motion_group(this);
+         this.queue_update();
+ 
+         return true;
+     }
+ 
++    /// The popup starts to open, close or resize: stop following every signal, keep the backdrop
++    /// (a surface that was hidden captures it once, where it comes to rest).
++    begin_settle() {
++        this.settling = true;
++        this.signals.remove_idle_update();
++        // banners slide in from off screen: there is no whole backdrop to keep, they stay live
++        if (this.static_blur || !this.settings.popup.MOTION_FREEZE || this.is_notification_surface())
++            return;
++        this.frozen = true;
++        this.pipeline.freeze(!this.actor.visible, (x, y) => this.motion.rest_point(x, y));
++    }
++
++    /// One frame of the popup's motion: move the glass with the popup, and only redo the whole
++    /// update when the surface appears, or changes size or clip (a growing submenu), in which case
++    /// it stays live until the motion is over (a frozen blur cannot change size).
++    follow() {
++        if (!this.actor)
++            return;
++        // hidden and staying hidden (a closed submenu): nothing to move
++        if (!this.actor.visible && !this.is_visible())
++            return;
++        if (this.static_blur || !this.actor.visible || !this.placement.follow()) {
++            if (this.frozen && this.actor.visible && this.placement.resized) {
++                this.frozen = false;
++                this.pipeline.thaw(true);
++            }
++            this.update();
++            return;
++        }
++        this.update_actors_visibility();
++    }
++
++    end_settle() {
++        this.settling = false;
++        if (this.frozen) {
++            this.frozen = false;
++            this.pipeline.thaw(false);
++        } else if (!this.static_blur) {
++            this.pipeline.set_texture_hold(false);
++        }
++        this.queue_update();
++    }
++
+     // Our overlay lives in `parent`, so tear it down before a destroyed
+     // parent disposes of it as one of its children.
+     connect_lifetime() {
+@@ -161,6 +217,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
  
@@ -405,7 +529,7 @@ index 5a891b9..d1b0c6d 100644
      is_heavy_surface() {
          return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
      }
-@@ -174,10 +219,25 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -174,10 +235,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      uses_full_actor_geometry() {
@@ -420,8 +544,6 @@ index 5a891b9..d1b0c6d 100644
      update() {
 +        const t0 = prof_begin();
 +        try {
-+            if (quick_settings_motion.surfaces.has(this))
-+                quick_settings_motion.moved(this);
 +            this.update_surface();
 +        } finally {
 +            prof_end('surface.update', t0);
@@ -432,7 +554,49 @@ index 5a891b9..d1b0c6d 100644
          if (this.is_notification_surface()) {
              this.update_live_surface();
              return;
-@@ -332,7 +392,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -267,7 +341,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         if (this.static_blur)
+             return this.static_actor.has_opacity(opacity);
+         return this.actor.opacity === opacity
+-            && this.pipeline.opacityFactor === this.get_pipeline_opacity(opacity) / 255;
++            && (opacity === 0 || this.pipeline.opacityFactor === this.get_pipeline_opacity(opacity) / 255);
+     }
+ 
+     update_surface_opacity(opacity) {
+@@ -276,6 +350,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+             return;
+         }
+         this.actor.opacity = opacity;
++        // hidden: leave the effects as they are, since a blur at strength 0 frees its textures,
++        // and every popup would build them again when it next opens (tahoe glass, Phase 1)
++        if (opacity === 0)
++            return;
+         this.pipeline.set_opacity_factor(this.get_pipeline_opacity(opacity) / 255);
+     }
+ 
+@@ -286,7 +364,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+     }
+ 
+     queue_update() {
+-        if (this.update_id || this.transition_update_id)
++        // while the popup moves, its motion group updates every surface once per frame
++        if (this.settling || this.update_id || this.transition_update_id)
+             return;
+         this.update_id = global.compositor.get_laters().add(
+             Meta.LaterType.BEFORE_REDRAW,
+@@ -299,8 +378,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+     }
+ 
+     queue_transition_update(transition_state = null) {
++        if (this.settling || this.transition_update_id || this.update_id)
++            return;
+         const has_running_transition = transition_state?.running ?? this.transitions.has_running();
+-        if (this.transition_update_id || this.update_id || !has_running_transition)
++        if (!has_running_transition)
+             return;
+         this.transition_update_id = global.compositor.get_laters().add(
+             Meta.LaterType.BEFORE_REDRAW,
+@@ -332,7 +413,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      get_corner_radius() {
@@ -441,14 +605,318 @@ index 5a891b9..d1b0c6d 100644
      }
  
      is_visible() {
-@@ -372,6 +432,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -372,6 +453,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);
-+        quick_settings_motion.remove(this);
++        leave_motion_group(this, this.motion);
++        this.motion = null;
++        this.settling = false;
++        this.frozen = false;
  
          if (this.static_blur) {
              this.static_actor.destroy();
+diff --git a/src/components/popup/surface/motion.js b/src/components/popup/surface/motion.js
+new file mode 100644
+index 0000000..8d7ad27
+--- /dev/null
++++ b/src/components/popup/surface/motion.js
+@@ -0,0 +1,200 @@
++import GLib from 'gi://GLib';
++import Meta from 'gi://Meta';
++import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
++import * as Main from 'resource:///org/gnome/shell/ui/main.js';
++
++import { prof_count } from '../../../conveniences/tahoe_prof.js';
++
++// tahoe glass: the surfaces of one popup move together. While the popup opens or closes (its
++// BoxPointer eases opacity, translation and scale), a quick settings submenu grows or shrinks, or a
++// notification banner slides, one frame callback per popup moves every glass surface with it,
++// instead of each surface re-running its full update for every signal of every ancestor. The
++// glass keeps the backdrop it has (or captures it once, where the popup will come to rest) and
++// goes live again when the last transition is over.
++
++const POPUP_PROPERTIES = ['opacity', 'translation-x', 'translation-y', 'scale-x', 'scale-y'];
++const BANNER_PROPERTIES = ['opacity', 'x', 'y', 'scale-x', 'scale-y'];
++const SUBMENU_PROPERTIES = ['height'];
++const SUBMENU_CONTAINER_CLASS = 'quick-toggle-menu-container';
++// started together with a submenu's opening or closing, and running on after it: the panel's
++// dimming (an effect property, so there is no signal to start from)
++const QUICK_SETTINGS_DIM = '@effects.dim.brightness';
++
++class PopupMotionGroup {
++    constructor(root, properties) {
++        this.root = root;
++        this.surfaces = new Set();
++        this.movers = new Map();
++        this.followers = [];
++        this.settling = false;
++        this.frame_id = 0;
++        this.overlay_id = 0;
++        this.watch(root, properties);
++        this.watch_submenus();
++    }
++
++    watch(actor, properties) {
++        if (this.movers.has(actor))
++            return;
++        const ids = properties.map(property =>
++            actor.connect(`notify::${property}`, () => this.maybe_begin()));
++        ids.push(actor.connect('destroy', () => this.unwatch(actor)));
++        this.movers.set(actor, { properties, ids });
++    }
++
++    unwatch(actor) {
++        const mover = this.movers.get(actor);
++        if (!mover)
++            return;
++        mover.ids.forEach(id => actor.disconnect(id));
++        this.movers.delete(actor);
++        this.followers = this.followers.filter(([follower]) => follower !== actor);
++    }
++
++    // quick settings submenus grow inside the panel's overlay and push the pieces below them
++    watch_submenus() {
++        const quick_settings = Main.panel.statusArea.quickSettings?.menu;
++        if (!quick_settings || quick_settings._boxPointer !== this.root)
++            return;
++        const overlay = quick_settings._overlay;
++        this.followers.push([this.root, QUICK_SETTINGS_DIM]);
++        const watch_child = child => {
++            if (!child.has_style_class_name?.(SUBMENU_CONTAINER_CLASS))
++                return;
++            this.watch(child, SUBMENU_PROPERTIES);
++            // a submenu closes by fading its rows out first, then shrinking
++            const box = child.get_first_child();
++            if (box)
++                this.watch(box, ['opacity']);
++        };
++        overlay.get_children().forEach(watch_child);
++        this.overlay = overlay;
++        this.overlay_id = overlay.connect('child-added', (_, child) => watch_child(child));
++    }
++
++    is_moving() {
++        for (const [actor, { properties }] of this.movers) {
++            for (const property of properties) {
++                if (actor.get_transition(property))
++                    return true;
++            }
++        }
++        return this.settling && this.followers.some(([actor, name]) => actor.get_transition(name));
++    }
++
++    maybe_begin() {
++        if (this.settling || !this.is_moving())
++            return;
++
++        this.settling = true;
++        prof_count('motion.settle');
++        this.surfaces.forEach(surface => surface.begin_settle());
++        // runs once per frame, after the transitions have advanced and before the layout
++        this.frame_id = global.compositor.get_laters().add(
++            Meta.LaterType.BEFORE_REDRAW,
++            () => this.frame()
++        );
++    }
++
++    frame() {
++        if (!this.is_moving()) {
++            this.frame_id = 0;
++            this.end();
++            return GLib.SOURCE_REMOVE;
++        }
++        prof_count('motion.frame');
++        this.surfaces.forEach(surface => surface.follow());
++        return GLib.SOURCE_CONTINUE;
++    }
++
++    end() {
++        this.settling = false;
++        this.surfaces.forEach(surface => surface.end_settle());
++    }
++
++    /// Where a point of the popup (in stage coordinates) will be once its own open or close
++    /// transition is over: the BoxPointer's translation and scale taken out. Used to capture the
++    /// backdrop once, at the place the glass comes to rest.
++    rest_point(x, y) {
++        const root = this.root;
++        if (!(root instanceof BoxPointer.BoxPointer))
++            return [x, y];
++        const [ox, oy] = root.get_transformed_position();
++        const sx = root.scale_x || 1;
++        const sy = root.scale_y || 1;
++        const [px, py] = root.pivot_point ? [root.pivot_point.x, root.pivot_point.y] : [0, 0];
++        const pivot_x = px * root.width;
++        const pivot_y = py * root.height;
++        // transformed position = origin + translation + pivot + scale * (0 - pivot)
++        const origin_x = ox - root.translation_x - pivot_x + sx * pivot_x;
++        const origin_y = oy - root.translation_y - pivot_y + sy * pivot_y;
++        return [
++            origin_x + (x - ox) / sx,
++            origin_y + (y - oy) / sy,
++        ];
++    }
++
++    add(surface) {
++        this.surfaces.add(surface);
++        if (this.settling)
++            surface.begin_settle();
++    }
++
++    remove(surface) {
++        this.surfaces.delete(surface);
++    }
++
++    destroy() {
++        if (this.frame_id)
++            global.compositor.get_laters().remove(this.frame_id);
++        this.frame_id = 0;
++        if (this.overlay_id)
++            this.overlay.disconnect(this.overlay_id);
++        this.overlay_id = 0;
++        [...this.movers.keys()].forEach(actor => this.unwatch(actor));
++        this.followers = [];
++        this.surfaces.clear();
++    }
++}
++
++const groups = new Map();
++
++function find_root(target) {
++    const banner_bin = Main.messageTray?._bannerBin;
++    for (let actor = target; actor; actor = actor.get_parent()) {
++        if (actor instanceof BoxPointer.BoxPointer)
++            return { root: actor, properties: POPUP_PROPERTIES };
++        // quick settings submenus live in an overlay beside the panel's BoxPointer, not in it
++        const box_pointer = actor._delegate?._boxPointer;
++        if (box_pointer instanceof BoxPointer.BoxPointer)
++            return { root: box_pointer, properties: POPUP_PROPERTIES };
++        if (actor === banner_bin)
++            return { root: actor, properties: BANNER_PROPERTIES };
++    }
++    return null;
++}
++
++/// The motion group of a surface's popup, or null for surfaces that are not in a popup (dialogs,
++/// the screenshot UI, OSDs), which keep their own updates.
++export function join_motion_group(surface) {
++    const found = find_root(surface.target);
++    if (!found)
++        return null;
++    let group = groups.get(found.root);
++    if (!group) {
++        group = new PopupMotionGroup(found.root, found.properties);
++        groups.set(found.root, group);
++    }
++    group.add(surface);
++    return group;
++}
++
++export function leave_motion_group(surface, group) {
++    if (!group)
++        return;
++    group.remove(surface);
++    if (group.surfaces.size === 0) {
++        group.destroy();
++        groups.delete(group.root);
++    }
++}
+diff --git a/src/components/popup/surface/placement.js b/src/components/popup/surface/placement.js
+index df5351e..0382f60 100644
+--- a/src/components/popup/surface/placement.js
++++ b/src/components/popup/surface/placement.js
+@@ -25,12 +25,15 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+         const clipped_geometry = this.get_clipped_surface_geometry(geometry);
+         if (!this.has_valid_geometry(clipped_geometry))
+             return null;
++        this.last_clipped = clipped_geometry.target_width !== geometry.target_width
++            || clipped_geometry.target_height !== geometry.target_height;
+ 
+         return this.get_monitor_surface_geometry(clipped_geometry);
+     }
+ 
+     get_unclipped_monitor_surface_geometry() {
+         this.offscreen = false;
++        this.last_clipped = false;
+ 
+         const geometry = this.get_unclipped_surface_geometry();
+         if (!this.has_valid_geometry(geometry))
+@@ -259,6 +262,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+         blur_actor.set_size(local.width, local.height);
+         blur_actor.set_pivot_point(0, 0);
+         blur_actor.set_transform(this.get_target_transform(local));
++        this.local = local;
++        this.clipped = this.last_clipped;
++        this.target_width = this.surface.target.width;
++        this.target_height = this.surface.target.height;
+         this.x = geometry.x;
+         this.y = geometry.y;
+         this.width = local.width;
+@@ -287,6 +294,22 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+         };
+     }
+ 
++    /// One frame of a popup's motion: moves the glass with its target from the geometry of the
++    /// last full update. False when that is not enough: no geometry yet, or the target changed
++    /// size or is cut by an ancestor's clip (`resized`, a growing submenu).
++    follow() {
++        this.resized = false;
++        if (!this.ready || !this.local || this.surface.static_blur)
++            return false;
++        const target = this.surface.target;
++        if (this.clipped || target.width !== this.target_width || target.height !== this.target_height) {
++            this.resized = true;
++            return false;
++        }
++        this.surface.blur_actor.set_transform(this.get_target_transform(this.local));
++        return true;
++    }
++
+     get_target_transform(local) {
+         const target = this.surface.target;
+         const parent = this.surface.parent;
+@@ -340,6 +363,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+     }
+ 
+     clear() {
++        this.local = null;
++        this.clipped = false;
++        this.last_clipped = false;
++        this.resized = false;
+         this.x = null;
+         this.y = null;
+         this.width = null;
+diff --git a/src/components/popup/surface/signals.js b/src/components/popup/surface/signals.js
+index 72d27e7..4f87b97 100644
+--- a/src/components/popup/surface/signals.js
++++ b/src/components/popup/surface/signals.js
+@@ -82,6 +82,10 @@ export const PopupBlurSurfaceSignals = class PopupBlurSurfaceSignals {
+             return;
+         }
+ 
++        // the popup's motion group moves the glass once per frame until it settles
++        if (this.surface.settling)
++            return;
++
+         if (is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal)) {
+             this.remove_idle_update();
+             this.surface.queue_update();
+diff --git a/src/components/popup/surface/transitions.js b/src/components/popup/surface/transitions.js
+index d13b7f3..cf8ab85 100644
+--- a/src/components/popup/surface/transitions.js
++++ b/src/components/popup/surface/transitions.js
+@@ -68,7 +68,9 @@ export const PopupBlurSurfaceTransitions = class PopupBlurSurfaceTransitions {
+         const actors = [...surface_actors];
+         const seen = new WeakSet(surface_actors);
+ 
+-        if (!this.surface.is_quick_settings()) {
++        // a quick settings piece's root is the whole panel: walking it for every piece, at every
++        // update, was most of the time spent opening quick settings (tahoe glass, Phase 0)
++        if (!this.surface.is_quick_settings() && !this.surface.in_quick_settings) {
+             this.add_descendants(actors, seen, this.surface.target);
+             this.add_descendants(actors, seen, this.surface.root_actor);
+         }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
 index 0dce45a..a18dd65 100644
 --- a/src/components/popup/targets.js
@@ -570,7 +1038,7 @@ index 0000000..d59f7a2
 +        prof.count[name] = (prof.count[name] ?? 0) + 1;
 +}
 diff --git a/src/effects/blur/dual_kawase_blur.js b/src/effects/blur/dual_kawase_blur.js
-index 352b7e8..efb468d 100644
+index 352b7e8..9d37e1e 100644
 --- a/src/effects/blur/dual_kawase_blur.js
 +++ b/src/effects/blur/dual_kawase_blur.js
 @@ -4,6 +4,7 @@ import * as utils from '../../conveniences/utils.js';
@@ -581,7 +1049,28 @@ index 352b7e8..efb468d 100644
  import {
      DOWNSAMPLE_CODE,
      DOWNSAMPLE_DECLARATIONS,
-@@ -414,6 +415,15 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
+@@ -266,15 +267,17 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
+         const {x, y, width: logicalWidth, height: logicalHeight} = bounds;
+         const width = Math.max(1, Math.ceil(logicalWidth * scale));
+         const height = Math.max(1, Math.ceil(logicalHeight * scale));
++        const hold = Boolean(this.get_actor()?._bms_texture_hold);
+         if (this.context !== context) {
+             this.releaseTargets();
+             this.capacityWidth = width;
+             this.capacityHeight = height;
+             this.context = context;
+-        } else if (!textureFits(width, this.capacityWidth) || !textureFits(height, this.capacityHeight)) {
++        } else if (!textureFits(width, this.capacityWidth, hold)
++            || !textureFits(height, this.capacityHeight, hold)) {
+             const limit = largestViewSize();
+-            const capacityWidth = getTextureCapacity(width, this.capacityWidth, limit.width);
+-            const capacityHeight = getTextureCapacity(height, this.capacityHeight, limit.height);
++            const capacityWidth = getTextureCapacity(width, this.capacityWidth, limit.width, hold);
++            const capacityHeight = getTextureCapacity(height, this.capacityHeight, limit.height, hold);
+             this.releaseTargets();
+             this.capacityWidth = capacityWidth;
+             this.capacityHeight = capacityHeight;
+@@ -414,6 +417,15 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
      }
  
      vfunc_paint_node(node, paintContext, flags) {
@@ -597,7 +1086,7 @@ index 352b7e8..efb468d 100644
          const actor = this.get_actor();
          const bounds = getEffectBounds(actor, this);
          if (bounds.width <= 0 || bounds.height <= 0)
-@@ -446,6 +456,7 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
+@@ -446,6 +458,7 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
              && (actor._bms_live_input || flags & Clutter.EffectPaintFlags.ACTOR_DIRTY);
          if (!this.blurValid || refreshes_input) {
              this.addBlurPasses(node, actor, inputBounds, passes, blend);
@@ -829,7 +1318,7 @@ index b779058..ee6000e 100644
              'opacity_factor', 'Opacity Factor', 'Refraction blend strength',
              0, 1, DEFAULT_PARAMS.opacity_factor
 diff --git a/src/render/backdrop/capture.js b/src/render/backdrop/capture.js
-index cee1710..975ed7c 100644
+index cee1710..3039aaa 100644
 --- a/src/render/backdrop/capture.js
 +++ b/src/render/backdrop/capture.js
 @@ -9,6 +9,7 @@ import { BackdropOutputEffect } from './output.js';
@@ -840,9 +1329,103 @@ index cee1710..975ed7c 100644
  import {
      getTextureCapacity,
      largestViewSize,
-@@ -243,6 +244,15 @@ export const BackdropCaptureEffect = GObject.registerClass({
+@@ -94,6 +95,41 @@ function captureGeometry(actor, framebuffer) {
+     };
+ }
+ 
++/// tahoe glass: the framebuffer rectangle under the actor once its popup has come to rest
++/// (`restPoint` maps a stage point to its place at rest), for the one capture of a frozen surface.
++function restCaptureGeometry(actor, framebuffer, view, restPoint) {
++    const layout = view.layout;
++    const scale = view.get_scale();
++    const xs = [];
++    const ys = [];
++    for (const vertex of actor.get_abs_allocation_vertices()) {
++        const [x, y] = restPoint(vertex.x, vertex.y);
++        xs.push((x - layout.x) * scale);
++        ys.push((y - layout.y) * scale);
++    }
++    if (![...xs, ...ys].every(Number.isFinite))
++        return null;
++
++    const sourceX = Math.floor(Math.min(...xs) + PIXEL_EPSILON);
++    const sourceY = Math.floor(Math.min(...ys) + PIXEL_EPSILON);
++    const width = Math.max(1, Math.ceil(Math.max(...xs) - PIXEL_EPSILON) - sourceX);
++    const height = Math.max(1, Math.ceil(Math.max(...ys) - PIXEL_EPSILON) - sourceY);
++    const clippedSourceX = Math.max(0, sourceX);
++    const clippedSourceY = Math.max(0, sourceY);
++    const destinationX = clippedSourceX - sourceX;
++    const destinationY = clippedSourceY - sourceY;
++    return {
++        sourceX: clippedSourceX,
++        sourceY: clippedSourceY,
++        destinationX,
++        destinationY,
++        copyWidth: Math.max(0, Math.min(width - destinationX, framebuffer.get_width() - clippedSourceX)),
++        copyHeight: Math.max(0, Math.min(height - destinationY, framebuffer.get_height() - clippedSourceY)),
++        width,
++        height,
++    };
++}
++
+ function captureRectangles(paintContext, view, geometry) {
+     const { sourceX, sourceY, copyWidth, copyHeight } = geometry;
+     const full = { x: sourceX, y: sourceY, width: copyWidth, height: copyHeight };
+@@ -147,6 +183,8 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         this.cloneTargets = new Map();
+         this.viewDestroyIds = new Map();
+         this.actorGeometry = null;
++        this.frozen = false;
++        this.restPoint = null;
+         this.output = new St.Widget();
+         this.output.add_constraint(new Clutter.BindConstraint({
+             source: contentActor,
+@@ -162,11 +200,13 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         const cached = targets.get(key) ?? null;
+         const reusable = cached !== null && cached.context === context
+             && (!view || cached.sourceFramebuffer === sourceFramebuffer);
+-        if (reusable && textureFits(width, cached.width) && textureFits(height, cached.height)) {
++        const hold = Boolean(this.get_actor()?._bms_texture_hold);
++        if (reusable && textureFits(width, cached.width, hold) && textureFits(height, cached.height, hold)) {
+             if (cached.usedWidth !== width || cached.usedHeight !== height) {
+                 cached.usedWidth = width;
+                 cached.usedHeight = height;
+                 cached.framebuffer.clear4f(Cogl.BufferBit.COLOR, 0, 0, 0, 0);
++                cached.frozenValid = false;
+                 cached.region.update(cached);
+             }
+             this.target = cached;
+@@ -177,8 +217,8 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         let textureHeight = height;
+         if (reusable) {
+             const limit = largestViewSize();
+-            textureWidth = getTextureCapacity(width, cached.width, limit.width);
+-            textureHeight = getTextureCapacity(height, cached.height, limit.height);
++            textureWidth = getTextureCapacity(width, cached.width, limit.width, hold);
++            textureHeight = getTextureCapacity(height, cached.height, limit.height, hold);
+         }
+         const texture = Cogl.Texture2D.new_with_size(context, textureWidth, textureHeight);
+         texture.set_components(Cogl.TextureComponents.RGBA);
+@@ -242,20 +282,57 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         this.viewDestroyIds.delete(view);
      }
  
++    /// tahoe glass: keep the captured backdrop while the popup moves (see DynamicPipeline.freeze).
++    /// `fresh`: the surface was hidden, its captures are out of date and are taken once again.
++    freeze(fresh, restPoint) {
++        this.frozen = true;
++        if (fresh) {
++            for (const target of this.targets.values())
++                target.frozenValid = false;
++        }
++        this.restPoint = restPoint;
++    }
++
++    thaw() {
++        this.frozen = false;
++        this.restPoint = null;
++    }
++
      vfunc_paint_node(node, paintContext) {
 +        const t0 = prof_begin();
 +        try {
@@ -856,7 +1439,44 @@ index cee1710..975ed7c 100644
          const actor = this.get_actor();
          const sourceFramebuffer = get_view_framebuffer(paintContext);
          if (!sourceFramebuffer) {
-@@ -278,6 +288,7 @@ export const BackdropCaptureEffect = GObject.registerClass({
+             node.add_child(new Clutter.ActorNode(actor, -1));
+             return;
+         }
+-        const geometry = captureGeometry(actor, sourceFramebuffer);
+-        if (!geometry)
+-            return;
+-
+         const painted_view = get_painted_view();
+         const view = painted_view.get_framebuffer() === sourceFramebuffer ? painted_view : null;
+         const inClone = actor.is_in_clone_paint();
++        // frozen with a backdrop already captured in this view: draw it as it is
++        const frozenTarget = this.frozen && !inClone && view ? this.targets.get(view) : null;
++        if (frozenTarget?.frozenValid && frozenTarget.context === sourceFramebuffer.get_context()) {
++            prof_count('capture.frozen');
++            this.target = frozenTarget;
++            node.add_child(new Clutter.ActorNode(actor, -1));
++            return;
++        }
++        const freezing = this.frozen && !inClone && view !== null;
++        const geometry = freezing && this.restPoint
++            ? restCaptureGeometry(actor, sourceFramebuffer, view, this.restPoint)
++                ?? captureGeometry(actor, sourceFramebuffer)
++            : captureGeometry(actor, sourceFramebuffer);
++        if (!geometry)
++            return;
++
+         if (inClone) {
+             this.ensureFramebuffer(this.cloneTargetsFor(view), `${geometry.width}x${geometry.height}`,
+                 geometry.width, geometry.height, sourceFramebuffer, view);
+@@ -274,10 +351,14 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         this.target.geometry = geometry;
+         this.target.inClone = inClone;
+         this.target.lastUsed = GLib.get_monotonic_time();
+-        const rectangles = captureRectangles(paintContext, view, geometry);
++        // the one capture of a frozen surface takes its whole rectangle, not only this frame's damage
++        const rectangles = freezing
++            ? [{ x: geometry.sourceX, y: geometry.sourceY, width: geometry.copyWidth, height: geometry.copyHeight }]
++            : captureRectangles(paintContext, view, geometry);
          for (const rect of rectangles) {
              if (rect.width <= 0 || rect.height <= 0)
                  continue;
@@ -864,8 +1484,21 @@ index cee1710..975ed7c 100644
              blitFramebuffer(sourceFramebuffer,
                  this.target.framebuffer,
                  rect.x,
+@@ -290,7 +371,11 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         }
+ 
+         node.add_child(new Clutter.ActorNode(actor, -1));
+-        if (rectangles.length > 0 && !coversCapture(rectangles, geometry))
++        // a capture of the whole rectangle, live or frozen, can be kept as it is
++        const covered = freezing || (rectangles.length > 0 && coversCapture(rectangles, geometry));
++        if (covered && !inClone)
++            this.target.frozenValid = true;
++        if (!covered && rectangles.length > 0)
+             queueBackdropRedraw(actor);
+     }
+ 
 diff --git a/src/render/backdrop/damage.js b/src/render/backdrop/damage.js
-index c16a601..2143d84 100644
+index c16a601..841390d 100644
 --- a/src/render/backdrop/damage.js
 +++ b/src/render/backdrop/damage.js
 @@ -1,3 +1,5 @@
@@ -874,7 +1507,7 @@ index c16a601..2143d84 100644
  const captures = new Set();
  
  export function registerBackdrop(capture) {
-@@ -16,6 +18,7 @@ function overlaps(a, b) {
+@@ -16,11 +18,13 @@ function overlaps(a, b) {
  }
  
  export function queueBackdropRedraw(actor) {
@@ -882,11 +1515,40 @@ index c16a601..2143d84 100644
      const affected = [{ actor, bounds: actor.get_transformed_extents() }];
      const candidates = new Map();
      for (const capture of captures) {
+         const other = capture.get_actor();
+-        if (other !== actor && other?.mapped)
++        // frozen glass keeps its backdrop: it neither needs nor passes on a redraw (tahoe glass)
++        if (other !== actor && other?.mapped && !capture.frozen)
+             candidates.set(other, other.get_transformed_extents());
+     }
+ 
 diff --git a/src/render/dynamic_surface.js b/src/render/dynamic_surface.js
-index ae03cc8..5a0e2e6 100644
+index ae03cc8..3612b49 100644
 --- a/src/render/dynamic_surface.js
 +++ b/src/render/dynamic_surface.js
-@@ -207,6 +207,16 @@ export class DynamicPipeline {
+@@ -13,6 +13,7 @@ export class DynamicPipeline {
+         this.cornerRadius = options.corner_radius ?? null;
+         this.getCorners = options.get_corners;
+         this.opacityFactor = 1;
++        this.frozen = false;
+         this.actor = null;
+         this.contentActor = null;
+         this.captureEffect = null;
+@@ -177,6 +178,13 @@ export class DynamicPipeline {
+         if (!force && this.opacityFactor === factor)
+             return;
+         this.opacityFactor = factor;
++        // frozen: the glass is blurred once at full strength and only its actor fades
++        if (this.frozen)
++            return;
++        this.apply_opacity_factor(factor);
++    }
++
++    apply_opacity_factor(factor) {
+ 
+         this.effects.forEach(effect => {
+             const params = effect._bms_effect_params ?? {};
+@@ -207,6 +215,58 @@ export class DynamicPipeline {
          this.roundedPipeline?.update();
      }
  
@@ -900,11 +1562,53 @@ index ae03cc8..5a0e2e6 100644
 +            this.repaint_effect();
 +    }
 +
++    /// tahoe glass: while a popup moves, keep the blur it has. A surface that was hidden (`fresh`)
++    /// captures its backdrop once, at the place `rest_point` says it comes to rest, and blurs it
++    /// once. Nothing is captured or blurred again until `thaw`.
++    freeze(fresh, rest_point = null) {
++        if (!this.contentActor || !this.captureEffect)
++            return;
++        this.contentActor._bms_live_input = false;
++        this.captureEffect.freeze(fresh, rest_point);
++        if (!this.frozen) {
++            this.frozen = true;
++            this.apply_opacity_factor(1);
++        }
++        if (fresh)
++            this.effects.forEach(effect => {
++                if ('blurValid' in effect)
++                    effect.blurValid = false;
++                if ('sourceValid' in effect)
++                    effect.sourceValid = false;
++            });
++    }
++
++    /// Live again. `resizing`: the surface keeps changing size until the motion is over, so its
++    /// textures grow once to the largest size they can need instead of at every step.
++    thaw(resizing) {
++        if (!this.contentActor || !this.captureEffect)
++            return;
++        this.captureEffect.thaw();
++        this.set_texture_hold(resizing);
++        if (this.frozen) {
++            this.frozen = false;
++            this.apply_opacity_factor(this.opacityFactor);
++        }
++        this.set_live(true);
++    }
++
++    set_texture_hold(hold) {
++        if (!this.actor || !this.contentActor)
++            return;
++        this.actor._bms_texture_hold = hold;
++        this.contentActor._bms_texture_hold = hold;
++    }
++
      repaint_effect() {
          this.captureEffect?.queue_repaint();
          this.effects.forEach(effect => effect.queue_repaint());
 diff --git a/src/render/shader/shader_effect.js b/src/render/shader/shader_effect.js
-index e277374..b38c303 100644
+index e277374..10421c7 100644
 --- a/src/render/shader/shader_effect.js
 +++ b/src/render/shader/shader_effect.js
 @@ -4,6 +4,7 @@ import GObject from 'gi://GObject';
@@ -915,7 +1619,26 @@ index e277374..b38c303 100644
  import {
      getTextureCapacity,
      largestViewSize,
-@@ -114,6 +115,15 @@ export const SurfaceShaderEffect = GObject.registerClass({
+@@ -26,13 +27,15 @@ export const SurfaceShaderEffect = GObject.registerClass({
+         const usedWidth = Math.max(1, Math.ceil(width * scale));
+         const usedHeight = Math.max(1, Math.ceil(height * scale));
+         const current = this.target !== null && this.target.context === context ? this.target : null;
++        const hold = Boolean(this.get_actor()?._bms_texture_hold);
+         if (current === null) {
+             this.createTarget(context, usedWidth, usedHeight);
+-        } else if (!textureFits(usedWidth, current.width) || !textureFits(usedHeight, current.height)) {
++        } else if (!textureFits(usedWidth, current.width, hold)
++            || !textureFits(usedHeight, current.height, hold)) {
+             const limit = largestViewSize();
+             this.createTarget(context,
+-                getTextureCapacity(usedWidth, current.width, limit.width),
+-                getTextureCapacity(usedHeight, current.height, limit.height));
++                getTextureCapacity(usedWidth, current.width, limit.width, hold),
++                getTextureCapacity(usedHeight, current.height, limit.height, hold));
+         }
+ 
+         const target = this.target;
+@@ -114,6 +117,15 @@ export const SurfaceShaderEffect = GObject.registerClass({
      }
  
      vfunc_paint(node, paintContext, flags) {
@@ -931,7 +1654,7 @@ index e277374..b38c303 100644
          const actor = this.get_actor();
          if (flags & Clutter.EffectPaintFlags.BYPASS_EFFECT || actor.width <= 0 || actor.height <= 0) {
              node.add_child(new Clutter.ActorNode(actor, -1));
-@@ -140,6 +150,7 @@ export const SurfaceShaderEffect = GObject.registerClass({
+@@ -140,6 +152,7 @@ export const SurfaceShaderEffect = GObject.registerClass({
              layer.set_name('BmsShader input');
              layer.add_child(new Clutter.ActorNode(actor, 255));
              node.add_child(layer);
@@ -939,8 +1662,38 @@ index e277374..b38c303 100644
              this.sourceValid = true;
          }
          this.vfunc_paint_target(node, paintContext);
+diff --git a/src/render/shader/texture_region.js b/src/render/shader/texture_region.js
+index 5e71c2b..f7a4d59 100644
+--- a/src/render/shader/texture_region.js
++++ b/src/render/shader/texture_region.js
+@@ -17,8 +17,10 @@ export function textureRegionDeclarations(name) {
+     return `${uniforms}\n#define ${name} vec4(${components})\n`;
+ }
+ 
+-export function textureFits(size, capacity) {
+-    return size <= capacity && size * 2 > capacity;
++/// `hold`: a surface that is resizing during an animation keeps its larger texture instead of
++/// reallocating a smaller one (tahoe glass).
++export function textureFits(size, capacity, hold = false) {
++    return size <= capacity && (hold || size * 2 > capacity);
+ }
+ 
+ export function largestViewSize() {
+@@ -32,7 +34,11 @@ export function largestViewSize() {
+     return { width, height };
+ }
+ 
+-export function getTextureCapacity(size, capacity, limit) {
++/// `hold`: a resizing surface grows its texture once to the largest view's size, instead of by a
++/// quarter at each step of the animation (each a new texture and, for the blur, new passes).
++export function getTextureCapacity(size, capacity, limit, hold = false) {
++    if (size > capacity && hold)
++        return Math.max(size, limit);
+     if (size > capacity)
+         return Math.max(size, Math.min(Math.ceil(size * TEXTURE_HEADROOM), limit));
+     if (size * 2 <= capacity)
 diff --git a/src/settings/keys.js b/src/settings/keys.js
-index 43e8d18..9b77e65 100644
+index 43e8d18..8b260ad 100644
 --- a/src/settings/keys.js
 +++ b/src/settings/keys.js
 @@ -56,6 +56,7 @@ export const KEYS = [
@@ -951,11 +1704,12 @@ index 43e8d18..9b77e65 100644
              { type: Type.B, name: "corner-when-maximized" },
              { type: Type.I, name: "opacity" },
              { type: Type.B, name: "dynamic-opacity" },
-@@ -95,6 +96,7 @@ export const KEYS = [
+@@ -95,6 +96,8 @@ export const KEYS = [
              { type: Type.B, name: "blur" },
              { type: Type.B, name: "static-blur" },
              { type: Type.S, name: "pipeline" },
 +            { type: Type.B, name: "quick-settings-freeze" },
++            { type: Type.B, name: "motion-freeze" },
              { type: Type.I, name: "corner-radius" },
              { type: Type.I, name: "rounded-corners" },
              { type: Type.I, name: "menu-corner-radius" },
