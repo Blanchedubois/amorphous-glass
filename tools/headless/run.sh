@@ -13,12 +13,25 @@ mkdir -p "$ext/blur-my-shell@aunetx" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_
 unzip -q "$zip" -d "$ext/blur-my-shell@aunetx"
 glib-compile-schemas "$ext/blur-my-shell@aunetx/schemas"
 cp -r "$H/tahoe-motion-test@local" "$ext/"
+# TAHOE_TEST_EXTS="uuid ...": the user's other extensions too (copied, with their settings)
+extra=""
+for uuid in ${TAHOE_TEST_EXTS:-}; do
+  cp -r "$HOME/.local/share/gnome-shell/extensions/$uuid" "$ext/"
+  [ -d "$ext/$uuid/schemas" ] && glib-compile-schemas "$ext/$uuid/schemas" 2>/dev/null
+  extra="$extra, '$uuid'"
+done
+export TAHOE_TEST_EXTRA="$extra"
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 - "$kf" <<'PY'
-import subprocess, sys
+import os, subprocess, sys
 out = []
 def dump(path):
-    txt = subprocess.run(['dconf', 'dump', path], capture_output=True, text=True).stdout
+    # the user's own dconf database, not the throwaway XDG_CONFIG_HOME exported above
+    env = dict(os.environ, XDG_CONFIG_HOME=os.path.expanduser('~/.config'))
+    env.pop('GSETTINGS_BACKEND', None)
+    txt = subprocess.run(['dconf', 'dump', path], capture_output=True, text=True, env=env).stdout
+    if not txt.strip():
+        sys.exit(f'dconf dump {path} is empty')
     base = path.strip('/')
     for line in txt.splitlines():
         if line.startswith('[') and line.endswith(']'):
@@ -26,10 +39,11 @@ def dump(path):
             out.append(f"[{base + ('/' + sub if sub else '')}]")
         else:
             out.append(line)
-dump('/org/gnome/shell/extensions/blur-my-shell/')
+dump('/org/gnome/shell/extensions/')
 dump('/org/gnome/desktop/background/')
 out += ['[org/gnome/shell]',
-        "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local']",
+        "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local'" + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
+        'disable-extension-version-validation=true',
         'welcome-dialog-last-shown-version=\'999\'',
         '[org/gnome/shell/extensions/user-theme]', "name='MacTahoe-Dark'",
         '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", 'enable-animations=true']
@@ -37,5 +51,5 @@ open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 timeout 90 dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
   --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
-rm -rf "$root"
+cp "$kf" "$out/keyfile.after" 2>/dev/null; rm -rf "$root"
 echo "done: $(grep -c . "$out/log.jsonl" 2>/dev/null || echo 0) records"

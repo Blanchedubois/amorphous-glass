@@ -173,6 +173,15 @@ popup once it has settled). The real desktop is never touched. Before = the live
 Still screenshots of quick settings, a submenu, the calendar and the desktop menu once settled:
 identical to the before, pixel for pixel (no pixel differs by more than 2/255).
 
+Correction (same evening): the runs above, before and after alike, had the default Blur My Shell
+settings (Kawase blur only), because `run.sh` asked dconf for the user's settings after pointing
+`XDG_CONFIG_HOME` at the throwaway folder. Fixed; rerun with the user's real glass (refraction
+pipeline, Liquid Glass tint, rim and shadow): quick settings open p95 46.2 → 11.9 ms, close
+59.5 → 9.4, submenu open 41.7 → 10.2, close 50.9 → 9.7, quick settings ↔ calendar switching
+58.9 / 43.9 → 9.7 / 11.9; calendar and desktop menu unchanged at 9 ms. Settled screenshots again
+identical to the before (the one submenu difference seen came from a sub-pixel layout difference
+between runs: the before differs from itself the same way).
+
 Not at the exit criterion yet:
 - The first quick settings open after the shell starts has one 30 ms frame: every piece's textures
   are built then. Later opens keep them.
@@ -230,6 +239,27 @@ patch, so it waits on Phase 0 and 1 numbers.
   glass at every frame (lit top edge, shadowed rim) rather than a cropped card.
 - Default reveal = the whole surface, so nothing changes until Phase 4 drives it.
 - Cost: one extra SDF per pixel, no extra texture fetch.
+
+### Phase 3 result (headless shell with the user's glass, 2026-10-19)
+
+- `refraction.glsl`: uniforms `reveal_x`, `reveal_y`, `reveal_width`, `reveal_height`,
+  `reveal_radius`, `reveal_feather`. When set, the reveal rectangle and radius replace the glass's
+  own bounds and corner radius for everything the shader draws: the refraction band, the rim light,
+  the inner shadow, the bottom shade and the anti-aliased edge, so a growing circle is lit and
+  shaded glass at every frame. Outside it the glass is transparent. Circle mode (the shader's
+  special case for round buttons) is off while a reveal is on, so the rim band does not jump when
+  the circle stops being round. A negative width (the default, uploaded at every first paint) is
+  the whole surface. No extra texture fetch.
+- `RefractionEffect.set_reveal()`, uploaded with cached uniform locations (not through the
+  uniform map, which re-uploads every uniform); `DynamicPipeline.set_reveal()`;
+  `PopupBlurSurface.set_reveal()` takes the target's own coordinates.
+- `globalThis.__tahoeGlass` (version 1), for `tahoe-motion`: `root_of(actor)`, `surfaces(root)`
+  (each with its `target`, `corner_radius` and `set_reveal`), `hold(root)` / `release(root)` to
+  freeze a popup's glass for an animation of its own. An actor flagged `_tahoe_glass_opacity_free`
+  can fade without fading its glass (the content fades, the glass is shaped by the reveal).
+- Checked: a full-size reveal and no reveal are identical pixel for pixel; circle, half-grown and
+  full stages on the calendar and on each quick settings piece in `shots/reveal-calendar.png` and
+  `shots/reveal-quick-settings.png` (the circle has its own rim light and inner shadow).
 
 ### Phase 4: the opening animations
 
