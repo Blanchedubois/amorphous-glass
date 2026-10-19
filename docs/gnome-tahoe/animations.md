@@ -1,8 +1,8 @@
 # Smooth glass popups and open animations: plan
 
-Status: Phase 0 measured, Phase 1 built and measured in a headless shell (below), waiting on the
-user's go-ahead to install it and log out for the real-desktop after. Branch
-`claude/glass-motion-3a54fe`. Only the dark-mode dropdown edge (CSS) is live.
+Status: Phase 1 installed on the real desktop (rebuilt from branch `claude/glass-motion-3a54fe`,
+not merged into main) and measured: quick settings and its submenus are smooth. Open: frames of
+20 to 33 ms while sliding across the top bar between menus (below). Phases 3 and 4 next.
 
 ## What the user asked
 
@@ -183,6 +183,33 @@ Not at the exit criterion yet:
 - A growing submenu's own glass stays live while it grows (10 ms frames): Phase 3's reveal shape
   lets it freeze at its final size.
 - The headless shell paces frames by a timer, not the monitor; the real after needs the desktop.
+
+### Phase 1 result on the real desktop (120 Hz, 2026-10-19, after a logout)
+
+The user opened the menus by hand; probe v3 (`tahoe-repair` had switched the probe off at login:
+it now keeps it on). 81 records.
+
+| Scenario | Kind | Runs | Frame p95 before → after (ms) | Worst frame | Dropped / run |
+|---|---|---|---|---|---|
+| Quick settings | open | 6 | 36.7 → **10.1** | 91 → 22 | 7 → 1 |
+| Quick settings | close | 7 | 56.6 → **9.9** | 77 → 32 | 6 → 1 |
+| QS submenus (Wi-Fi, Power) | open | 23 | 42.7 → **10.3** | 56 → 96 (once) | 7 → 1 |
+| QS submenus | close | 23 | 42.0 → **10.8** | 59 → 58 (once) | 3 → 1 |
+| Desktop right-click | open | 2 | 9.3 → 9.6 | 114 → 17 | 1 → 2 |
+| Files menus (app dropdown, new) | open | 3 | (none) → 8.8 | 15 | 1 |
+| Now Playing menu | open | 2 | (none) → 10.4 | 19 | 2.5 |
+| Calendar, Vitals: sliding from one to the other | open / close | 1 to 2 | 9.5 → 14 to 28 | 33 | 9 to 19 |
+
+- Quick settings and submenus: from about a third of frames late to about one frame per open.
+  Blur My Shell's JS per open is 9 to 16 ms (was 160 to 260).
+- **Open issue: sliding across the top bar** (Vitals → calendar while the first closes). Frames of
+  20 to 33 ms come about 150 ms in, after the motion has ended, with the shell's CPU at 2 ms per
+  frame, so they are waits (GPU or a sync), not JS. Each such window counts 20 to 30 cascaded
+  redraws and about 10 capture blits per frame. The before table has no menu switching to compare
+  with, and the headless shell (no Vitals, no Open Bar) does not show it: quick settings ↔ calendar
+  switching there is p95 44 to 63 ms before, 9.8 to 11.5 ms after. Next: per-frame counters in the
+  probe to tie the long frames to the blits and cascades.
+- First open after login, dock menus and Settings drop-downs: not in this round.
 
 ### Phase 2: shared backdrop for quick settings (only if Phase 1 is not enough)
 
