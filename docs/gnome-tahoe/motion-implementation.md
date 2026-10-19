@@ -18,6 +18,10 @@ committed, then installed for the user with one logout at the end.
   1.15 for the glass body.
 - `stagger(index, count, { base, ease, from })`: anime.js-style eased stagger delays.
 - `speedFor(width, height)`: fast below 200 x 200, default up to 600 x 500, slow above.
+- Result (`tools/headless/spring-test.js`): spatial fast overshoots 9.4 % and settles in 400 ms,
+  default 1.5 % / 467 ms, slow 1.5 % / 617 ms; effects 0 % / 175, 250, 342 ms (with the liquid
+  mass 1.15, about 5 % slower); a retargeted spring keeps its velocity (6.29 before and after);
+  the path is the same at 120 and 30 Hz.
 - Exit: a GJS self-test prints each token's overshoot and settle time (spatial fast should
   overshoot about 9 to 10 %, default and slow about 1.5 %, effects 0 %), and a retargeted spring
   keeps its velocity.
@@ -35,7 +39,7 @@ committed, then installed for the user with one logout at the end.
   origin on an expressive spatial spring: it overshoots to about 1.02, and its width and height
   wobble out of phase (the height a little short while the width is long), then settle.
 - **Rows.** Each row starts when the edge reaches it, but no sooner than the eased stagger allows
-  (base 50 ms, `outQuad`); it rises 16 px and grows from 0.85 on a spatial spring (fast in small
+  (base 50 ms, eased `inQuad`, the whole spread capped at 240 ms); it rises 16 px and grows from 0.85 on a spatial spring (fast in small
   menus, default otherwise), its fade on an effects spring.
 - **Close.** Retarget everything back: rows fade together (effects fast), the edges gather to the
   drop (no overshoot: critically damped spatial), the drop rises into its origin and fades.
