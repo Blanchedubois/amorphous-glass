@@ -1,7 +1,8 @@
 # Smooth glass popups and open animations: plan
 
-Status: answers in (see "Decisions" at the end), Phase 0 measured (freeze off), Phase 1 in progress
-in the `claude/glass-motion-3a54fe` worktree. Nothing installed.
+Status: Phase 0 measured, Phase 1 built and measured in a headless shell (below), waiting on the
+user's go-ahead to install it and log out for the real-desktop after. Branch
+`claude/glass-motion-3a54fe`. Only the dark-mode dropdown edge (CSS) is live.
 
 ## What the user asked
 
@@ -125,6 +126,63 @@ What the numbers say:
 
 Exit criterion: no frame over 8.3 ms in any Phase 0 scenario at 120 Hz, glass identical in still
 screenshots before and after.
+
+### Phase 1 result (headless shell, 2026-10-19)
+
+What changed in `config/bms-tahoe-glass.patch`:
+
+- `components/popup/surface/motion.js` (new): one motion group per popup, keyed on its BoxPointer
+  (quick settings submenus, which sit in an overlay beside the BoxPointer, join it through the
+  menu's `_boxPointer`; banners on the message tray's banner bin). It starts when one of the
+  popup's own transitions starts (BoxPointer opacity, translation, scale; a submenu's height or
+  rows' opacity; a banner's position) and ends on the frame where none is left (checked each
+  frame, no timer; the panel's dimming keeps it going while it runs). Meanwhile one
+  `BEFORE_REDRAW` callback per popup moves every surface: a transform from the geometry of the
+  last full update, no geometry walk; signals from ancestors are ignored.
+- A surface only runs its full update when it appears, or changes size or clip (a growing
+  submenu); such a surface stays live for the rest of the motion, with its textures grown once to
+  the view's size instead of by a quarter at each step (`_bms_texture_hold`).
+- Freeze (`popup motion-freeze`, default on; replaces `quick-settings-freeze`, which now does
+  nothing): while the popup moves, no capture, no blur, no refraction pass. A popup that was hidden
+  captures its backdrop once, over its whole rectangle, at the place it comes to rest (the
+  BoxPointer's translation and scale taken out), blurs it once at full strength, and only its
+  actor's opacity fades. Live again when the motion ends. Banners stay live (they slide in from
+  off screen). Frozen surfaces neither cause nor receive cascaded redraws.
+- A quick settings piece no longer walks the whole panel's tree looking for transitions.
+- A hidden popup keeps its blur textures (a blur at strength 0 freed them, so every open rebuilt
+  13 sets of Kawase textures: 9 ms of the first frame).
+- Shader warm-up: 4 s after the shell starts, a 48 px glass at 1/255 opacity is drawn for three
+  frames under everything, with the menu and app pipelines, so their programs exist.
+- `tahoe-repair.sh` keeps `motion-freeze` on.
+
+Measured with `tools/headless/run.sh`: a throwaway headless gnome-shell (`--headless
+--virtual-monitor 2560x1440@120`, own XDG dirs, keyfile settings, own D-Bus session) on the RTX 3090,
+with the user's Blur My Shell settings and theme, driven by `tahoe-motion-test@local` (opens and
+closes each popup five times, logs frame intervals and the `tahoe_prof` counters, screenshots each
+popup once it has settled). The real desktop is never touched. Before = the live patch (3513705).
+
+| Scenario | Kind | Frame p95 before → after (ms) | Worst frame | Slow frames in 5 runs | BMS JS per open (ms) |
+|---|---|---|---|---|---|
+| Quick settings | open | 46.2 → **11.7** | 53 → 30 (first open after start) | 26 → 4 | 198 → **12** |
+| Quick settings | close | 60.8 → **9.3** | 61 → 9.7 | 30 → 0 | 267 → **3** |
+| QS submenu | open | 45.0 → **10.4** | 55 → 13 | 35 → 0 | 265 → **12** |
+| QS submenu | close | 53.4 → **10.1** | 56 → 49 (once, after the motion) | 12 → 0 | 302 → **19** |
+| Calendar | open | 9.2 → 9.1 | 17 → 18 | 1 → 1 | 4.5 → 1.7 |
+| Desktop menu | open | 9.2 → 8.9 | 9.7 → 9.2 | 0 → 0 | 3.4 → 0.9 |
+
+Still screenshots of quick settings, a submenu, the calendar and the desktop menu once settled:
+identical to the before, pixel for pixel (no pixel differs by more than 2/255).
+
+Not at the exit criterion yet:
+- The first quick settings open after the shell starts has one 30 ms frame: every piece's textures
+  are built then. Later opens keep them.
+- Quick settings opens still have about one frame in a few at 12 to 13 ms: the first appearance
+  of 13 pieces (about 0.5 ms of JS each) and their fresh capture and blur in the same frame.
+  Phase 4's staggered pop-in spreads these over several frames; Phase 2 (one shared blur) would
+  cut the blur part. Decide after the real-desktop numbers.
+- A growing submenu's own glass stays live while it grows (10 ms frames): Phase 3's reveal shape
+  lets it freeze at its final size.
+- The headless shell paces frames by a timer, not the monitor; the real after needs the desktop.
 
 ### Phase 2: shared backdrop for quick settings (only if Phase 1 is not enough)
 
