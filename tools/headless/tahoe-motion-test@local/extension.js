@@ -118,6 +118,19 @@ export default class Driver extends Extension {
         await sleep(8000);
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
+        const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'switch') {
+            for (let i = 0; i < RUNS; i++) {
+                qs.open(true);
+                await sleep(300);
+                await this.measure('switch', 'qs>date', () => { qs.close(true); date.open(true); }, OPEN_MS);
+                await this.measure('switch', 'date>qs', () => { date.close(true); qs.open(true); }, OPEN_MS);
+                qs.close(false);
+                await sleep(300);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         await this.scenario('quick-settings', qs, () => qs._boxPointer, RUNS);
 
         const toggle = qs._grid.get_children().find(c => c.menu && c.visible);
@@ -137,7 +150,6 @@ export default class Driver extends Extension {
             write('log.jsonl', { note: 'no quick toggle with a menu' });
         }
 
-        const date = Main.panel.statusArea.dateMenu.menu;
         await this.scenario('calendar', date, () => date.box.get_parent() ?? date.actor, RUNS);
 
         const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
@@ -148,6 +160,15 @@ export default class Driver extends Extension {
             });
         } else {
             write('log.jsonl', { note: 'no background menu' });
+        }
+        // sliding across the top bar: one menu closes while the next opens
+        for (let i = 0; i < RUNS; i++) {
+            qs.open(true);
+            await sleep(300);
+            await this.measure('switch', 'qs>date', () => { qs.close(true); date.open(true); }, OPEN_MS);
+            await this.measure('switch', 'date>qs', () => { date.close(true); qs.open(true); }, OPEN_MS);
+            qs.close(false);
+            await sleep(300);
         }
         write('log.jsonl', { done: true });
     }
