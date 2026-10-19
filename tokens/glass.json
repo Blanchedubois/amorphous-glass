@@ -1,6 +1,6 @@
 {
-  "_comment": "Liquid Glass colours per mode (docs/STANDARD.md). edge: the 1 px line on the bar, dock, quick settings capsules and widgets only; dropdowns have none. card: the lift of a card on glass (calendar events, weather). Read by scripts/glass-tokens.py.",
-  "light": { "edge": "rgba(255, 255, 255, 0.25)", "edge_alpha": 0.25, "hover": "rgba(0, 0, 0, 0.06)", "pressed": "rgba(0, 0, 0, 0.10)", "separator": "rgba(0, 0, 0, 0.10)", "card": "rgba(255, 255, 255, 0.30)" },
-  "dark":  { "edge": "rgba(255, 255, 255, 0.16)", "edge_alpha": 0.16, "hover": "rgba(255, 255, 255, 0.12)", "pressed": "rgba(255, 255, 255, 0.18)", "separator": "rgba(255, 255, 255, 0.10)", "card": "rgba(255, 255, 255, 0.06)" },
-  "milky": { "edge": "rgba(255, 255, 255, 0.12)", "edge_alpha": 0.12, "hover": "rgba(255, 255, 255, 0.12)", "pressed": "rgba(255, 255, 255, 0.18)", "separator": "rgba(255, 255, 255, 0.10)", "card": "rgba(255, 255, 255, 0.06)" }
+  "_comment": "Liquid Glass colours per mode (docs/STANDARD.md). edge: the 1 px line on the bar, dock, quick settings capsules and widgets only; dropdowns have none in light and milky. dropdown_edge: the same line on dropdowns in dark mode only (an inset shadow, so the rows keep their gap). card: the lift of a card on glass (calendar events, weather). Read by scripts/glass-tokens.py.",
+  "light": { "edge": "rgba(255, 255, 255, 0.25)", "edge_alpha": 0.25, "hover": "rgba(0, 0, 0, 0.06)", "pressed": "rgba(0, 0, 0, 0.10)", "separator": "rgba(0, 0, 0, 0.10)", "card": "rgba(255, 255, 255, 0.30)", "dropdown_edge": "none" },
+  "dark":  { "edge": "rgba(255, 255, 255, 0.16)", "edge_alpha": 0.16, "hover": "rgba(255, 255, 255, 0.12)", "pressed": "rgba(255, 255, 255, 0.18)", "separator": "rgba(255, 255, 255, 0.10)", "card": "rgba(255, 255, 255, 0.06)", "dropdown_edge": "inset 0 0 0 1px rgba(255, 255, 255, 0.16)" },
+  "milky": { "edge": "rgba(255, 255, 255, 0.12)", "edge_alpha": 0.12, "hover": "rgba(255, 255, 255, 0.12)", "pressed": "rgba(255, 255, 255, 0.18)", "separator": "rgba(255, 255, 255, 0.10)", "card": "rgba(255, 255, 255, 0.06)", "dropdown_edge": "none" }
 }

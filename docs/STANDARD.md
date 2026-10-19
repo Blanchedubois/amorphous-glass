@@ -9,10 +9,15 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
 
 - **One owner per layer.** Blur My Shell draws the glass (blur, tint, rim light, edge shadow).
   CSS draws only the rows and the text. No surface paints a fill of its own over the glass.
-- **No outline on dropdowns.** Menus, popovers, the calendar, quick settings submenus and
-  notifications have no CSS border or ring: the shader's rim light is their only edge (user, 2026-10-19:
-  the outline was thick and fought the glass). Rows draw no focus outline either. The 1 px edge line
-  stays only on the bar, the dock, the quick settings capsules and the widgets.
+- **No outline on dropdowns in light and milky.** Menus, popovers, the calendar, quick settings
+  submenus and notifications have no CSS border or ring there: the shader's rim light is their only
+  edge (user, 2026-10-19: the old outline was thick and fought the glass). Rows draw no focus outline.
+- **Dark mode: the widgets' edge on shell dropdowns** (user, 2026-10-19 evening, to make them easier
+  to see): top bar, dock and desktop menus, the calendar, quick settings submenus and notification
+  banners get the same 1 px white 16 % line as the widgets, drawn as an inset shadow inside the shape
+  (`dropdown_edge` in `tokens/glass.json`), so it follows the radius and the rows keep their gap.
+  GTK app menus keep none. The 1 px edge line is also on the bar, the dock, the quick settings
+  capsules and the widgets in every mode.
 - **One shape.** The CSS shape (rows, hit area) and the glass under it have the same radius, from the same token.
 - **Concentric rows.** A row or card inside a surface is rounded at the surface radius minus the
   gap around it. A row can be no rounder than a capsule (half its height), so the surface radius
@@ -43,7 +48,8 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
 |---|---|---|---|
 | Tint (Blur My Shell) | white at 0.18 | rgb 34,34,38 at 0.42 | white at 0.12 |
 | Fill painted by CSS on any glass surface | none | none | none |
-| Edge line on dropdowns (menus, popovers, calendar, submenus, notifications) | none | none | none |
+| Edge line on shell dropdowns (menus, calendar, submenus, notifications) | none | 1 px white at 0.16, inset | none |
+| Edge line on GTK app menus and popovers | none | none | none |
 | Edge line on bar, dock, quick settings capsules, widgets | 1 px white at 0.25 | 1 px white at 0.16 | 1 px white at 0.12 |
 | Rim light | 0.55 over 0.45 of the edge band | same | same |
 | Edge shadow (inner AO band) | 0.30 over 0.20 of the band | same | same |

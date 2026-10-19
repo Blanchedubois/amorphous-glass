@@ -16,10 +16,18 @@
 /* Liquid Glass dropdowns (docs/STANDARD.md, radii from tokens/radius.json via
    scripts/glass-tokens.py): top bar menus, dock and desktop menus, the calendar and
    notification banners. Blur My Shell draws the glass, its tint and its rim light; the
-   theme's own fill shows only when the menu glass is off. No outline, no glow: the rim
-   light is the only edge. The radius matches the glass under it. */
+   theme's own fill shows only when the menu glass is off. No glow; no outline in light and milky,
+   where the rim light is the only edge. The radius matches the glass under it. */
 .popup-menu-content,
 .notification-banner { border: none !important; box-shadow: none !important; }
+/* Dark mode: the widgets' 1 px edge (white 16 %) on every dropdown too (user, 2026-10-19), drawn
+   inside the shape as an inset shadow so the rows keep their concentric gap; none in light and
+   milky. The id outranks Blur My Shell's own "no outline" rule. The quick settings panel itself
+   has no card (its pieces keep their own edge), so it gets none. */
+#uiGroup .popup-menu-content,
+#uiGroup .notification-banner,
+#uiGroup .quick-toggle-menu { box-shadow: {{mode.dropdown_edge}} !important; }
+#uiGroup .popup-menu-content.quick-settings { box-shadow: none !important; }
 .popup-menu-content { border-radius: {{menu.radius}}px !important; }
 .notification-banner, .notification-banner .message { border-radius: {{notification.radius}}px !important; }
 /* The calendar: a large panel at {{calendar.radius}} px, its cards (events, world clocks,
