@@ -8,7 +8,14 @@ Every glass surface follows one standard: shell menus, quick settings and its su
 calendar, dock menus, the desktop right-click menu, GTK app popovers and context menus (Files,
 Text Editor, ...), app windows and header bars, widgets, the top bar and the dock.
 
-## What the standard has to fix (seen today)
+## Status (end of 2026-10-19)
+
+Items 1 to 4 below are done: `docs/STANDARD.md` is the approved standard, radii come from
+`tokens/radius.json` and colours from `tokens/glass.json` through `scripts/glass-tokens.py`, and the
+live desktop runs from this repo (tahoe-repair autostart and the Blur My Shell build). The GTK menu
+glass geometry (Phase 2) is in `docs/GLASS_MENUS_PLAN.md`.
+
+## What the standard had to fix (seen 2026-10-19)
 
 1. **GTK popovers draw two layers.** Files' right-click and ⋯ menus and Text Editor's main menu
    show the theme's opaque square-cornered menu on top of a rounded glass card. Wanted: one glass
@@ -56,4 +63,5 @@ right-click menu too. Phases 1 to 5 are in `docs/gnome-tahoe/animations.md`.
 
 - `tahoe-probe@cachyos-tahoe` is enabled on the real desktop (logs to ~/.cache/tahoe-probe.jsonl).
   Disable with `gnome-extensions disable tahoe-probe@cachyos-tahoe` when done measuring.
-- The live desktop runs from ~/Projects/cachyos-tahoe-theme (branch glass-bar), not from here.
+- The live desktop runs from this repo since 2026-10-19 evening. The icon theme still links into
+  ~/Projects/cachyos-tahoe-theme/icons, which stays the home of the icon generator.

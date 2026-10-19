@@ -21,7 +21,8 @@ two layers:
 | Symptom | Cause |
 |---|---|
 | The glass card is taller than the menu, by about one arrow's height on the side facing the button (`⋯` menu) | `place_dynamic_blur` sizes the blur to `get_frame_rect()`. For a GTK4 popover the frame (xdg window geometry) is the whole popover widget: **contents plus the arrow strip**. The arrow is drawn clear, but the glass still fills its strip. GTK4 hardcodes the tail height (`TAIL_HEIGHT` in `gtkpopover.c`), and the app decides `has-arrow`, so CSS cannot remove the strip. |
-| An inner rounded box with its own lighter fill and edge sits inside the card | The contents still paint something: a fill from a rule the block does not outrank (libadwaita's `--popover-bg-color` path, the `contents:backdrop` or `.menu` variants, or the theme's `0 0 0 1px @headerbar_darker_shade_color` shadow ring), plus our own inset edge drawn on top of the pipeline's rim. Two rims, two shapes. |
+| An inner rounded box with its own edge sits inside the card | Measured in Phase 0: **no fill**, only edges. The theme's `popover > arrow, popover > contents { border: 1px solid … }` (grey at about 96 %) is never reset by the block, and our inset white edge sits 1 px inside it. Add the pipeline's own rim and that makes three rims. The darker band around the box is the card's own edge region (and, on the `⋯` menu, the arrow strip). |
+| A pill outline on the first row | `popover.menu modelbutton:focus { box-shadow: inset 0 0 0 2px … }`: GTK focuses the first row when a menu opens. |
 | Card corners and menu corners don't line up | The card is rounded at 20 px on the frame. The contents are rounded at 20 px, but inset from it. |
 | (expected) Submenus (`Open ›`, `Scripts ›`) leave stale glass | `GtkPopoverMenu` resizes in place when it slides to a submenu. The blur has to follow the frame's `size-changed`. |
 
@@ -43,11 +44,37 @@ Each phase ends with a check on Files' context menu, Files' `⋯` menu, a `GtkDr
 - Result: the exact tail height and contents inset per side, and the rule that still paints the
   fill. Write them into this doc.
 
+**Results (2026-10-19).** Measured off-screen, without touching the desktop:
+`tools/popover_probe.py` runs a libadwaita window (with Files' `.nautilus-window` class) on
+GTK's Broadway backend. It loads the live `~/.config/gtk-4.0` CSS (`XDG_CONFIG_HOME` points at
+a copy for experiments) and dumps each popover's render nodes and widget bounds. GTK 4.24.1,
+libadwaita 1.10, dark mode.
+
+| | `⋯` menu (has-arrow) | Context menu (no arrow) |
+|---|---|---|
+| Popover (= frame rect on Wayland) | 163 × 167 | 157 × 155 |
+| Contents box inside it | x 1, y 13, 161 × 153 | x 1, y 1, 155 × 153 |
+| Inset: arrow side / other sides | **12 px** (+1) / **1 px** | – / **1 px** |
+| Fill painted | none | none |
+| Edges painted | theme border 1 px rgba(71,71,74,0.96), our inset white 0.16, arrow outline (white 0.16, in a cairo node), first-row focus ring white 0.06 | the same, minus the arrow |
+
+- The 1 px inset on every side is GTK's own layout. It stays with `margin: 0`, `border: none`
+  and `box-shadow: none`, so Phase 2 has to inset the glass by it, not CSS.
+- Candidate Phase 1 rules, verified in the probe: `border: none` on `contents` and `arrow`
+  removes the grey ring and the arrow outline, and `box-shadow: none` on
+  `popover.menu modelbutton:focus` removes the row pill. Before/after:
+  `docs/shots/gtk-popover-phase0.png`. The yellow outline there is the frame rect, which is
+  where Blur My Shell puts the card today.
+- Not measured yet: the frame rect as Mutter sees it. Use the BMS debug log above, in the VM,
+  since a BMS build needs a logout. The expected value is the popover size, which the
+  screenshots support: the `⋯` card overhangs the menu by about 12 px at the top. Light mode
+  is also not measured, because `gtk-Light.css` has no glass block while the mode is dark.
+
 ### Phase 1: one fill, one rim (CSS only)
 
-- Make the block's popover rules win over whatever Phase 0 found. Scope them to
-  `popover.background > contents` *and* the libadwaita variable (`--popover-bg-color:
-  transparent` on `popover`), and clear the theme's `box-shadow` ring (`box-shadow: none`).
+- Add `border: none` to the block's `popover.background > contents` and `> arrow` rules, and
+  `box-shadow: none` on `popover.menu modelbutton:focus`. Phase 0 found no fill to fight, so the
+  `--popover-bg-color` and `box-shadow` ideas are unnecessary.
 - Drop our inset edge on `contents`, since the glass pipeline already draws a rim. Keep it only
   if Phase 2 cannot make the shapes coincide.
 - Rows: Tahoe's hover is a soft white lift (white 0.10 dark / black 0.06 light), not the accent
@@ -55,6 +82,16 @@ Each phase ends with a check on Files' context menu, Files' `⋯` menu, a `GtkDr
   shell menus.
 - Check: with the glass off (`glass-bar.sh menus off`), the menu must be fully clear except
   its text. That proves GTK paints nothing of its own.
+
+**Phase 1a result (VM, 2026-10-19).** `gtk_glass` in `scripts/glass-bar.sh` now adds `border: none` to
+the contents and arrow rules (the arrow lost its outline colour) and
+`window popover.menu modelbutton:focus { box-shadow: none; }`. Off-screen, the probe shows only our
+inset edge and the separators left, with an empty arrow layer. In the VM (mirror user, dark), Files'
+`⋯` and background menus went from a bordered box inside the card, with a pill on the first row, to
+one glass shape: `docs/shots/gtk-popover-phase1-vm.png` (top: before, bottom: after). Left for Phase
+2: on the `⋯` menu the glass still fills the empty 12 px arrow strip. Still open in Phase 1: the
+inset edge (kept until Phase 2), Tahoe row hover, and the `menus off` check. The real desktop is
+not changed yet.
 
 ### Phase 2: the glass covers the contents, not the frame (BMS patch)
 
@@ -97,3 +134,31 @@ Each phase ends with a check on Files' context menu, Files' `⋯` menu, a `GtkDr
   already in the uncommitted diff).
 - Add a "Menus" row to the layer table in `docs/liquid-glass.md`. Commit per phase: Phase 1 is
   CSS only, Phase 2 is the BMS patch only.
+
+## Phase 2 result (VM, light mode, 2026-10-19)
+
+- **Blur My Shell** (`config/bms-tahoe-glass.patch`, `applications/window_geometry.js` and `index.js`):
+  an app menu's glass is placed on the menu box, not the popup frame: GTK's 12 px arrow strip is cut
+  off on the side facing the pointer. With the block's contents at `box-shadow: none` the menu is
+  flush with the frame on the other sides (the 1 px of Phase 0 came from our old inset-edge shadow),
+  so nothing else is cut and the rows sit exactly the menu gap (4 px) in from the glass edge
+  (`docs/shots/gtk-popover-inset-corner.png`). That side is read on the
+  menu's first real frame, because the window is still 0 × 0 when its glass is created. Context
+  menus open at the pointer (0 to 1 px away), so they get no strip cut; a menu button's popover
+  sits at least 3 px past the clicked button.
+- **CSS** (`gtk_glass`): `popover.background` itself is now clear. The scoped `.background` window
+  rule had painted every popover outside Files with the window tint: the square-cornered card
+  behind Settings' and Text Editor's menus.
+- **Radii**: the card (20) is the contents radius, the row (16) plus the gap (4), from
+  `tokens/radius.json`. With the glass on the menu box, the hover capsule sits concentric in the
+  card corner.
+- Shots: `docs/shots/gtk-popover-phase2-vm.png` (Files ⋯ and right-click, Settings ⋯, Text Editor ☰).
+- **Known limits**: GTK tooltips are popups of the same Mutter type, and no window property told
+  them apart from menus, so a tooltip below its widget also gets the top cut. The tooltip's own
+  opaque box covers its glass, so it does not show today; revisit if tooltips become glass. An
+  arrow menu opened from the keyboard while the pointer is elsewhere keeps its strip.
+- **App-menu radius (follow-up)**: GTK menu rows are 26 px tall, so a 16 px row radius clamps to
+  13, and a 20 px card around it was too round. GTK menus now have their own token,
+  `app_menu` {radius 17, gap 4, row 13} in `tokens/radius.json`, and their own Blur My Shell key,
+  `applications/menu-corner-radius`. The GTK4 and GTK3 menu CSS read the same token. Shell menus
+  keep `menu` (20 / 4 / 16). Shot: `docs/shots/gtk-popover-radius-corner.png`.
