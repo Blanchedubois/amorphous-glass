@@ -79,10 +79,10 @@ WANT="['user-theme@gnome-shell-extensions.gcampax.github.com','dash-to-dock@micx
 [[ -d "$EXT_DIR/tahoe-widgets@cachyos-tahoe" && "$(glass_state widgets)" == on ]] && WANT="${WANT%]},'tahoe-widgets@cachyos-tahoe']"
 # Control Center (scripts/tahoe-control-center.sh): kept on while installed and switched on
 [[ -d "$EXT_DIR/tahoe-control-center@cachyos-tahoe" && "$(glass_state controlcenter)" == on ]] && WANT="${WANT%]},'tahoe-control-center@cachyos-tahoe']"
-# measuring tools (tools/tahoe-probe@cachyos-tahoe, later tahoe-motion): kept on while they are on
-for keep in tahoe-probe@cachyos-tahoe tahoe-motion@cachyos-tahoe; do
-  [[ -d "$EXT_DIR/$keep" ]] && gsettings get org.gnome.shell enabled-extensions | grep -q "'$keep'" && WANT="${WANT%]},'$keep']"
-done
+# open and close animations (scripts/tahoe-motion.sh): kept on while installed and switched on
+[[ -d "$EXT_DIR/tahoe-motion@cachyos-tahoe" && "$(glass_state motion)" == on ]] && WANT="${WANT%]},'tahoe-motion@cachyos-tahoe']"
+# the frame probe (tools/tahoe-probe@cachyos-tahoe, measuring only): kept on while it is on
+[[ -d "$EXT_DIR/tahoe-probe@cachyos-tahoe" ]] && gsettings get org.gnome.shell enabled-extensions | grep -q "'tahoe-probe@cachyos-tahoe'" && WANT="${WANT%]},'tahoe-probe@cachyos-tahoe']"
 SHELL_VER="$(gnome-shell --version 2>/dev/null | grep -oE '[0-9]+' | head -1)"
 changed=0
 
