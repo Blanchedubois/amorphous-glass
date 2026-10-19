@@ -176,7 +176,8 @@ so none of the BoxPointer work above reaches them.
 - **Phase 0:** probe v3 (`tools/tahoe-probe@cachyos-tahoe`) also records these windows on the window
   manager's `map` and `destroy` signals, labelled `app:<app id>:<window type>`. Needs a measuring
   round on the real desktop (the user opens Files ⋯, Files right-click, a Settings drop-down, a GTK3
-  context menu).
+  context menu). User's choice: no separate before for these; probe v3 loads with the Phase 1
+  logout and records their after (GNOME does not animate them today).
 - **Phase 1:** reuse the app-menu glass pipeline between popups (a small pool keyed by size class)
   instead of building one per window; warm its shaders at startup with the shell's.
 - **Phase 3:** the reveal shape is the same refraction uniforms, on the app-menu pipeline.
@@ -184,8 +185,8 @@ so none of the BoxPointer work above reaches them.
   (only when `is_app_menu` is true), drives the window actor's content (opacity, scale from 0.96)
   and the glass reveal on the same spring, and calls `completed_map` / keeps the actor for the close.
 - **Where the circle starts:** Mutter keeps the popup's anchor rectangle (the clicked widget, from
-  `xdg_positioner`) private; JS gets only the popup window, its parent and the pointer. Closest
-  option, proposed to the user: start the circle at the pointer when the popup opened from a click
+  `xdg_positioner`) private; JS gets only the popup window, its parent and the pointer. User's choice
+  (2026-10-19): start the circle at the pointer when the popup opened from a click
   (the pointer is on the clicked widget), clamped to the popup edge that faces it (the arrow side:
   the edge nearest the pointer, usually the top); with the keyboard, from the middle of that edge.
   Circle size fixed at a header-button capsule (about 34 px), since the widget's size is unknown.
