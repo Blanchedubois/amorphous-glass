@@ -1,0 +1,65 @@
+/* Tahoe Control Center. Each piece: Blur My Shell's glass at the bottom, a fill layer (hairline,
+   fallback fill, the "on" white), the content on top. SF Pro Display Bold titles, Medium subtitles. */
+.tahoe-cc { padding: 14px; spacing: 12px; }
+.tahoe-cc-cols { spacing: 18px; }
+.tahoe-cc-col { spacing: 12px; }
+
+.tahoe-cc-piece { background-color: transparent; border: none; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); color: #ffffff; }
+.tahoe-cc-fill { border: 1px solid rgba(255, 255, 255, 0.16); background-color: rgba(60, 60, 70, 0.55); }
+.glassed .tahoe-cc-fill { background-color: transparent; }
+.tahoe-cc-piece:hover .tahoe-cc-fill { background-color: rgba(255, 255, 255, 0.08); }
+
+.tahoe-cc-pill, .tahoe-cc-pill .tahoe-cc-fill { border-radius: 999px; }
+.tahoe-cc-pill-box { spacing: 10px; padding: 0 12px 0 10px; }
+.tahoe-cc-pill-circle { width: 40px; height: 40px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.22); }
+.tahoe-cc-pill-glyph { icon-size: 20px; color: #ffffff; }
+.tahoe-cc-pill.on .tahoe-cc-pill-glyph { color: #0a84ff; }
+.tahoe-cc-title { font-family: "SF Pro Display"; font-weight: 700; font-size: 0.95em; }
+.tahoe-cc-subtitle { font-family: "SF Pro Display"; font-weight: 500; font-size: 0.8em; color: rgba(255, 255, 255, 0.65); }
+
+.tahoe-cc-circle, .tahoe-cc-circle .tahoe-cc-fill { border-radius: 999px; }
+.tahoe-cc-circle-icon { icon-size: 24px; color: #ffffff; }
+.tahoe-cc-circle.on .tahoe-cc-fill, .glassed.tahoe-cc-circle.on .tahoe-cc-fill { background-color: #ffffff; }
+.tahoe-cc-circle.on .tahoe-cc-circle-icon { color: #1d1d1f; }
+.tahoe-cc-circle.accent .tahoe-cc-fill, .glassed.tahoe-cc-circle.accent .tahoe-cc-fill { background-color: rgba(10, 132, 255, 0.9); }
+
+.tahoe-cc-player, .tahoe-cc-player .tahoe-cc-fill { border-radius: 28px; }
+.tahoe-cc-player-inner { padding: 12px 10px 6px 10px; }
+.tahoe-cc-art { width: 44px; height: 44px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.18); margin-bottom: 8px; }
+.tahoe-cc-art-icon { icon-size: 22px; color: rgba(255, 255, 255, 0.9); }
+.tahoe-cc-track { font-family: "SF Pro Display"; font-weight: 700; font-size: 1em; }
+.tahoe-cc-artist { font-family: "SF Pro Display"; font-weight: 500; font-size: 0.75em; color: rgba(255, 255, 255, 0.65); }
+.tahoe-cc-transport { spacing: 2px; }
+.tahoe-cc-transport-btn { height: 38px; border-radius: 12px; }
+.tahoe-cc-transport-btn:hover { background-color: rgba(255, 255, 255, 0.10); }
+.tahoe-cc-transport-icon { icon-size: 22px; color: #ffffff; }
+.tahoe-cc-transport-icon.play { icon-size: 30px; }
+
+.tahoe-cc-card, .tahoe-cc-card .tahoe-cc-fill { border-radius: 28px; }
+.tahoe-cc-card-inner { padding: 10px 14px; spacing: 4px; }
+.tahoe-cc-card-label { font-family: "SF Pro Display"; font-weight: 700; font-size: 0.9em; }
+.tahoe-cc-card-row { spacing: 10px; }
+.tahoe-cc-endicon-small { icon-size: 12px; color: rgba(255, 255, 255, 0.85); }
+.tahoe-cc-endicon { icon-size: 18px; color: #ffffff; }
+.tahoe-cc-endbtn { width: 28px; height: 28px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.22); }
+.tahoe-cc-endbtn-icon { icon-size: 14px; color: #ffffff; }
+.tahoe-cc-slider {
+  color: #ffffff; height: 24px; min-width: 90px;
+  -slider-height: 5px; -slider-background-color: rgba(255, 255, 255, 0.22); -slider-border-color: transparent;
+  -slider-active-background-color: rgba(255, 255, 255, 0.95); -slider-active-border-color: transparent;
+  -slider-border-width: 0px; -slider-handle-radius: 8px; -slider-handle-border-width: 0px;
+  -barlevel-height: 5px; -barlevel-background-color: rgba(255, 255, 255, 0.22);
+  -barlevel-active-background-color: rgba(255, 255, 255, 0.95); -barlevel-border-width: 0px;
+}
+
+.tahoe-cc-edit, .tahoe-cc-edit .tahoe-cc-fill { border-radius: 15px; }
+.tahoe-cc-edit-label { font-family: "SF Pro Display"; font-weight: 700; font-size: 0.85em; padding: 0 14px; }
+
+/* light mode: dark ink on light glass */
+.tahoe-cc-light .tahoe-cc-piece { color: #1d1d1f; }
+.tahoe-cc-light .tahoe-cc-fill { border-color: rgba(255, 255, 255, 0.25); background-color: rgba(250, 250, 252, 0.6); }
+.tahoe-cc-light .tahoe-cc-pill-glyph, .tahoe-cc-light .tahoe-cc-circle-icon, .tahoe-cc-light .tahoe-cc-transport-icon,
+.tahoe-cc-light .tahoe-cc-endicon, .tahoe-cc-light .tahoe-cc-endicon-small, .tahoe-cc-light .tahoe-cc-endbtn-icon,
+.tahoe-cc-light .tahoe-cc-art-icon { color: #1d1d1f; }
+.tahoe-cc-light .tahoe-cc-subtitle, .tahoe-cc-light .tahoe-cc-artist { color: rgba(0, 0, 0, 0.6); }
+.tahoe-cc-light .tahoe-cc-pill.on .tahoe-cc-pill-glyph { color: #ffffff; }

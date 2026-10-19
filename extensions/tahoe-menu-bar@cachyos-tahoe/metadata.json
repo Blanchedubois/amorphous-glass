@@ -1,0 +1,8 @@
+{
+  "uuid": "tahoe-menu-bar@cachyos-tahoe",
+  "name": "Tahoe Menu Bar",
+  "description": "macOS Tahoe menu bar details on the top bar: one Control Center glyph in place of the quick settings indicator icons, and a Focus moon while Do Not Disturb is on.",
+  "shell-version": ["51"],
+  "url": "https://github.com/Blanchedubois/cachyos-tahoe-theme",
+  "version": 1
+}

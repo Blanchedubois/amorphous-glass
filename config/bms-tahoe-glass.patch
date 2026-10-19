@@ -1,0 +1,1040 @@
+diff --git a/Makefile b/Makefile
+index 67d4d97..e6c759a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -16,7 +16,8 @@ STYLESHEETS = src/styles/panel.css \
+ 	src/styles/popup/menu-items.css \
+ 	src/styles/overview.css \
+ 	src/styles/appfolders.css \
+-	src/styles/panel-light-text.css
++	src/styles/panel-light-text.css \
++	src/styles/tahoe-glass.css
+ 
+ .PHONY: build install pot test-shell test-prefs test-vm remove clean
+ 
+diff --git a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
+index d983d96..56e1a96 100644
+--- a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
++++ b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
+@@ -431,6 +431,11 @@
+             <default>"pipeline_default"</default>
+             <summary>String, the name of the pipeline to use. It must exist, else "pipeline_default" will be used</summary>
+         </key>
++        <!-- TAHOE GLASS: QUICK SETTINGS FREEZE -->
++        <key type="b" name="quick-settings-freeze">
++            <default>true</default>
++            <summary>Boolean, whether quick settings keep the blur they have while they move (opening, submenus), refreshing it once they settle</summary>
++        </key>
+         <!-- SIGMA -->
+         <key type="i" name="sigma">
+             <default>30</default>
+diff --git a/src/components/applications/index.js b/src/components/applications/index.js
+index a98c5e8..ddd9226 100644
+--- a/src/components/applications/index.js
++++ b/src/components/applications/index.js
+@@ -7,11 +7,15 @@ import { Pipeline } from '../../pipelines/pipeline.js';
+ import { is_desktop_window } from '../../conveniences/window.js';
+ import { DynamicPipeline } from '../../render/dynamic_surface.js';
+ import { RoundedPipeline } from '../../render/rounded_pipeline.js';
+-import { WindowRules } from './window_rules.js';
++import { WindowRules, is_app_menu } from './window_rules.js';
+ import { BLUR_ACTOR_NAME, WindowOpacity } from './window_opacity.js';
+ import { compute_scale, place_dynamic_blur, place_static_blur } from './window_geometry.js';
+ import { finish_preview_fade } from './overview_drag.js';
+ 
++// tahoe glass: app menus use the shell menus' pipeline and the GTK popover's corner radius
++const MENU_PIPELINE = 'pipeline_glassbar_menus';
++const MENU_CORNER_RADIUS = 20;
++
+ export const ApplicationsBlur = class ApplicationsBlur {
+     constructor(connections, settings, effects_manager) {
+         this.connections = connections;
+@@ -293,6 +297,14 @@ export const ApplicationsBlur = class ApplicationsBlur {
+         }
+     }
+ 
++    /// The pipeline for this window: the applications' one, or the menus' for an app menu.
++    pipeline_for(meta_window) {
++        if (is_app_menu(meta_window)
++            && Object.hasOwn(global.blur_my_shell._pipelines_manager.pipelines, MENU_PIPELINE))
++            return MENU_PIPELINE;
++        return this.settings.applications.PIPELINE;
++    }
++
+     /// Add the blur effect to the window.
+     /// Accepts only tracked meta window that is NOT already blurred.
+     create_blur_effect(meta_window) {
+@@ -307,7 +319,7 @@ export const ApplicationsBlur = class ApplicationsBlur {
+             const pipeline = new Pipeline(
+                 this.effects_manager,
+                 global.blur_my_shell._pipelines_manager,
+-                this.settings.applications.PIPELINE
++                this.pipeline_for(meta_window)
+             );
+             const bg_managers = [];
+             blur_actor = pipeline.create_background_with_effects(
+@@ -325,7 +337,7 @@ export const ApplicationsBlur = class ApplicationsBlur {
+             const pipeline = new DynamicPipeline(
+                 this.effects_manager,
+                 global.blur_my_shell._pipelines_manager,
+-                this.settings.applications.PIPELINE,
++                this.pipeline_for(meta_window),
+                 {
+                     corner_radius: this.settings.applications.CORNER_RADIUS,
+                     get_corners: () => this.settings.applications.ROUNDED_CORNERS,
+@@ -375,7 +387,8 @@ export const ApplicationsBlur = class ApplicationsBlur {
+             meta_window.bms_rounded_pipeline.setStraightCorners(use_0_radius);
+         } else {
+             const pipeline = meta_window.bg_manager._bms_pipeline;
+-            pipeline.set_corner_radius(this.settings.applications.CORNER_RADIUS);
++            pipeline.set_corner_radius(is_app_menu(meta_window)
++                ? MENU_CORNER_RADIUS : this.settings.applications.CORNER_RADIUS);
+             pipeline.set_straight_corners(use_0_radius);
+         }
+     }
+@@ -440,7 +453,7 @@ export const ApplicationsBlur = class ApplicationsBlur {
+     change_pipeline() {
+         this.meta_windows.forEach(meta_window => {
+             meta_window.bg_manager?._bms_pipeline.change_pipeline_to(
+-                this.settings.applications.PIPELINE
++                this.pipeline_for(meta_window)
+             );
+             this.update_corner_radius(meta_window);
+         });
+diff --git a/src/components/applications/window_rules.js b/src/components/applications/window_rules.js
+index 0ca7acc..2adcb7b 100644
+--- a/src/components/applications/window_rules.js
++++ b/src/components/applications/window_rules.js
+@@ -6,6 +6,26 @@ const BLURRED_FRAME_TYPES = [
+     Meta.FrameType.MODAL_DIALOG,
+ ];
+ 
++// tahoe glass (cachyos-tahoe-theme): a GTK app's menus and popovers are small windows of their
++// own (Wayland popups); they get the menus' glass, as the shell's menus do
++const MENU_WINDOW_TYPES = [
++    Meta.WindowType.DROPDOWN_MENU, Meta.WindowType.POPUP_MENU, Meta.WindowType.MENU,
++];
++
++/// A menu window of a GTK app: its parent (or, failing that, another window of the same
++/// process) is a GTK application's window.
++export function is_app_menu(meta_window) {
++    if (!MENU_WINDOW_TYPES.includes(meta_window.get_window_type())
++        || meta_window.get_client_type() !== Meta.WindowClientType.WAYLAND)
++        return false;
++    if (meta_window.get_transient_for()?.get_gtk_application_id())
++        return true;
++    const pid = meta_window.get_pid();
++    return pid > 0 && global.get_window_actors().some(actor =>
++        actor.meta_window.get_pid() === pid && actor.meta_window.get_gtk_application_id()
++    );
++}
++
+ /// Converts a case-insensitive wildcard pattern, where `*` matches any sequence and `?` any single
+ /// character, to a RegExp.
+ function wildcard_to_regex(pattern) {
+@@ -32,6 +52,8 @@ export class WindowRules {
+     }
+ 
+     matches(meta_window) {
++        if (is_app_menu(meta_window))
++            return true;
+         const wm_class = meta_window.get_wm_class();
+         const listed = this.settings.applications.ENABLE_ALL
+             ? !matches_any(wm_class, this.blacklist)
+diff --git a/src/components/popup/index.js b/src/components/popup/index.js
+index 4d16af5..bd4ca91 100644
+--- a/src/components/popup/index.js
++++ b/src/components/popup/index.js
+@@ -69,6 +69,16 @@ export const PopupBlur = class PopupBlur {
+         this.track_container(Main.layoutManager.screenShieldGroup);
+         this.track_container(Main.messageTray._bannerBin);
+         this.track_container(Main.panel.statusArea.quickSettings.menu._overlay);
++        // Quick settings fills in its toggles after startup, and some (Wi-Fi, Bluetooth)
++        // come and go: look for unblurred pieces each time it opens.
++        Main.panel.statusArea.quickSettings.menu.connectObject(
++            'open-state-changed',
++            (menu, open) => {
++                if (open)
++                    this.try_blur(menu.actor);
++            },
++            this
++        );
+         this.track_container(global.window_group);
+         this.track_keyboard();
+     }
+@@ -351,6 +361,7 @@ export const PopupBlur = class PopupBlur {
+         }
+ 
+         this.cancel_queued_blurs();
++        Main.panel.statusArea.quickSettings?.menu?.disconnectObject(this);
+ 
+         if (!this.enabled) {
+             this._log("blur already removed");
+diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
+index 5a891b9..d1b0c6d 100644
+--- a/src/components/popup/surface/blur_surface.js
++++ b/src/components/popup/surface/blur_surface.js
+@@ -1,5 +1,6 @@
+ import GLib from 'gi://GLib';
+ import Meta from 'gi://Meta';
++import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+ 
+ import { DynamicPipeline } from '../../../render/dynamic_surface.js';
+ import { has_any_style_class, has_style_class } from '../actors.js';
+@@ -10,8 +11,45 @@ import { PopupBlurSurfaceStyle } from './style.js';
+ import { PopupBlurSurfaceTransitions } from './transitions.js';
+ import { PopupBlurStaticActor } from '../static_actor.js';
+ import { getSurfaceSibling, registerSurface, unregisterSurface } from './stack.js';
++import { QuickMenuToggle } from 'resource:///org/gnome/shell/ui/quickSettings.js';
++import { prof_begin, prof_end } from '../../../conveniences/tahoe_prof.js';
++
++// Quick settings pieces each have a live blur. While the panel moves (it opens, a submenu
++// slides open and pushes the pieces below it down) every piece would blur its backdrop again
++// at each frame: they keep the blur they have instead, the moving submenu excepted (a blur
++// whose size changes is redone), and all refresh once nothing has moved for a moment.
++const QUICK_SETTINGS_SETTLE_MS = 160;
++const quick_settings_motion = {
++    surfaces: new Set(),
++    settle_id: 0,
++
++    moved(surface) {
++        if (!surface.settings.popup.QUICK_SETTINGS_FREEZE)
++            return;
++        if (this.settle_id)
++            GLib.source_remove(this.settle_id);
++        else
++            this.surfaces.forEach(other => other.pipeline?.set_live?.(false));
++        this.settle_id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, QUICK_SETTINGS_SETTLE_MS, () => {
++            this.settle_id = 0;
++            this.surfaces.forEach(other => other.pipeline?.set_live?.(true));
++            return GLib.SOURCE_REMOVE;
++        });
++    },
++
++    remove(surface) {
++        this.surfaces.delete(surface);
++        if (this.surfaces.size === 0 && this.settle_id) {
++            GLib.source_remove(this.settle_id);
++            this.settle_id = 0;
++        }
++    },
++};
+ 
+ const NOTIFICATION_STYLE_CLASSES = ['notification-banner'];
++const QUICK_SETTINGS_PIECE_GEOMETRY_CLASSES = [
++    'quick-toggle', 'quick-toggle-has-menu', 'quick-slider', 'icon-button', 'power-item',
++];
+ const FULL_GEOMETRY_STYLE_CLASSES = [
+     'popup-menu-content', 'candidate-popup-content',
+     'quick-settings', 'quick-toggle-menu', 'screenshot-ui-panel',
+@@ -60,6 +98,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+ 
+         this.actor.hide();
+         registerSurface(this);
++        if (!this.static_blur && this.is_quick_settings_piece())
++            quick_settings_motion.surfaces.add(this);
+         this.parent.add_child(this.actor);
+         if (!this.static_blur)
+             this.pipeline.attach_pipeline();
+@@ -161,6 +201,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
+     }
+ 
++    is_quick_settings_piece() {
++        const menu = Main.panel.statusArea.quickSettings?.menu?.actor;
++        return Boolean(menu?.contains(this.target));
++    }
++
+     is_heavy_surface() {
+         return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
+     }
+@@ -174,10 +219,25 @@ export const PopupBlurSurface = class PopupBlurSurface {
+     }
+ 
+     uses_full_actor_geometry() {
+-        return this.matches_any_style_class(FULL_GEOMETRY_STYLE_CLASSES);
++        // quick settings pieces: the blur fills the button's own box, the box its outline is
++        // drawn on, not the box of its icon and padding (which sits smaller and off centre)
++        return this.matches_any_style_class(FULL_GEOMETRY_STYLE_CLASSES)
++            || has_any_style_class(this.target, QUICK_SETTINGS_PIECE_GEOMETRY_CLASSES)
++            || this.target instanceof QuickMenuToggle;
+     }
+ 
+     update() {
++        const t0 = prof_begin();
++        try {
++            if (quick_settings_motion.surfaces.has(this))
++                quick_settings_motion.moved(this);
++            this.update_surface();
++        } finally {
++            prof_end('surface.update', t0);
++        }
++    }
++
++    update_surface() {
+         if (this.is_notification_surface()) {
+             this.update_live_surface();
+             return;
+@@ -332,7 +392,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+     }
+ 
+     get_corner_radius() {
+-        return this.settings.popup[this.corner_radius.property];
++        return this.corner_radius.value ?? this.settings.popup[this.corner_radius.property];
+     }
+ 
+     is_visible() {
+@@ -372,6 +432,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         this.signals.destroy();
+         this.style.restore_target_style();
+         unregisterSurface(this);
++        quick_settings_motion.remove(this);
+ 
+         if (this.static_blur) {
+             this.static_actor.destroy();
+diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
+index 0dce45a..a18dd65 100644
+--- a/src/components/popup/targets.js
++++ b/src/components/popup/targets.js
+@@ -1,4 +1,5 @@
+ import St from 'gi://St';
++import { QuickMenuToggle } from 'resource:///org/gnome/shell/ui/quickSettings.js';
+ 
+ import { has_any_style_class, is_internal_actor } from './actors.js';
+ 
+@@ -9,6 +10,17 @@ const POPUP_TARGET_STYLE_CLASSES = [
+ ];
+ const POPUP_CHILD_STYLE_CLASSES = ['osd-window', 'resize-popup', 'switcher-list', 'workspace-switcher', 'modal-dialog', 'run-dialog', 'clipboard-dialog'];
+ const POPUP_DESCENDANT_TARGET_STYLE_CLASSES = ['switcher-list'];
++// Quick settings without a card: each toggle, slider, system button and opened
++// submenu gets a blur of its own, and the panel behind them none.
++const QUICK_SETTINGS_PIECE_STYLE_CLASSES = [
++    'quick-toggle-has-menu', 'quick-toggle', 'quick-slider', 'quick-toggle-menu',
++    'icon-button', 'power-item',
++];
++// Toggles, sliders and system buttons are capsules and circles: a radius past any of
++// their heights, which the blur caps at half the height. Opened submenus keep theirs.
++const QUICK_SETTINGS_ROUND_STYLE_CLASSES = QUICK_SETTINGS_PIECE_STYLE_CLASSES
++    .filter(style_class => style_class !== 'quick-toggle-menu');
++const ROUND_CORNER_RADIUS = { key: null, property: null, value: 9999 };
+ 
+ export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
+ export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
+@@ -95,6 +107,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+         }
+ 
+         const box = actor._delegate?.box;
++        const quick_settings = [box, actor].find(
++            candidate => this.has_any_style_class(candidate, ['quick-settings'])
++        );
++        if (quick_settings) {
++            // never the panel itself, even before its pieces exist
++            this.find_quick_settings_pieces(quick_settings, targets);
++            return targets;
++        }
++
+         if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
+             targets.add(box);
+ 
+@@ -143,6 +164,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+                 }
+             }
+ 
++            if (this.has_any_style_class(child, ['quick-settings'])) {
++                this.find_quick_settings_pieces(child, targets);
++                continue;
++            }
++
+             if (this.is_blur_target_actor(child)) {
+                 targets.add(child);
+                 continue;
+@@ -152,6 +178,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+         }
+     }
+ 
++    /// The outermost pieces only: a split toggle is blurred once, not per half.
++    find_quick_settings_pieces(quick_settings, targets) {
++        const stack = [...quick_settings.get_children()];
++        while (stack.length > 0) {
++            const child = stack.pop();
++            if (is_internal_actor(child))
++                continue;
++            // a split toggle (Wi-Fi, Bluetooth, power mode) is one piece: GNOME adds its
++            // 'quick-toggle-has-menu' class only once the menu is ready, so it is also known
++            // by its widget type, or its toggle and arrow would be blurred apart
++            if (this.has_any_style_class(child, QUICK_SETTINGS_PIECE_STYLE_CLASSES)
++                || child instanceof QuickMenuToggle) {
++                targets.add(child);
++                continue;
++            }
++            stack.push(...child.get_children());
++        }
++    }
++
+     push_children(stack, children) {
+         for (let index = children.length - 1; index >= 0; index--)
+             stack.push({ actor: children[index], fallback_count: null });
+@@ -167,6 +212,10 @@ export const PopupBlurTargets = class PopupBlurTargets {
+     }
+ 
+     get_corner_radius(target, root_actor) {
++        if ((this.has_any_style_class(target, QUICK_SETTINGS_ROUND_STYLE_CLASSES)
++            || target instanceof QuickMenuToggle)
++            && !this.has_any_style_class(target, ['quick-toggle-menu']))
++            return ROUND_CORNER_RADIUS;
+         return POPUP_CORNER_RADII.find(radius =>
+             has_any_style_class(target, radius.style_classes)
+             || has_any_style_class(root_actor, radius.style_classes)
+diff --git a/src/conveniences/tahoe_prof.js b/src/conveniences/tahoe_prof.js
+new file mode 100644
+index 0000000..d59f7a2
+--- /dev/null
++++ b/src/conveniences/tahoe_prof.js
+@@ -0,0 +1,21 @@
++import GLib from 'gi://GLib';
++
++/// Tahoe glass frame probe: time spent in the blur code while quick settings is open, read by the
++/// tahoe-probe extension through the shell's shared global object. Off unless that probe is on.
++export const prof = globalThis.__tahoeProf ??= { on: false, time: {}, count: {} };
++
++export function prof_begin() {
++    return prof.on ? GLib.get_monotonic_time() : 0;
++}
++
++export function prof_end(name, t0) {
++    if (!t0)
++        return;
++    prof.time[name] = (prof.time[name] ?? 0) + GLib.get_monotonic_time() - t0;
++    prof.count[name] = (prof.count[name] ?? 0) + 1;
++}
++
++export function prof_count(name) {
++    if (prof.on)
++        prof.count[name] = (prof.count[name] ?? 0) + 1;
++}
+diff --git a/src/effects/blur/dual_kawase_blur.js b/src/effects/blur/dual_kawase_blur.js
+index 352b7e8..efb468d 100644
+--- a/src/effects/blur/dual_kawase_blur.js
++++ b/src/effects/blur/dual_kawase_blur.js
+@@ -4,6 +4,7 @@ import * as utils from '../../conveniences/utils.js';
+ import { getEffectBounds } from '../../render/effect_bounds.js';
+ import { get_view_framebuffer } from '../../render/backdrop/painted_view.js';
+ import { getKawaseConfiguration, getKawaseInputBounds } from './kawase_sampling.js';
++import { prof_begin, prof_count, prof_end } from '../../conveniences/tahoe_prof.js';
+ import {
+     DOWNSAMPLE_CODE,
+     DOWNSAMPLE_DECLARATIONS,
+@@ -414,6 +415,15 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
+     }
+ 
+     vfunc_paint_node(node, paintContext, flags) {
++        const t0 = prof_begin();
++        try {
++            this.paint_blur_node(node, paintContext, flags);
++        } finally {
++            prof_end('kawase.paint', t0);
++        }
++    }
++
++    paint_blur_node(node, paintContext, flags) {
+         const actor = this.get_actor();
+         const bounds = getEffectBounds(actor, this);
+         if (bounds.width <= 0 || bounds.height <= 0)
+@@ -446,6 +456,7 @@ const DualKawaseBlurEffectClass = utils.IS_IN_PREFERENCES ? null : GObject.regis
+             && (actor._bms_live_input || flags & Clutter.EffectPaintFlags.ACTOR_DIRTY);
+         if (!this.blurValid || refreshes_input) {
+             this.addBlurPasses(node, actor, inputBounds, passes, blend);
++            prof_count('kawase.rerender');
+             this.blurValid = true;
+         }
+ 
+diff --git a/src/render/backdrop/capture.js b/src/render/backdrop/capture.js
+index cee1710..975ed7c 100644
+--- a/src/render/backdrop/capture.js
++++ b/src/render/backdrop/capture.js
+@@ -9,6 +9,7 @@ import { BackdropOutputEffect } from './output.js';
+ import { registerBackdrop, unregisterBackdrop, queueBackdropRedraw } from './damage.js';
+ import { get_painted_view, get_view_framebuffer } from './painted_view.js';
+ import { get_snippet } from '../shader/snippet_cache.js';
++import { prof_begin, prof_count, prof_end } from '../../conveniences/tahoe_prof.js';
+ import {
+     getTextureCapacity,
+     largestViewSize,
+@@ -243,6 +244,15 @@ export const BackdropCaptureEffect = GObject.registerClass({
+     }
+ 
+     vfunc_paint_node(node, paintContext) {
++        const t0 = prof_begin();
++        try {
++            this.capture_node(node, paintContext);
++        } finally {
++            prof_end('capture.paint', t0);
++        }
++    }
++
++    capture_node(node, paintContext) {
+         const actor = this.get_actor();
+         const sourceFramebuffer = get_view_framebuffer(paintContext);
+         if (!sourceFramebuffer) {
+@@ -278,6 +288,7 @@ export const BackdropCaptureEffect = GObject.registerClass({
+         for (const rect of rectangles) {
+             if (rect.width <= 0 || rect.height <= 0)
+                 continue;
++            prof_count('capture.blit');
+             blitFramebuffer(sourceFramebuffer,
+                 this.target.framebuffer,
+                 rect.x,
+diff --git a/src/render/backdrop/damage.js b/src/render/backdrop/damage.js
+index c16a601..2143d84 100644
+--- a/src/render/backdrop/damage.js
++++ b/src/render/backdrop/damage.js
+@@ -1,3 +1,5 @@
++import { prof_count } from '../../conveniences/tahoe_prof.js';
++
+ const captures = new Set();
+ 
+ export function registerBackdrop(capture) {
+@@ -16,6 +18,7 @@ function overlaps(a, b) {
+ }
+ 
+ export function queueBackdropRedraw(actor) {
++    prof_count('backdrop.cascade');
+     const affected = [{ actor, bounds: actor.get_transformed_extents() }];
+     const candidates = new Map();
+     for (const capture of captures) {
+diff --git a/src/render/dynamic_surface.js b/src/render/dynamic_surface.js
+index ae03cc8..5a0e2e6 100644
+--- a/src/render/dynamic_surface.js
++++ b/src/render/dynamic_surface.js
+@@ -207,6 +207,16 @@ export class DynamicPipeline {
+         this.roundedPipeline?.update();
+     }
+ 
++    /// Live, the blur follows the backdrop at every paint; otherwise it keeps what it has
++    /// until its size changes, and is refreshed once when it goes live again.
++    set_live(live) {
++        if (!this.contentActor || this.contentActor._bms_live_input === live)
++            return;
++        this.contentActor._bms_live_input = live;
++        if (live)
++            this.repaint_effect();
++    }
++
+     repaint_effect() {
+         this.captureEffect?.queue_repaint();
+         this.effects.forEach(effect => effect.queue_repaint());
+diff --git a/src/render/shader/shader_effect.js b/src/render/shader/shader_effect.js
+index e277374..b38c303 100644
+--- a/src/render/shader/shader_effect.js
++++ b/src/render/shader/shader_effect.js
+@@ -4,6 +4,7 @@ import GObject from 'gi://GObject';
+ import Graphene from 'gi://Graphene';
+ import { getEffectBounds } from '../effect_bounds.js';
+ import { get_view_framebuffer } from '../backdrop/painted_view.js';
++import { prof_begin, prof_count, prof_end } from '../../conveniences/tahoe_prof.js';
+ import {
+     getTextureCapacity,
+     largestViewSize,
+@@ -114,6 +115,15 @@ export const SurfaceShaderEffect = GObject.registerClass({
+     }
+ 
+     vfunc_paint(node, paintContext, flags) {
++        const t0 = prof_begin();
++        try {
++            this.paint_shader(node, paintContext, flags);
++        } finally {
++            prof_end('shader.paint', t0);
++        }
++    }
++
++    paint_shader(node, paintContext, flags) {
+         const actor = this.get_actor();
+         if (flags & Clutter.EffectPaintFlags.BYPASS_EFFECT || actor.width <= 0 || actor.height <= 0) {
+             node.add_child(new Clutter.ActorNode(actor, -1));
+@@ -140,6 +150,7 @@ export const SurfaceShaderEffect = GObject.registerClass({
+             layer.set_name('BmsShader input');
+             layer.add_child(new Clutter.ActorNode(actor, 255));
+             node.add_child(layer);
++            prof_count('shader.rerender');
+             this.sourceValid = true;
+         }
+         this.vfunc_paint_target(node, paintContext);
+diff --git a/src/settings/keys.js b/src/settings/keys.js
+index 43e8d18..ad7ae05 100644
+--- a/src/settings/keys.js
++++ b/src/settings/keys.js
+@@ -95,6 +95,7 @@ export const KEYS = [
+             { type: Type.B, name: "blur" },
+             { type: Type.B, name: "static-blur" },
+             { type: Type.S, name: "pipeline" },
++            { type: Type.B, name: "quick-settings-freeze" },
+             { type: Type.I, name: "corner-radius" },
+             { type: Type.I, name: "rounded-corners" },
+             { type: Type.I, name: "menu-corner-radius" },
+diff --git a/src/styles/tahoe-glass.css b/src/styles/tahoe-glass.css
+new file mode 100644
+index 0000000..874b03b
+--- /dev/null
++++ b/src/styles/tahoe-glass.css
+@@ -0,0 +1,238 @@
++/* tahoe glass (cachyos-tahoe-theme): blurred menus and each quick settings piece (blurred
++   on its own, no card behind it) look like the top bar's capsule. The tint comes from the
++   same Liquid Glass effect as the bar, so nothing here paints a fill of its own, and every
++   edge is the bar's: a thin white line at 12 %, no glow. The pieces are matched with extra
++   specificity too, since some of Blur My Shell's quick settings rules outweigh two classes. */
++.bms-popup-background-transparent .popup-menu-content,
++.bms-popup-background-transparent .popup-menu-content.datemenu-popover,
++.bms-popup-background-transparent .notification-banner,
++.bms-popup-background-transparent .quick-toggle-menu,
++.bms-popup-background-transparent .modal-dialog,
++.bms-popup-background-dark .popup-menu-content,
++.bms-popup-background-dark .popup-menu-content.datemenu-popover,
++.bms-popup-background-dark .notification-banner,
++.bms-popup-background-dark .quick-toggle-menu,
++.bms-popup-background-dark .modal-dialog,
++.bms-popup-background-light .popup-menu-content,
++.bms-popup-background-light .popup-menu-content.datemenu-popover,
++.bms-popup-background-light .notification-banner,
++.bms-popup-background-light .quick-toggle-menu,
++.bms-popup-background-light .modal-dialog,
++.bms-popup-background-transparent .quick-toggle,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle,
++.bms-popup-background-transparent .quick-toggle-has-menu,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu,
++.bms-popup-background-transparent .quick-toggle-has-menu:checked,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu:checked,
++.bms-popup-background-transparent .quick-slider,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-slider,
++.bms-popup-background-transparent .quick-settings-system-item .icon-button,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-settings-system-item .icon-button,
++.bms-popup-background-transparent .quick-settings-system-item .power-item,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-settings-system-item .power-item,
++.bms-popup-background-dark .quick-toggle,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle,
++.bms-popup-background-dark .quick-toggle-has-menu,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu,
++.bms-popup-background-dark .quick-toggle-has-menu:checked,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu:checked,
++.bms-popup-background-dark .quick-slider,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-slider,
++.bms-popup-background-dark .quick-settings-system-item .icon-button,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-settings-system-item .icon-button,
++.bms-popup-background-dark .quick-settings-system-item .power-item,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-settings-system-item .power-item,
++.bms-popup-background-light .quick-toggle,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle,
++.bms-popup-background-light .quick-toggle-has-menu,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu,
++.bms-popup-background-light .quick-toggle-has-menu:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu:checked,
++.bms-popup-background-light .quick-slider,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-slider,
++.bms-popup-background-light .quick-settings-system-item .icon-button,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-settings-system-item .icon-button,
++.bms-popup-background-light .quick-settings-system-item .power-item,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-settings-system-item .power-item {
++  background-color: transparent !important;
++  border: 1px solid rgba(255, 255, 255, 0.12) !important;
++  box-shadow: none !important;
++}
++
++/* cards inside the calendar and its notifications: the same edge, no fill */
++.bms-popup-background-transparent .events-button,
++.bms-popup-background-transparent .world-clocks-button,
++.bms-popup-background-transparent .weather-button,
++.bms-popup-background-transparent .popup-menu .message,
++.bms-popup-background-dark .events-button,
++.bms-popup-background-dark .world-clocks-button,
++.bms-popup-background-dark .weather-button,
++.bms-popup-background-dark .popup-menu .message,
++.bms-popup-background-light .events-button,
++.bms-popup-background-light .world-clocks-button,
++.bms-popup-background-light .weather-button,
++.bms-popup-background-light .popup-menu .message {
++  background-color: transparent !important;
++  border: 1px solid rgba(255, 255, 255, 0.12) !important;
++  box-shadow: none !important;
++}
++
++/* a split toggle draws one outline and no fill, not one per half */
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button {
++  background-color: transparent !important;
++  border-color: transparent !important;
++  box-shadow: none !important;
++}
++
++/* a toggle that is on keeps the theme's white fill and accent-coloured label */
++.bms-popup-background-transparent .quick-toggle:checked,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle:checked,
++.bms-popup-background-dark .quick-toggle:checked,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle:checked,
++.bms-popup-background-light .quick-toggle:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle:checked {
++  background-color: white !important;
++  color: -st-accent-color !important;
++}
++.bms-popup-background-transparent .quick-toggle:checked:hover,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle:checked:hover,
++.bms-popup-background-dark .quick-toggle:checked:hover,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle:checked:hover,
++.bms-popup-background-light .quick-toggle:checked:hover,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle:checked:hover {
++  background-color: st-mix(#dadada, white, 6%) !important;
++  color: -st-accent-color !important;
++}
++.bms-popup-background-transparent .quick-toggle:checked:active,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle:checked:active,
++.bms-popup-background-dark .quick-toggle:checked:active,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle:checked:active,
++.bms-popup-background-light .quick-toggle:checked:active,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle:checked:active {
++  background-color: st-mix(#dadada, white, 15%) !important;
++  color: -st-accent-color !important;
++}
++
++/* a split toggle that is on (Wi-Fi, Bluetooth, power mode): white label and a clear arrow,
++   as the theme draws them, in place of Blur My Shell's accent-coloured ones. The white icon
++   circle shows the state. */
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked {
++  background-color: transparent !important;
++  color: white !important;
++}
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:hover,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover {
++  background-color: rgba(255, 255, 255, 0.14) !important;
++  color: white !important;
++}
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button:checked:active,
++.bms-popup-background-transparent .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:active,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button:checked:active,
++.bms-popup-background-dark .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:active,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:active,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:checked:active,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked:active {
++  background-color: rgba(255, 255, 255, 0.2) !important;
++  color: white !important;
++}
++
++/* no card behind quick settings */
++.bms-popup-background-transparent .popup-menu-content.quick-settings,
++.bms-popup-background-dark .popup-menu-content.quick-settings,
++.bms-popup-background-light .popup-menu-content.quick-settings {
++  background-color: transparent !important;
++  border: none !important;
++  box-shadow: none !important;
++}
++
++/* capsules and circles, matching the blur behind them: 9999 px rounds each to its shorter side */
++.bms-popup-background-transparent .quick-toggle,
++.bms-popup-background-transparent .quick-toggle-has-menu,
++.bms-popup-background-transparent .quick-slider,
++.bms-popup-background-transparent .quick-settings-system-item .icon-button,
++.bms-popup-background-transparent .quick-settings-system-item .power-item,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-transparent .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-dark .quick-toggle,
++.bms-popup-background-dark .quick-toggle-has-menu,
++.bms-popup-background-dark .quick-slider,
++.bms-popup-background-dark .quick-settings-system-item .icon-button,
++.bms-popup-background-dark .quick-settings-system-item .power-item,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-dark .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .quick-toggle,
++.bms-popup-background-light .quick-toggle-has-menu,
++.bms-popup-background-light .quick-slider,
++.bms-popup-background-light .quick-settings-system-item .icon-button,
++.bms-popup-background-light .quick-settings-system-item .power-item,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button {
++  border-radius: 9999px !important;
++}
++
++/* the dock in glass: Blur My Shell's transparent dock style clears the theme's background
++   and also its edge; put back the top bar's edge (same selectors, so this, loaded later, wins) */
++.transparent-dash .dash-background,
++.transparent-dash.dash-background,
++#dash.transparent-dash > .dash-background.transparent-dash,
++#dash.transparent-dash .dash-background,
++StBoxLayout > StWidget > #dash.transparent-dash > .dash-background.transparent-dash,
++.transparent-dash .multimonitor-dock .dash-background,
++.multimonitor-dock.transparent-dash .dash-background {
++  border: 1px solid rgba(255, 255, 255, 0.12) !important;
++  box-shadow: none !important;
++}
++
++/* light mode (Blur My Shell's light menu style): dark labels on light glass, as Tahoe draws them,
++   on a split toggle that is on (the rules above make it white for the dark styles) */
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle:checked,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button,
++.bms-popup-background-light .quick-toggle-has-menu .quick-toggle-menu-button:checked,
++.bms-popup-background-light .popup-menu-content.quick-settings .quick-toggle-has-menu .quick-toggle-menu-button:checked {
++  color: rgba(0, 0, 0, 0.85) !important;
++}
+diff --git a/src/effects/refraction/info.js b/src/effects/refraction/info.js
+index 959ec68..6514fec 100644
+--- a/src/effects/refraction/info.js
++++ b/src/effects/refraction/info.js
+@@ -144,6 +144,46 @@ export function get_refraction_effects(_) {
+                     big_increment: 0.1,
+                     digits: 2
+                 },
++                rim_light: {
++                    name: _("Rim light"),
++                    description: _("A lit rim at the glass edge, from the Fresnel glare angle."),
++                    type: "float",
++                    min: 0.,
++                    max: 1.,
++                    increment: 0.01,
++                    big_increment: 0.1,
++                    digits: 2
++                },
++                rim_light_width: {
++                    name: _("Rim light width"),
++                    description: _("Width of the lit rim, as a fraction of the refraction band."),
++                    type: "float",
++                    min: 0.05,
++                    max: 1.,
++                    increment: 0.05,
++                    big_increment: 0.25,
++                    digits: 2
++                },
++                ao: {
++                    name: _("Edge shadow"),
++                    description: _("Darkening just inside the glass edge."),
++                    type: "float",
++                    min: 0.,
++                    max: 1.,
++                    increment: 0.01,
++                    big_increment: 0.1,
++                    digits: 2
++                },
++                ao_width: {
++                    name: _("Edge shadow width"),
++                    description: _("Width of the edge shadow, as a fraction of the refraction band."),
++                    type: "float",
++                    min: 0.02,
++                    max: 1.,
++                    increment: 0.02,
++                    big_increment: 0.1,
++                    digits: 2
++                },
+                 rgb_fringing: {
+                     name: _("Chromatic dispersion"),
+                     description: _("Physical per-channel refraction dispersion at the glass edge."),
+diff --git a/src/effects/refraction/refraction.glsl b/src/effects/refraction/refraction.glsl
+index 359dd19..2f7ded4 100644
+--- a/src/effects/refraction/refraction.glsl
++++ b/src/effects/refraction/refraction.glsl
+@@ -41,6 +41,16 @@ uniform float clip_y0;
+ uniform float clip_width;
+ uniform float clip_height;
+ 
++// tahoe glass (cachyos-tahoe-theme): a lit rim and an inner shadow on top of the 0.1.1b port.
++// The rim is lit from a height field, after liquid-glass (ryohsuke1231, MIT): the edge of the
++// glass is a superellipse slope whose normal catches a light from fresnel_angle; the inner
++// shadow is the ambient-occlusion band inside that edge. Both act within the refraction band,
++// so the flat interior keeps its fast path. All widths are fractions of the band.
++uniform float rim_light;
++uniform float rim_light_width;
++uniform float ao;
++uniform float ao_width;
++
+ const float DISPERSION_SCALE = 10.0;
+ 
+ float quartzGlassEdgeProfile(float distanceFromEdge,
+@@ -269,6 +279,39 @@ vec3 applyTintAndShadow(vec3 sample, vec2 localUV) {
+     return clamp(outRGB, 0.0, 1.0);
+ }
+ 
++// slope of the superellipse profile h(t) = (1 - (1 - t)^n)^(1/n), t = 0 at the edge, 1 inside:
++// steep at the edge, flat in the middle
++float tahoeLensSlope(float t) {
++    float n = 3.6;
++    float u = clamp(1.0 - t, 0.0, 1.0);
++    float inner = max(1.0 - pow(u, n), 1e-4);
++    return pow(inner, 1.0 / n - 1.0) * pow(u, n - 1.0);
++}
++
++vec3 tahoeRimLight(vec3 color, float distFromEdge, float band, vec2 outward) {
++    if (rim_light <= 0.001)
++        return color;
++    float width = max(band * rim_light_width, 1.0);
++    float t = clamp(distFromEdge / width, 0.0, 1.0);
++    float slope = tahoeLensSlope(t) * 2.5;
++    vec3 normal = normalize(vec3(outward * slope, 1.0));
++    float fresnel = pow(1.0 - normal.z, 3.0);
++    vec3 light = normalize(vec3(cos(fresnel_angle), sin(fresnel_angle), 0.38));
++    float lit = pow(abs(dot(normal, light)), 1.9);
++    float edgeBand = 1.0 - smoothstep(0.0, width, distFromEdge);
++    float glow = mix(pow(edgeBand, 0.85), fresnel, 0.55) * edgeBand * lit * rim_light;
++    glow = clamp(glow, 0.0, 1.0);
++    return 1.0 - (1.0 - color) * (1.0 - glow);
++}
++
++vec3 tahoeInnerShadow(vec3 color, float distFromEdge, float band) {
++    if (ao <= 0.001)
++        return color;
++    float width = max(band * ao_width, 0.5);
++    float mask = 1.0 - smoothstep(0.0, width, distFromEdge);
++    return color * (1.0 - mask * ao);
++}
++
+ void main() {
+     vec2 actorSize = vec2(width, height);
+     vec2 actorUV = cogl_tex_coord_in[0].xy;
+@@ -400,6 +443,9 @@ if (!useCircularSurface && (roundingRadius == 0.0 || R < shortestSide * 0.45)
+         outRGB = 1.0 - (1.0 - outRGB) * (1.0 - specular);
+     }
+ 
++    outRGB = tahoeInnerShadow(outRGB, distFromSide, refractionBand);
++    outRGB = tahoeRimLight(outRGB, distFromSide, refractionBand, dir);
++
+     outRGB *= 1.0 - smoothstep(0.25, 1.0, localUV.y) * shadow * 0.20;
+     outRGB = mix(sourceColor.rgb, outRGB, opacity_factor);
+ 
+diff --git a/src/effects/refraction/refraction.js b/src/effects/refraction/refraction.js
+index d02274b..c43940b 100644
+--- a/src/effects/refraction/refraction.js
++++ b/src/effects/refraction/refraction.js
+@@ -344,6 +344,58 @@ const RefractionEffectClass = utils.IS_IN_PREFERENCES ? null : class RefractionE
+             }
+         }
+ 
++        get rim_light() {
++            return this._rim_light;
++        }
++
++        set rim_light(value) {
++            const v = utils.clamp(value, 0, 1, DEFAULT_PARAMS.rim_light);
++            if (this._rim_light !== v) {
++                this._rim_light = v;
++
++                uniforms.set_uniform(this, 'rim_light', parseFloat(this._rim_light - 1e-6));
++            }
++        }
++
++        get rim_light_width() {
++            return this._rim_light_width;
++        }
++
++        set rim_light_width(value) {
++            const v = utils.clamp(value, 0.05, 1, DEFAULT_PARAMS.rim_light_width);
++            if (this._rim_light_width !== v) {
++                this._rim_light_width = v;
++
++                uniforms.set_uniform(this, 'rim_light_width', parseFloat(this._rim_light_width - 1e-6));
++            }
++        }
++
++        get ao() {
++            return this._ao;
++        }
++
++        set ao(value) {
++            const v = utils.clamp(value, 0, 1, DEFAULT_PARAMS.ao);
++            if (this._ao !== v) {
++                this._ao = v;
++
++                uniforms.set_uniform(this, 'ao', parseFloat(this._ao - 1e-6));
++            }
++        }
++
++        get ao_width() {
++            return this._ao_width;
++        }
++
++        set ao_width(value) {
++            const v = utils.clamp(value, 0.02, 1, DEFAULT_PARAMS.ao_width);
++            if (this._ao_width !== v) {
++                this._ao_width = v;
++
++                uniforms.set_uniform(this, 'ao_width', parseFloat(this._ao_width - 1e-6));
++            }
++        }
++
+         get opacity_factor() {
+             return this._opacity_factor;
+         }
+diff --git a/src/effects/refraction/refraction_config.js b/src/effects/refraction/refraction_config.js
+index b779058..ee6000e 100644
+--- a/src/effects/refraction/refraction_config.js
++++ b/src/effects/refraction/refraction_config.js
+@@ -21,6 +21,10 @@ export const DEFAULT_PARAMS = {
+     tint_color: [1, 1, 1, 1],
+     backdrop_zoom: 1,
+     shadow: 0.3,
++    rim_light: 0,
++    rim_light_width: 0.35,
++    ao: 0,
++    ao_width: 0.15,
+     opacity_factor: 1,
+     texture_repeat: 0,
+     width: 0,
+@@ -126,6 +130,22 @@ export const REFRACTION_EFFECT_META = {
+             'shadow', 'Shadow', 'Inner shadow strength',
+             0, 1, DEFAULT_PARAMS.shadow
+         ),
++        rim_light: doubleProperty(
++            'rim_light', 'Rim Light', 'Strength of the lit rim at the glass edge',
++            0, 1, DEFAULT_PARAMS.rim_light
++        ),
++        rim_light_width: doubleProperty(
++            'rim_light_width', 'Rim Light Width', 'Width of the lit rim, as a fraction of the refraction band',
++            0.05, 1, DEFAULT_PARAMS.rim_light_width
++        ),
++        ao: doubleProperty(
++            'ao', 'Edge Shadow', 'Darkening just inside the glass edge',
++            0, 1, DEFAULT_PARAMS.ao
++        ),
++        ao_width: doubleProperty(
++            'ao_width', 'Edge Shadow Width', 'Width of the edge shadow, as a fraction of the refraction band',
++            0.02, 1, DEFAULT_PARAMS.ao_width
++        ),
+         opacity_factor: doubleProperty(
+             'opacity_factor', 'Opacity Factor', 'Refraction blend strength',
+             0, 1, DEFAULT_PARAMS.opacity_factor
