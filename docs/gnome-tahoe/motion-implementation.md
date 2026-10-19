@@ -46,6 +46,16 @@ committed, then installed for the user with one logout at the end.
 - Exit: headless stills (slowed) show drop, liquid spread and the overshoot-settle; frame times as
   before (p95 under 12 ms); no snap at the end of any stage.
 
+### Phase B result (headless, 2026-10-19)
+
+Built as planned with one change, found in the stills: the elastic overshoot is carried by
+scale, not by the shape's edges. A shape's edge cannot pass its glass, so an edge spring that
+overshoots stops dead at the boundary. The edges now settle smoothly (damping 0.9), and the
+popup (BoxPointer, banner bin, app menu window) grows from 0.86 about its origin on an elastic
+spring (damping 0.55), overshooting by about 2 %, its height giving way while its width is past
+its size (jelly). Rows also wait until the glass is 85 % wide, so text never shows outside it.
+Stills: `shots/motion3-calendar.png`, `motion3-desktop.png`.
+
 ## Phase C: quick settings, liquid and staggered
 
 - Buttons arrive top to bottom with an eased stagger (70 ms between rows, 20 ms within a row);
@@ -56,6 +66,20 @@ committed, then installed for the user with one logout at the end.
 - Submenus: the toggle's capsule is the starting shape; the card pours down out of it (the bottom
   edge leads), the buttons below move with the submenu's height on the same spring.
 - Exit: stills, frame times.
+
+### Phase C result (headless, 2026-10-19)
+
+A button is one liquid body: glass, fill, edge and content scale together (no reveal shape), its
+width on a spatial fast spring and its height on spatial default, from a round blob 55 % of its
+height. It widens ahead of growing taller and wobbles as the two settle out of step. (A first try
+kept the glass on its own edge springs: the button's outline and parts reached full size before
+its glass did.) The glass fades with the button; the panel itself does not fade. Blur My Shell
+patch: a surface whose glass is fully faded no longer runs a full update on every frame (it did
+260 updates per close). Buttons arrive in rows on an eased stagger (about 70 ms between rows,
+20 ms within one), parts 50 ms apart. Stills: `shots/motion3-quick-settings.png`.
+
+Frame times with the user's glass, p95 (max): quick settings open 9.9 (13.7), close 9.0 (9.8);
+submenus 8.9 / 8.6; calendar 8.6 / 8.5; desktop menu 8.5 / 8.5; menu switching 9.0 / 9.5.
 
 ## Phase D: icon effects (with the current icons)
 

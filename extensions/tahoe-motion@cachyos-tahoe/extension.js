@@ -124,6 +124,7 @@ export default class TahoeMotion extends Extension {
             origin: stageRect(menu.sourceActor),
             pieces: [piece],
             fadeRoot: false,
+            elastic: false,
             step: () => {
                 container.height = Math.max(0, lerp(0, fullHeight, Math.min(1, Math.max(0, piece.qy))));
             },

@@ -417,7 +417,7 @@ index 4d16af5..eed8f3d 100644
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..f59f64e 100644
+index 5a891b9..4e0c441 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -461,7 +461,7 @@ index 5a891b9..f59f64e 100644
          this.parent.add_child(this.actor);
          if (!this.static_blur)
              this.pipeline.attach_pipeline();
-@@ -77,11 +89,88 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -77,11 +89,89 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.connect_ancestors(this.root_actor);
          if (has_style_class(this.target, 'screenshot-ui-panel'))
              this.signals.connect_actor(this.parent);
@@ -489,8 +489,9 @@ index 5a891b9..f59f64e 100644
 +    follow() {
 +        if (!this.actor)
 +            return;
-+        // hidden and staying hidden (a closed submenu): nothing to move
-+        if (!this.actor.visible && !this.is_visible())
++        // hidden and staying hidden (a closed submenu, or glass faded out by an animation): nothing
++        // to move
++        if (!this.actor.visible && (!this.is_visible() || this.fade.get_opacity() === 0))
 +            return;
 +        if (this.static_blur || !this.actor.visible || !this.at_rest(() => this.placement.follow())) {
 +            if (this.frozen && this.actor.visible && this.placement.resized) {
@@ -550,7 +551,7 @@ index 5a891b9..f59f64e 100644
      // Our overlay lives in `parent`, so tear it down before a destroyed
      // parent disposes of it as one of its children.
      connect_lifetime() {
-@@ -161,6 +250,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -161,6 +251,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
  
@@ -562,7 +563,7 @@ index 5a891b9..f59f64e 100644
      is_heavy_surface() {
          return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
      }
-@@ -174,10 +268,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -174,10 +269,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      uses_full_actor_geometry() {
@@ -587,7 +588,7 @@ index 5a891b9..f59f64e 100644
          if (this.is_notification_surface()) {
              this.update_live_surface();
              return;
-@@ -267,7 +374,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -267,7 +375,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
          if (this.static_blur)
              return this.static_actor.has_opacity(opacity);
          return this.actor.opacity === opacity
@@ -596,7 +597,7 @@ index 5a891b9..f59f64e 100644
      }
  
      update_surface_opacity(opacity) {
-@@ -276,6 +383,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -276,6 +384,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
              return;
          }
          this.actor.opacity = opacity;
@@ -607,7 +608,7 @@ index 5a891b9..f59f64e 100644
          this.pipeline.set_opacity_factor(this.get_pipeline_opacity(opacity) / 255);
      }
  
-@@ -286,7 +397,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -286,7 +398,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_update() {
@@ -617,7 +618,7 @@ index 5a891b9..f59f64e 100644
              return;
          this.update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -299,8 +411,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -299,8 +412,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_transition_update(transition_state = null) {
@@ -629,7 +630,7 @@ index 5a891b9..f59f64e 100644
              return;
          this.transition_update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -332,7 +446,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -332,7 +447,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      get_corner_radius() {
@@ -638,7 +639,7 @@ index 5a891b9..f59f64e 100644
      }
  
      is_visible() {
-@@ -372,6 +486,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -372,6 +487,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);

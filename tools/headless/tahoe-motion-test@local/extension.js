@@ -146,6 +146,18 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'scales') {
+            St.Settings.get().slow_down_factor = 10;
+            qs.open(true);
+            for (let i = 0; i < 6; i++) {
+                await sleep(300);
+                const pieces = qs._grid.get_children().filter(c => c.visible).slice(0, 4);
+                write('log.jsonl', { i, pieces: pieces.map(p => `${p.constructor.name} s${p.scale_x.toFixed(2)}/${p.scale_y.toFixed(2)} pv${p.pivot_point.x.toFixed(2)} op${p.opacity} flags${p._tahoe_glass_opacity_free ? 'O' : ''}${p._tahoe_glass_transform_free ? 'T' : ''}`) });
+            }
+            St.Settings.get().slow_down_factor = 1;
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'items') {
             const dir = GLib.getenv('TAHOE_TEST_MOTION_DIR');
             const items = await import(`file://${dir}/items.js`);
@@ -243,7 +255,7 @@ export default class Driver extends Extension {
                 settings.slow_down_factor = slow;
                 const step = Number(GLib.getenv('TAHOE_TEST_STEP') ?? 30);
                 menu.open(true);
-                for (let i = 0; i < Math.ceil(450 / step); i++) {
+                for (let i = 0; i < Math.ceil(Number(GLib.getenv("TAHOE_TEST_OPEN_WINDOW") ?? 450) / step); i++) {
                     await shotRect(`strip-${label}-open-${i}`, box);
                     await sleep(step * slow);
                 }
