@@ -162,6 +162,34 @@ it). It replaces GNOME's BoxPointer slide-and-fade for glass popups only.
 - **Dock menus and notifications:** optional, same mechanism; listed in the questions.
 - **Reduced motion:** when GNOME's animations switch is off, popups appear at once, as now.
 
+### App dropdowns (scope added 2026-10-19 evening, user: "the animation should apply to dropdowns aswell")
+
+GTK4 popovers and popover menus (Files' ⋯ and right-click menus, header bar menus), GtkDropDown
+lists (Settings) and GTK3 popup menus. They are Wayland `xdg_popup` windows of their own, glassed
+by the patch's `is_app_menu()` path in `components/applications/` (not by the popup component),
+so none of the BoxPointer work above reaches them.
+
+- **Today:** GNOME 51's `WindowManager._mapWindow` animates only normal windows and dialogs; menu,
+  dropdown, popup-menu and combo windows map and unmap at once (no fade). So they cannot be choppy
+  in motion; the risk is the first frame: every popup is a new window, so the patch builds a new
+  glass pipeline (capture, Kawase levels, refraction target) for each one.
+- **Phase 0:** probe v3 (`tools/tahoe-probe@cachyos-tahoe`) also records these windows on the window
+  manager's `map` and `destroy` signals, labelled `app:<app id>:<window type>`. Needs a measuring
+  round on the real desktop (the user opens Files ⋯, Files right-click, a Settings drop-down, a GTK3
+  context menu).
+- **Phase 1:** reuse the app-menu glass pipeline between popups (a small pool keyed by size class)
+  instead of building one per window; warm its shaders at startup with the shell's.
+- **Phase 3:** the reveal shape is the same refraction uniforms, on the app-menu pipeline.
+- **Phase 4:** `tahoe-motion` hooks the window manager's `map` / `destroy` for these window types
+  (only when `is_app_menu` is true), drives the window actor's content (opacity, scale from 0.96)
+  and the glass reveal on the same spring, and calls `completed_map` / keeps the actor for the close.
+- **Where the circle starts:** Mutter keeps the popup's anchor rectangle (the clicked widget, from
+  `xdg_positioner`) private; JS gets only the popup window, its parent and the pointer. Closest
+  option, proposed to the user: start the circle at the pointer when the popup opened from a click
+  (the pointer is on the clicked widget), clamped to the popup edge that faces it (the arrow side:
+  the edge nearest the pointer, usually the top); with the keyboard, from the middle of that edge.
+  Circle size fixed at a header-button capsule (about 34 px), since the widget's size is unknown.
+
 ### Phase 5: tune by eye, then real desktop
 
 Durations, spring stiffness, the circle's start size, and the content fade point, tuned with the
@@ -193,7 +221,8 @@ The menu bar's contents and icons, the quick settings layout, the Tahoe Control 
 3. Feel: a slight springy overshoot, fast: about 260 ms open, 160 ms close.
 4. The blurred backdrop is frozen for the quarter second of the animation (to be pointed out
    when showing results).
-5. Scope: top bar dropdowns, the quick settings panel (pieces pop in with a small stagger), QS
+5. Scope: top bar dropdowns, app dropdowns (GTK popovers, popover menus, drop-down lists, GTK3
+   popup menus; added later the same evening), the quick settings panel (pieces pop in with a small stagger), QS
    submenus (the card grows out of its toggle, rows below slide on the same spring), dock icon
    menus, the desktop right-click menu, notification banners. Reduced motion (GNOME animations
    off) = appear at once.
