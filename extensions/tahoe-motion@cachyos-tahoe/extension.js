@@ -18,6 +18,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { State as TrayState } from 'resource:///org/gnome/shell/ui/messageTray.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import { IconEffects } from './icons.js';
 import { animationsOn, ButtonPiece, CardPiece, glassApi, Morph, stageRect } from './morph.js';
 import { lerp } from './spring.js';
 
@@ -47,6 +48,9 @@ export default class TahoeMotion extends Extension {
         };
         this.patchBanners();
         this.watchAppMenus();
+        // quick settings icons bounce on press and replace on toggle (not while the panel moves)
+        this._icons = new IconEffects(() => animationsOn() === false
+            || this._morphs.has(Main.panel.statusArea.quickSettings?.menu?._boxPointer));
     }
 
     /// GNOME 51 does not export QuickToggleMenu: its prototype comes from a live toggle's menu
@@ -284,6 +288,8 @@ export default class TahoeMotion extends Extension {
     }
 
     disable() {
+        this._icons?.destroy();
+        this._icons = null;
         if (this._mapId)
             global.window_manager.disconnect(this._mapId);
         this._mapId = 0;
@@ -333,6 +339,8 @@ export default class TahoeMotion extends Extension {
 
     open(boxPointer, onComplete) {
         this.patchSubmenus();
+        if (this.isQuickSettings(boxPointer))
+            this._icons?.track(Main.panel.statusArea.quickSettings.menu);
         const previous = this.takeOver(boxPointer);
         boxPointer.remove_all_transitions();
         boxPointer.set({ opacity: 255, translation_x: 0, translation_y: 0, scale_x: 1, scale_y: 1 });

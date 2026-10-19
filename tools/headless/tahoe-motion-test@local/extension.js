@@ -146,6 +146,24 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'iconfx') {
+            qs.open(true);
+            await sleep(1500);
+            const toggle = qs._grid.get_children().find(c => c.constructor.name === 'DarkModeToggle');
+            const box = stageBox(toggle);
+            St.Settings.get().slow_down_factor = 10;
+            const icon = (function find(a) { if (a instanceof St.Icon) return a; for (const c of a.get_children()) { const f = find(c); if (f) return f; } return null; })(toggle);
+            const samples = [];
+            toggle.emit('clicked', 1);
+            for (let i = 0; i < 40; i++) {
+                samples.push(`${icon.scale_x.toFixed(2)}/${icon.opacity}`);
+                await sleep(10 * 10);
+            }
+            write('log.jsonl', { samples: samples.join(' ') });
+            St.Settings.get().slow_down_factor = 1;
+            write('log.jsonl', { checked: toggle.checked, done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'scales') {
             St.Settings.get().slow_down_factor = 10;
             qs.open(true);
