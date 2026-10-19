@@ -1,6 +1,7 @@
 # Smooth glass popups and open animations: plan
 
-Status: plan only, waiting on the user's answers (end of this file). Nothing installed.
+Status: answers in (see "Decisions" at the end), Phase 0 measured (freeze off), Phase 1 in progress
+in the `claude/glass-motion-3a54fe` worktree. Nothing installed.
 
 ## What the user asked
 
@@ -61,6 +62,47 @@ user's go-ahead, and shipped through `glass-bar.sh rebuild` plus a logout.
   menu, the desktop right-click menu, a dock icon menu. Five runs each, freeze off and on.
 - Output: a table in this file (median and worst frame time per scenario). This is the before.
 - The user opens the menus; I do not drive the shell with synthetic input (it misfired before).
+
+### Phase 0 result: the before (real desktop, 120 Hz, freeze off, 2026-10-19)
+
+From the probe session of 19:46 to 20:43 (the user opening the menus by hand; 222 records in
+`~/.cache/tahoe-probe.jsonl`). Each record is the 700 ms after an open or the 450 ms after a close.
+"Slow frames" counts frames over 12.5 ms (1.5x the 8.3 ms period) in the first 300 ms.
+
+| Scenario | Kind | Runs | First frame ms | Frame p50 | Frame p95 | Worst frame | Dropped / run | Slow frames | BMS JS (`surface.update`) per open, ms |
+|---|---|---|---|---|---|---|---|---|---|
+| Quick settings | open | 19 | **32.7** | 8.3 | **36.7** | 91 | 7 | **32 %** | **210** |
+| Quick settings | close | 19 | **36.3** | 8.4 | **56.6** | 77 | 6 | **36 %** | **257** |
+| QS submenu (Wi-Fi, Power) | open | 8 | 7.0 | 8.3 | **42.7** | 56 | 7 | **27 %** | **217** |
+| QS submenu | close | 8 | 3.9 | 8.3 | **42.0** | 59 | 3 | 6 % | 159 |
+| App indicator menus | open | 23 | 7.6 | 8.3 | **31.7** | 73 | 6 | 10 % | **195** |
+| App indicator menus | close | 23 | 9.3 | 8.3 | 14.7 | 73 | 3 | 10 % | 126 |
+| Calendar | open | 15 | 4.2 | 8.3 | 9.5 | 88 | 2 | 3 % | 10 |
+| Calendar | close | 15 | 5.0 | 8.3 | 9.5 | 56 | 0 | 2 % | 5 |
+| Vitals menu | open | 14 | 4.4 | 8.3 | 9.7 | 73 | 2 | 3 % | 20 |
+| Desktop right-click | open | 21 | 2.8 | 8.3 | 9.3 | 114 | 1 | 1 % | 7 |
+| Desktop right-click | close | 21 | 2.8 | 8.3 | 9.5 | 60 | 1 | 3 % | 6 |
+| Window menu | open | 9 | 5.7 | 8.3 | 9.7 | 18 | 1 | 3 % | 5 |
+| Dock icon menu | close | 1 | 3.8 | 8.3 | 8.9 | 15 | 1 | 3 % | 5 |
+
+Freeze on: not measured yet (asked).
+
+What the numbers say:
+
+- **The stall is Blur My Shell's JavaScript, not the GPU.** Quick settings opening runs about 137
+  `surface.update` calls at about 1.1 ms each (210 ms in all) during the 150 ms slide, so its first
+  four or five frames take 31 to 41 ms each (raw: 50, 36, 42, 36 ms ...). These updates run in
+  `BEFORE_REDRAW` laters, before the probe's `before-update` mark, which is why the probe's own
+  "CPU per frame" column (2 ms) missed them. All the GPU-side work together (capture blits, Kawase,
+  refraction) is under 0.6 ms per frame.
+- The cost per update is the geometry and transition walk: on a geometry change each surface calls
+  `transitions.complete_state()`, which walks **every descendant** of its target and root actor
+  looking for running transitions; for a quick settings piece the root is the whole panel, so the
+  13 to 15 pieces each walk the whole panel tree, several times per frame (one update per signal).
+- Menus with one glass surface (calendar, desktop menu, Vitals, window menu) are already smooth at
+  p95; their single worst frames (56 to 114 ms) are one-off hitches, most likely first paints
+  allocating textures and linking shaders.
+- The freeze key cannot fix this: it stops re-blurring but every piece still runs `update()`.
 
 ### Phase 1: make the existing animations smooth (looks the same)
 
@@ -141,14 +183,22 @@ only), record in the shared notes, and have `tahoe-repair.sh` keep any new keys.
 The menu bar's contents and icons, the quick settings layout, the Tahoe Control Center extension
 (stays off), and the glass's look itself (tint, rim, blur), which this plan keeps as it is.
 
-## Questions for the user
+## Decisions (user, 2026-10-19; final)
 
-1. "Control Center" means GNOME's quick settings panel that is on now, not the switched-off
-   Tahoe Control Center extension?
-2. Animation style for the top bar menus: the circle-from-the-icon morph, a macOS-faithful
-   quick fade and small scale from the bar (Tahoe's own menus do this), or both with a switch?
-3. Feel: a slight springy overshoot, or a calm ease with no overshoot? Roughly how fast?
-4. Is it fine that the glass behind a popup is frozen for the quarter second of the animation
-   (a video playing behind it would pause in the glass only during the open)?
-5. Which surfaces besides the top bar menus and quick settings: dock icon menus, desktop
-   right-click menu, notification banners?
+1. "Control Center" is GNOME's quick settings panel. The Tahoe Control Center extension stays off.
+2. Style: the circle morph only. A glass circle the size of the clicked icon's capsule pops out
+   under the icon and grows into the card, corners relaxing to the card radius; the content fades
+   in and scales from about 0.96 once the shape is about 60 % open. Close morphs back into the
+   icon, faster. No macOS-fade alternative.
+3. Feel: a slight springy overshoot, fast: about 260 ms open, 160 ms close.
+4. The blurred backdrop is frozen for the quarter second of the animation (to be pointed out
+   when showing results).
+5. Scope: top bar dropdowns, the quick settings panel (pieces pop in with a small stagger), QS
+   submenus (the card grows out of its toggle, rows below slide on the same spring), dock icon
+   menus, the desktop right-click menu, notification banners. Reduced motion (GNOME animations
+   off) = appear at once.
+6. Where: Phases 1 to 3 in the Blur My Shell patch; Phase 4 in a new `tahoe-motion@cachyos-tahoe`
+   extension that can be switched off on its own.
+7. Extra Phase 1 items: capture once at the final geometry, pre-allocate textures at the final
+   size, unfreeze on the transition's `completed` (no timer), warm the shaders at startup so the
+   first open does not hitch, no per-frame JS allocations.
