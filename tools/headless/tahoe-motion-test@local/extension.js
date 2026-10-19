@@ -63,7 +63,8 @@ export default class Driver extends Extension {
                 if (this._frames) {
                     const p = globalThis.__tahoeProf;
                     this._frames.push([GLib.get_monotonic_time(), GLib.get_monotonic_time() - this._t0,
-                        p ? Object.fromEntries(Object.entries(p.time).map(([k, v]) => [k, v])) : null]);
+                        p ? Object.fromEntries(Object.entries(p.time).map(([k, v]) => [k, v])) : null,
+                        p ? { ...p.count } : null]);
                 }
             }),
         ];
@@ -90,6 +91,15 @@ export default class Driver extends Extension {
             first_ms: frames.length ? (frames[0][0] - start) / 1000 : null,
             iv: iv.map(x => Math.round(x * 100) / 100),
             cpu: frames.map(f => Math.round(f[1] / 10) / 100),
+            fcount: frames.map((f, i) => {
+                const prev = i ? frames[i - 1][3] : p0?.count;
+                const out = {};
+                for (const k of Object.keys(f[3] ?? {})) {
+                    const d = f[3][k] - (prev?.[k] ?? 0);
+                    if (d > 0 && !k.startsWith('motion') && k !== 'surface.update') out[k] = d;
+                }
+                return out;
+            }),
             ftime: frames.slice(0, 6).map((f, i) => {
                 const prev = i ? frames[i - 1][2] : p0?.time;
                 const out = {};
@@ -119,6 +129,64 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'reveal') {
+            // Phase 3: the reveal shape on the calendar and on quick settings, at a few stages
+            const glass = globalThis.__tahoeGlass;
+            write('log.jsonl', { note: `api: ${Boolean(glass)}` });
+            try {
+                const pm = global.blur_my_shell._pipelines_manager;
+                write('log.jsonl', { pipelines: Object.keys(pm.pipelines ?? {}), menus: JSON.stringify(pm.pipelines?.pipeline_glassbar_menus)?.slice(0, 300), popup: global.blur_my_shell._settings?.popup?.PIPELINE });
+            } catch (e) { write('log.jsonl', { pm_error: `${e}` }); }
+            try {
+                const ext = Main.extensionManager.lookup('blur-my-shell@aunetx');
+                const src = Gio.SettingsSchemaSource.new_from_directory(`${ext.path}/schemas`, Gio.SettingsSchemaSource.get_default(), false);
+                const st = new Gio.Settings({ settings_schema: src.lookup('org.gnome.shell.extensions.blur-my-shell', false) });
+                write('log.jsonl', { backend: GLib.getenv('GSETTINGS_BACKEND'), cfg: GLib.getenv('XDG_CONFIG_HOME'), version: st.get_int('settings-version'), pipes: st.get_value('pipelines').deepUnpack ? Object.keys(st.get_value('pipelines').deepUnpack()) : null });
+            } catch (e) { write('log.jsonl', { gs_error: `${e}` }); }
+            for (const [label, menu, actor] of [['calendar', date, () => date.box], ['qs', qs, () => qs._boxPointer]]) {
+                menu.open(false);
+                await sleep(700);
+                const root = glass.root_of(actor());
+                const surfaces = glass.surfaces(root);
+                write('log.jsonl', { note: `${label}: ${surfaces.length} surfaces` });
+                for (const [stage, f] of [['circle', 0], ['mid', 0.5], ['full', 1]]) {
+                    for (const s of surfaces) {
+                        const w = s.target.width, h = s.target.height;
+                        const d = Math.min(w, h, 38);
+                        const cx = w / 2, cy = Math.min(h / 2, 19);
+                        const rw = d + (w - d) * f, rh = d + (h - d) * f;
+                        const x = (cx - d / 2) * (1 - f), y = (cy - d / 2) * (1 - f);
+                        const radius = d / 2 + (Math.min(s.corner_radius, Math.min(w, h) / 2) - d / 2) * f;
+                        s.set_reveal({ x, y, width: rw, height: rh, radius });
+                    }
+                    await sleep(200);
+                    await shot(`reveal-${label}-${stage}`, actor());
+                }
+                surfaces.forEach(s => s.set_reveal(null));
+                await sleep(200);
+                await shot(`reveal-${label}-off`, actor());
+                menu.close(false);
+                await sleep(300);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'slide') {
+            // sliding across the top bar as the user did: Vitals, then the calendar, and back
+            const vitals = Main.panel.statusArea.vitalsMenu?.menu;
+            write('log.jsonl', { note: `vitals: ${Boolean(vitals)}` });
+            const first = vitals ?? qs;
+            for (let i = 0; i < RUNS; i++) {
+                first.open(true);
+                await sleep(400);
+                await this.measure('slide', 'vitals>date', () => { first.close(true); date.open(true); }, OPEN_MS);
+                await this.measure('slide', 'date>vitals', () => { date.close(true); first.open(true); }, OPEN_MS);
+                first.close(false);
+                await sleep(400);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'switch') {
             for (let i = 0; i < RUNS; i++) {
                 qs.open(true);

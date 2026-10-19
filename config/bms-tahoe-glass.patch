@@ -417,7 +417,7 @@ index 4d16af5..eed8f3d 100644
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..a4709d1 100644
+index 5a891b9..a7d7dee 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -461,7 +461,7 @@ index 5a891b9..a4709d1 100644
          this.parent.add_child(this.actor);
          if (!this.static_blur)
              this.pipeline.attach_pipeline();
-@@ -77,11 +89,55 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -77,11 +89,68 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.connect_ancestors(this.root_actor);
          if (has_style_class(this.target, 'screenshot-ui-panel'))
              this.signals.connect_actor(this.parent);
@@ -503,6 +503,19 @@ index 5a891b9..a4709d1 100644
 +        this.update_actors_visibility();
 +    }
 +
++    /// tahoe glass: the reveal shape, a rounded rectangle in the target's own coordinates
++    /// ({x, y, width, height, radius, feather}), or null for the whole glass.
++    set_reveal(reveal) {
++        if (this.static_blur || !this.pipeline)
++            return;
++        const local = this.placement.local;
++        this.pipeline.set_reveal(reveal && {
++            ...reveal,
++            x: reveal.x - (local?.x ?? 0),
++            y: reveal.y - (local?.y ?? 0),
++        });
++    }
++
 +    end_settle() {
 +        this.settling = false;
 +        if (this.frozen) {
@@ -517,7 +530,7 @@ index 5a891b9..a4709d1 100644
      // Our overlay lives in `parent`, so tear it down before a destroyed
      // parent disposes of it as one of its children.
      connect_lifetime() {
-@@ -161,6 +217,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -161,6 +230,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
  
@@ -529,7 +542,7 @@ index 5a891b9..a4709d1 100644
      is_heavy_surface() {
          return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
      }
-@@ -174,10 +235,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -174,10 +248,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      uses_full_actor_geometry() {
@@ -554,7 +567,7 @@ index 5a891b9..a4709d1 100644
          if (this.is_notification_surface()) {
              this.update_live_surface();
              return;
-@@ -267,7 +341,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -267,7 +354,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
          if (this.static_blur)
              return this.static_actor.has_opacity(opacity);
          return this.actor.opacity === opacity
@@ -563,7 +576,7 @@ index 5a891b9..a4709d1 100644
      }
  
      update_surface_opacity(opacity) {
-@@ -276,6 +350,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -276,6 +363,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
              return;
          }
          this.actor.opacity = opacity;
@@ -574,7 +587,7 @@ index 5a891b9..a4709d1 100644
          this.pipeline.set_opacity_factor(this.get_pipeline_opacity(opacity) / 255);
      }
  
-@@ -286,7 +364,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -286,7 +377,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_update() {
@@ -584,7 +597,7 @@ index 5a891b9..a4709d1 100644
              return;
          this.update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -299,8 +378,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -299,8 +391,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_transition_update(transition_state = null) {
@@ -596,7 +609,7 @@ index 5a891b9..a4709d1 100644
              return;
          this.transition_update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -332,7 +413,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -332,7 +426,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      get_corner_radius() {
@@ -605,10 +618,11 @@ index 5a891b9..a4709d1 100644
      }
  
      is_visible() {
-@@ -372,6 +453,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -372,6 +466,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);
++        this.set_reveal(null);
 +        leave_motion_group(this, this.motion);
 +        this.motion = null;
 +        this.settling = false;
@@ -616,12 +630,36 @@ index 5a891b9..a4709d1 100644
  
          if (this.static_blur) {
              this.static_actor.destroy();
+diff --git a/src/components/popup/surface/fade.js b/src/components/popup/surface/fade.js
+index 3130fdd..058815e 100644
+--- a/src/components/popup/surface/fade.js
++++ b/src/components/popup/surface/fade.js
+@@ -65,6 +65,10 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
+             : actor;
+         if (!shown_actor?.visible || !shown_actor.mapped)
+             return 0;
++        // tahoe glass: an animation fades this actor's content while its glass is shown whole
++        // (and shaped by the reveal), see motion.js
++        if (actor._tahoe_glass_opacity_free)
++            return opacity;
+ 
+         return Math.round(opacity * actor.opacity / 255);
+     }
+@@ -81,6 +85,8 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
+         )
+             return null;
+ 
++        if (actor._tahoe_glass_opacity_free)
++            return actor.get_parent()?.get_paint_opacity() ?? 255;
+         return actor.get_paint_opacity();
+     }
+ };
 diff --git a/src/components/popup/surface/motion.js b/src/components/popup/surface/motion.js
 new file mode 100644
-index 0000000..8d7ad27
+index 0000000..b798602
 --- /dev/null
 +++ b/src/components/popup/surface/motion.js
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,241 @@
 +import GLib from 'gi://GLib';
 +import Meta from 'gi://Meta';
 +import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
@@ -651,6 +689,7 @@ index 0000000..8d7ad27
 +        this.movers = new Map();
 +        this.followers = [];
 +        this.settling = false;
++        this.holds = 0;
 +        this.frame_id = 0;
 +        this.overlay_id = 0;
 +        this.watch(root, properties);
@@ -697,6 +736,8 @@ index 0000000..8d7ad27
 +    }
 +
 +    is_moving() {
++        if (this.holds > 0)
++            return true;
 +        for (const [actor, { properties }] of this.movers) {
 +            for (const property of properties) {
 +                if (actor.get_transition(property))
@@ -704,6 +745,16 @@ index 0000000..8d7ad27
 +            }
 +        }
 +        return this.settling && this.followers.some(([actor, name]) => actor.get_transition(name));
++    }
++
++    /// An animation of its own (tahoe-motion) moves this popup: keep it settling until release.
++    hold() {
++        this.holds++;
++        this.maybe_begin();
++    }
++
++    release() {
++        this.holds = Math.max(0, this.holds - 1);
 +    }
 +
 +    maybe_begin() {
@@ -782,6 +833,34 @@ index 0000000..8d7ad27
 +}
 +
 +const groups = new Map();
++
++/// tahoe glass: what the tahoe-motion extension drives, through the shell's shared global (the
++/// extensions cannot import each other). `root` is a popup's BoxPointer or the banner bin.
++const api = {
++    version: 1,
++    hold(root) {
++        groups.get(root)?.hold();
++        return groups.has(root);
++    },
++    release(root) {
++        groups.get(root)?.release();
++    },
++    /// the glass surfaces of a popup: their target actors and a reveal setter (target coordinates)
++    surfaces(root) {
++        const group = groups.get(root);
++        return group ? [...group.surfaces].map(surface => ({
++            target: surface.target,
++            corner_radius: surface.get_corner_radius(),
++            set_reveal: reveal => surface.set_reveal(reveal),
++        })) : [];
++    },
++    /// the popup's motion root for an actor in it, or null when it has no glass
++    root_of(actor) {
++        const found = actor ? find_root(actor) : null;
++        return found && groups.has(found.root) ? found.root : null;
++    },
++};
++globalThis.__tahoeGlass = api;
 +
 +function find_root(target) {
 +    const banner_bin = Main.messageTray?._bannerBin;
@@ -1146,10 +1225,10 @@ index 959ec68..6514fec 100644
                      name: _("Chromatic dispersion"),
                      description: _("Physical per-channel refraction dispersion at the glass edge."),
 diff --git a/src/effects/refraction/refraction.glsl b/src/effects/refraction/refraction.glsl
-index 359dd19..2f7ded4 100644
+index 359dd19..b4588e1 100644
 --- a/src/effects/refraction/refraction.glsl
 +++ b/src/effects/refraction/refraction.glsl
-@@ -41,6 +41,16 @@ uniform float clip_y0;
+@@ -41,6 +41,28 @@ uniform float clip_y0;
  uniform float clip_width;
  uniform float clip_height;
  
@@ -1163,10 +1242,22 @@ index 359dd19..2f7ded4 100644
 +uniform float ao;
 +uniform float ao_width;
 +
++// tahoe glass: the reveal shape, for open and close animations. A rounded rectangle (x, y, width,
++// height in the surface's pixels, from the glass's top left corner) with its own corner radius;
++// the glass shows only inside it, and its edge (rim light, inner shadow, refraction band) follows
++// the reveal's edge, so a circle growing into a card looks like glass at every frame. A negative
++// width (the default) is the whole surface. feather softens the inside of the edge, in pixels.
++uniform float reveal_x;
++uniform float reveal_y;
++uniform float reveal_width;
++uniform float reveal_height;
++uniform float reveal_radius;
++uniform float reveal_feather;
++
  const float DISPERSION_SCALE = 10.0;
  
  float quartzGlassEdgeProfile(float distanceFromEdge,
-@@ -269,6 +279,39 @@ vec3 applyTintAndShadow(vec3 sample, vec2 localUV) {
+@@ -269,6 +291,39 @@ vec3 applyTintAndShadow(vec3 sample, vec2 localUV) {
      return clamp(outRGB, 0.0, 1.0);
  }
  
@@ -1206,7 +1297,54 @@ index 359dd19..2f7ded4 100644
  void main() {
      vec2 actorSize = vec2(width, height);
      vec2 actorUV = cogl_tex_coord_in[0].xy;
-@@ -400,6 +443,9 @@ if (!useCircularSurface && (roundingRadius == 0.0 || R < shortestSide * 0.45)
+@@ -278,6 +333,18 @@ void main() {
+         ? vec4(0.0, 0.0, width, height)
+         : vec4(clip_x0, clip_y0, clip_x0 + clip_width, clip_y0 + clip_height);
+ 
++    bool revealing = reveal_width >= 0.0 && reveal_height >= 0.0;
++    float cornerRadius = corner_radius;
++    if (revealing) {
++        vec2 revealOrigin = bounds.xy + vec2(reveal_x, reveal_y);
++        bounds = vec4(revealOrigin, revealOrigin + vec2(reveal_width, reveal_height));
++        cornerRadius = reveal_radius;
++        if (reveal_width < 0.5 || reveal_height < 0.5) {
++            cogl_color_out = vec4(0.0);
++            return;
++        }
++    }
++
+     vec2 glassSize = max(bounds.zw - bounds.xy, vec2(1.0));
+     vec2 glassPx = actorPx - bounds.xy;
+     vec2 halfSize = glassSize * 0.5;
+@@ -286,7 +353,7 @@ void main() {
+     float W = glassSize.x;
+     float H = glassSize.y;
+     float shortestSide = min(W, H);
+-    float R = clamp(corner_radius, 0.0, shortestSide * 0.5);
++    float R = clamp(cornerRadius, 0.0, shortestSide * 0.5);
+     float roundingRadius = R;
+     if ((glassPx.y < H * 0.5 && corners_top == 0)
+         || (glassPx.y >= H * 0.5 && corners_bottom == 0))
+@@ -295,7 +362,8 @@ void main() {
+     float glassThickness = max(0.5, edge_size * 0.55 * falloff);
+ 
+     bool nearlySquare = abs(W - H) < max(4.0, shortestSide * 0.035);
+-    bool useCircularSurface = corners_top != 0 && corners_bottom != 0
++    // a reveal keeps the rounded box's rim band all the way from circle to card (no jump)
++    bool useCircularSurface = !revealing && corners_top != 0 && corners_bottom != 0
+         && nearlySquare && R >= shortestSide * 0.5 - 0.5;
+ 
+     EdgeInfo edge = estimateAnalyticEdge(glassPx, halfSize, roundingRadius, actorPx);
+@@ -306,6 +374,8 @@ void main() {
+ 
+     float distFromSide = edge.distance;
+     float edgeOpacity = edge.alpha;
++    if (revealing && reveal_feather > 0.0)
++        edgeOpacity *= smoothstep(0.0, reveal_feather, distFromSide);
+     float edgeBand = 1.0;
+     float refractionBand = bezel;
+     vec2 dir = edge.dir;
+@@ -400,6 +470,9 @@ if (!useCircularSurface && (roundingRadius == 0.0 || R < shortestSide * 0.45)
          outRGB = 1.0 - (1.0 - outRGB) * (1.0 - specular);
      }
  
@@ -1217,10 +1355,22 @@ index 359dd19..2f7ded4 100644
      outRGB = mix(sourceColor.rgb, outRGB, opacity_factor);
  
 diff --git a/src/effects/refraction/refraction.js b/src/effects/refraction/refraction.js
-index d02274b..c43940b 100644
+index d02274b..a8feded 100644
 --- a/src/effects/refraction/refraction.js
 +++ b/src/effects/refraction/refraction.js
-@@ -344,6 +344,58 @@ const RefractionEffectClass = utils.IS_IN_PREFERENCES ? null : class RefractionE
+@@ -13,6 +13,11 @@ const Shell = await utils.import_in_shell_only('gi://Shell');
+ const SHADER_FILENAME = 'refraction.glsl';
+ const SHADER_SOURCE = utils.get_shader_source(Shell, SHADER_FILENAME, import.meta.url);
+ 
++const REVEAL_UNIFORMS = [
++    'reveal_x', 'reveal_y', 'reveal_width', 'reveal_height', 'reveal_radius', 'reveal_feather',
++];
++const REVEAL_OFF = [0, 0, -1, -1, 0, 0];
++
+ const RefractionEffectClass = utils.IS_IN_PREFERENCES ? null : class RefractionEffect extends utils.ShaderEffect {
+ 
+         constructor(params) {
+@@ -344,6 +349,58 @@ const RefractionEffectClass = utils.IS_IN_PREFERENCES ? null : class RefractionE
              }
          }
  
@@ -1279,6 +1429,46 @@ index d02274b..c43940b 100644
          get opacity_factor() {
              return this._opacity_factor;
          }
+@@ -460,8 +517,39 @@ const RefractionEffectClass = utils.IS_IN_PREFERENCES ? null : class RefractionE
+             super.vfunc_set_actor(actor);
+         }
+ 
++        /// tahoe glass: the reveal shape (refraction.glsl), in the surface's pixels from the glass's
++        /// top left corner; set every frame of an animation, so it bypasses the uniform map.
++        /// null: the whole surface.
++        set_reveal(reveal) {
++            const values = reveal
++                ? [reveal.x, reveal.y, reveal.width, reveal.height, reveal.radius, reveal.feather ?? 0]
++                : REVEAL_OFF;
++            if (this._reveal?.every((value, index) => value === values[index]))
++                return;
++            this._reveal = values;
++            this.queue_repaint();
++        }
++
++        upload_reveal() {
++            const pipeline = this.get_pipeline();
++            if (!pipeline)
++                return;
++            if (this._reveal_pipeline !== pipeline) {
++                this._reveal_pipeline = pipeline;
++                this._reveal_locations = REVEAL_UNIFORMS.map(name => pipeline.get_uniform_location(name));
++                this._reveal_uploaded = null;
++            }
++            const values = this._reveal ?? REVEAL_OFF;
++            if (this._reveal_uploaded === values)
++                return;
++            values.forEach((value, index) =>
++                pipeline.set_uniform_1f(this._reveal_locations[index], value));
++            this._reveal_uploaded = values;
++        }
++
+         vfunc_paint_target(paint_node, paint_context) {
+             uniforms.upload_uniforms(this);
++            this.upload_reveal();
+             super.vfunc_paint_target(paint_node, paint_context);
+         }
+ 
 diff --git a/src/effects/refraction/refraction_config.js b/src/effects/refraction/refraction_config.js
 index b779058..ee6000e 100644
 --- a/src/effects/refraction/refraction_config.js
@@ -1523,7 +1713,7 @@ index c16a601..841390d 100644
      }
  
 diff --git a/src/render/dynamic_surface.js b/src/render/dynamic_surface.js
-index ae03cc8..3612b49 100644
+index ae03cc8..0bee3f6 100644
 --- a/src/render/dynamic_surface.js
 +++ b/src/render/dynamic_surface.js
 @@ -13,6 +13,7 @@ export class DynamicPipeline {
@@ -1548,7 +1738,7 @@ index ae03cc8..3612b49 100644
  
          this.effects.forEach(effect => {
              const params = effect._bms_effect_params ?? {};
-@@ -207,6 +215,58 @@ export class DynamicPipeline {
+@@ -207,6 +215,64 @@ export class DynamicPipeline {
          this.roundedPipeline?.update();
      }
  
@@ -1595,6 +1785,12 @@ index ae03cc8..3612b49 100644
 +            this.apply_opacity_factor(this.opacityFactor);
 +        }
 +        this.set_live(true);
++    }
++
++    /// tahoe glass: the reveal shape of the glass (refraction.glsl), in the surface's pixels from
++    /// its top left corner, or null for the whole surface.
++    set_reveal(reveal) {
++        this.effects.forEach(effect => effect.set_reveal?.(reveal));
 +    }
 +
 +    set_texture_hold(hold) {
