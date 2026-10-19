@@ -91,6 +91,14 @@ submenus 8.9 / 8.6; calendar 8.6 / 8.5; desktop menu 8.5 / 8.5; menu switching 9
   `notify::icon-name` / `notify::gicon`); nothing else changes.
 - Exit: stills of a toggle switching, no extra cost when nothing is pressed.
 
+### Phase D result (headless, 2026-10-19)
+
+`icons.js`: quick settings buttons are watched when the panel opens. Bounce gives the icon a push
+(a velocity of -7 per second on spatial fast); Replace shrinks it to 0.55 and fades it to a quarter
+(critically damped), then grows it back on spatial fast: measured, slowed 10x, it dips to 0.59 /
+opacity 68, overshoots to 1.04 and settles, about 300 ms in real time. Icons that change on their
+own get a small push at most every 400 ms. No effects while the panel itself is animating.
+
 ## Phase E (needs the user's go-ahead): Material Symbols Rounded
 
 - Needs `MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf` from google/material-design-icons
