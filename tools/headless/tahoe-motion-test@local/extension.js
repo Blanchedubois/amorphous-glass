@@ -37,6 +37,22 @@ async function shot(name, actor) {
     await new Promise(resolve => stream.close_async(0, null, () => resolve()));
 }
 
+function stageBox(actor) {
+    const [x, y] = actor.get_transformed_position();
+    const [w, h] = actor.get_transformed_size();
+    const pad = 40;
+    return [Math.max(0, Math.floor(x - pad)), Math.max(0, Math.floor(y - pad)), Math.ceil(w + 2 * pad), Math.ceil(h + 2 * pad)];
+}
+
+async function shotRect(name, [x, y, w, h]) {
+    const file = Gio.File.new_for_path(`${OUT}/${name}.png`);
+    const stream = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
+    const shooter = new Shell.Screenshot();
+    await new Promise((resolve, reject) => shooter.screenshot_area(x, y, w, h, stream,
+        (o, res) => { try { o.screenshot_area_finish(res); resolve(); } catch (e) { reject(e); } }));
+    await new Promise(resolve => stream.close_async(0, null, () => resolve()));
+}
+
 function prof() {
     const p = globalThis.__tahoeProf;
     return p ? { time: { ...p.time }, count: { ...p.count } } : null;
@@ -129,6 +145,38 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'strip') {
+            // stills of the open and close animations, slowed down
+            const settings = St.Settings.get();
+            const slow = Number(GLib.getenv('TAHOE_TEST_SLOW') ?? 10);
+            const cases = [['calendar', date, () => date.box.get_parent()?.get_parent() ?? date.box],
+                ['qs', qs, () => qs._boxPointer]];
+            const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
+            if (bg) cases.push(['desktop', bg, () => bg._boxPointer ?? bg.actor]);
+            for (const [label, menu, actor] of cases) {
+                // open once unslowed so the layout exists, to frame the stills
+                menu.open(false);
+                await sleep(500);
+                const box = stageBox(actor());
+                menu.close(false);
+                await sleep(300);
+                settings.slow_down_factor = slow;
+                menu.open(true);
+                for (let i = 0; i < 9; i++) {
+                    await shotRect(`strip-${label}-open-${i}`, box);
+                    await sleep(30 * slow);
+                }
+                menu.close(true);
+                for (let i = 0; i < 6; i++) {
+                    await shotRect(`strip-${label}-close-${i}`, box);
+                    await sleep(25 * slow);
+                }
+                settings.slow_down_factor = 1;
+                await sleep(400);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'reveal') {
             // Phase 3: the reveal shape on the calendar and on quick settings, at a few stages
             const glass = globalThis.__tahoeGlass;
