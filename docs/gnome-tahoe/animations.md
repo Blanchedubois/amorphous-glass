@@ -1,6 +1,7 @@
 # Smooth glass popups and open animations: plan
 
-Status: Phase 1 installed on the real desktop (rebuilt from branch `claude/glass-motion-3a54fe`,
+Status: Phases 1 to 4 installed; Phase 5 round 1 (drop, rows, quick settings stagger) installed
+after the user's notes. Phase 1 installed on the real desktop (rebuilt from branch `claude/glass-motion-3a54fe`,
 not merged into main) and measured: quick settings and its submenus are smooth. Open: frames of
 20 to 33 ms while sliding across the top bar between menus (below). Phases 3 and 4 next.
 
@@ -344,6 +345,73 @@ With animations off, reduced motion, or no glass API, GNOME's own code runs.
   click in the headless shell).
 - Stills, animation slowed 10x: `shots/motion-calendar.png`, `motion-quick-settings.png`,
   `motion-submenu.png`, `motion-banner.png`.
+
+### Phase 5, round 1: the user's notes after trying it live (2026-10-19 evening)
+
+What the user asked for, after the first install:
+
+1. Quick settings should open top to bottom, its pieces popping in one after another.
+2. A dropdown should not just grow outwards with its content: a circle morphs into a bar, then the
+   bar opens into the card while the rows pop in one after the other ("scatter and grow"). Not too
+   fancy or slow; the morph itself was right, the timing was not.
+3. Inside a button (the volume slider especially) the parts should stagger into place, not just
+   grow with the glass.
+4. The right-click menu should open out of the pointer; the same origin feel for every dropdown.
+5. (Added while this was being built) the circle should drop lower and expand into the card;
+   the motion should have inertia and be a bit elastic; it should read as a drop falling and
+   morphing into the card.
+
+Research behind the numbers: dropdowns open in about 200 to 250 ms and close in 150 to 200 ms,
+items stagger 20 to 40 ms apart (below about 30 ms the stagger is not noticed, above about 80 ms it
+drags) [dylantarre animation-principles, navigation menus; Emil Kowalski, stagger delays; Flutter
+staggered menu cookbook]. Liquid morphs read best as one drop travelling and stretching away from
+its source, then spreading into the target, with squash and stretch kept subtle on cards and
+stronger on small shapes; content trails its container by 20 to 40 ms [liquid_glass_widgets
+LiquidMorphPhysics; dylantarre cards-containers]. Apple's Liquid Glass menus expand from the
+button that opens them.
+
+What was built (`extensions/tahoe-motion@cachyos-tahoe`, now `extension.js` for the hooks,
+`morph.js` for the choreography, `items.js` for rows and parts):
+
+- **The drop.** A card opens from a glass circle at its origin (the clicked icon's capsule, 24 to
+  48 px; an 18 px circle exactly at the pointer for the right-click menu and GTK app menus). The
+  circle falls a little way into the card (18 % of its height, at most 40 px) on an elastic spring
+  (180 ms, damping 0.58). Its back edge trails its front by 32 ms, so it lengthens as it pulls
+  away and narrows to keep its volume; where the spring carries it past its landing point it
+  squashes, wider and shorter, then settles round.
+- **Bar, then card.** The strokes overlap so the fall's momentum carries on: from 60 ms the drop
+  spreads into a bar across the card (230 ms, damping 0.66), from 115 ms the bar opens up and down
+  into the card (290 ms, damping 0.64), corners relaxing from round to the card's radius. The
+  overshoot is clipped by the card's own bounds, so the elastic is in the stroke and the edge stays
+  clean.
+- **Rows pop in.** The card's rows and blocks (split while taller than 40 % of the card; a grid
+  such as the calendar's days, and buttons, arrive whole) appear as the growing edge reaches them,
+  at least 22 ms apart: a quick fade, a scale from 0.9 and a 9 px drop into place on a bouncy
+  spring (170 ms, damping 0.55).
+- **Closing** reverses it in about 250 ms: the rows fade out together (70 ms), the card folds into
+  the bar, the bar into the drop, and the drop rises back into its origin.
+- **Quick settings** opens top to bottom: buttons arrive row by row (45 ms per row, 15 ms within a
+  row), each growing from a circle at its centre into its capsule (260 ms, damping 0.62). Once a
+  button is 30 % grown its parts follow 35 ms apart: icons pop from 0.35 on a bouncy spring, labels
+  slide in from 12 px to the left, a slider's track grows from its start.
+- **Submenus** grow out of their toggle the same way, without the fall; banners drop from a
+  capsule at their top; the card's own 1 px dark-mode edge waits until the card is open
+  (`.tahoe-morphing`).
+- **The calendar** (user: "stagger the elements in the calendar ... in its own card"): its day grid
+  arrives as a card of its own, the days popping in as a diagonal wave, week by week (30 ms a row,
+  8 ms a column, the whole wave within 150 ms); the events, world clocks and weather cards step
+  in one by one.
+- Fixed on the way: a quick settings button hidden before its first layout kept opacity 0 after
+  the animation (it saved its state too late); a submenu opened for the first time showed its rows
+  without glass for one frame (not laid out yet: now fully hidden until it is).
+- Headless, with the user's glass: p95 at or under 11.2 ms in every scenario (quick settings open
+  11.2, close 8.9; submenus 10.6 / 10.9; calendar 8.8 / 8.8; desktop menu 8.9 / 8.5), the same as
+  before this round. One frame in about 50 animations runs long (20 to 70 ms) with the shell's CPU
+  idle; seen with and without the morphing style class; most likely a JS garbage collection.
+  Watch for it on the desktop.
+- Stills, slowed 12x: `shots/motion2-desktop.png` (from the pointer), `motion2-calendar-drop.png`
+  (the drop's fall, close up), `motion2-calendar.png` (rows and the day wave),
+  `motion2-quick-settings.png`, `motion2-submenu.png`, `motion2-banner.png`.
 
 ### Phase 5: tune by eye, then real desktop
 

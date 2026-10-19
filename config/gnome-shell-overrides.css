@@ -28,6 +28,9 @@
 #uiGroup .notification-banner,
 #uiGroup .quick-toggle-menu { box-shadow: {{mode.dropdown_edge}} !important; }
 #uiGroup .popup-menu-content.quick-settings { box-shadow: none !important; }
+/* While tahoe-motion morphs a card (circle, bar, card), the glass's reveal is its edge: the
+   card's own outline waits until it is open. */
+#uiGroup .tahoe-morphing { box-shadow: none !important; }
 .popup-menu-content { border-radius: {{menu.radius}}px !important; }
 .notification-banner, .notification-banner .message { border-radius: {{notification.radius}}px !important; }
 /* The calendar: a large panel at {{calendar.radius}} px, its cards (events, world clocks,
