@@ -12,7 +12,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const OUT = GLib.getenv('TAHOE_TEST_OUT');
 const RUNS = Number(GLib.getenv('TAHOE_TEST_RUNS') ?? 5);
-const OPEN_MS = 700;
+const OPEN_MS = Number(GLib.getenv("TAHOE_TEST_OPEN_MS") ?? 700);
 const CLOSE_MS = 500;
 
 const sleep = ms => new Promise(r => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { r(); return GLib.SOURCE_REMOVE; }));
@@ -146,6 +146,26 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'items') {
+            const dir = GLib.getenv('TAHOE_TEST_MOTION_DIR');
+            const items = await import(`file://${dir}/items.js`);
+            for (const [label, menu, target] of [['calendar', date, () => date.box], ['qs', qs, null]]) {
+                menu.open(false);
+                await sleep(600);
+                if (target) {
+                    const t = target();
+                    const card = { x: 0, y: 0, width: t.width, height: t.height };
+                    write('log.jsonl', { label, items: items.cardItems(t, card).map(i => `${i.kind}:${i.actor.constructor.name}.${i.actor.get_style_class_name?.() ?? ''} ${Math.round(i.rect.y)}+${Math.round(i.rect.height)}${i.cells ? ` cells ${i.cells.length} span ${i.span}` : ''}`) });
+                } else {
+                    for (const piece of qs._grid.get_children().filter(c => c.visible).slice(0, 6))
+                        write('log.jsonl', { label: piece.constructor.name, parts: items.pieceItems(piece).map(i => `${i.kind}:${i.actor.constructor.name}.${i.actor.get_style_class_name?.() ?? ''}`) });
+                }
+                menu.close(false);
+                await sleep(300);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'strip') {
             // stills of the open and close animations, slowed down
             const settings = St.Settings.get();
@@ -221,15 +241,16 @@ export default class Driver extends Extension {
                 menu.close(false);
                 await sleep(300);
                 settings.slow_down_factor = slow;
+                const step = Number(GLib.getenv('TAHOE_TEST_STEP') ?? 30);
                 menu.open(true);
-                for (let i = 0; i < 9; i++) {
+                for (let i = 0; i < Math.ceil(450 / step); i++) {
                     await shotRect(`strip-${label}-open-${i}`, box);
-                    await sleep(30 * slow);
+                    await sleep(step * slow);
                 }
                 menu.close(true);
-                for (let i = 0; i < 6; i++) {
+                for (let i = 0; i < Math.ceil(300 / step); i++) {
                     await shotRect(`strip-${label}-close-${i}`, box);
-                    await sleep(25 * slow);
+                    await sleep(step * slow);
                 }
                 settings.slow_down_factor = 1;
                 await sleep(400);
