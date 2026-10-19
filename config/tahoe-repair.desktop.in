@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tahoe theme repair
+Comment=Restores the MacTahoe GNOME look if a theme file, extension or blur setting broke
+Exec=@ROOT@/scripts/tahoe-repair.sh
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-Delay=8
+NoDisplay=true

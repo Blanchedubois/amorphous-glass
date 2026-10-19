@@ -1,0 +1,55 @@
+/* Tahoe Widgets: the glass itself comes from Blur My Shell; this draws the rim and the text.
+   Text is dark on light glass (as the top bar in light mode) and white on dark and milky glass. */
+
+.tahoe-widget { border-radius: 24px; }
+
+/* the rim sits on the content, which is drawn over the glass */
+.tahoe-widget-content {
+  padding: 16px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-family: "SF Pro Text", sans-serif;
+}
+.tahoe-widget-light .tahoe-widget-content { border-color: rgba(255, 255, 255, 0.25); color: #1c1c1e; }
+.tahoe-widget-milky .tahoe-widget-content { border-color: rgba(255, 255, 255, 0.12); }
+
+/* no Blur My Shell: a plain translucent card */
+.tahoe-widget-fallback { background-color: rgba(34, 34, 38, 0.55); }
+.tahoe-widget-fallback.tahoe-widget-light { background-color: rgba(255, 255, 255, 0.35); }
+
+/* lifted while dragged */
+.tahoe-widget-dragging { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* shared text roles */
+.tahoe-widget-accent { font-size: 13px; font-weight: 700; color: #ff453a; }
+.tahoe-widget-light .tahoe-widget-accent { color: #e0352b; }
+.tahoe-widget-secondary { font-size: 13px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+.tahoe-widget-light .tahoe-widget-secondary { color: rgba(28, 28, 30, 0.6); }
+
+/* clocks */
+.tahoe-widget-clock-analog .tahoe-widget-content { padding: 9px; }
+.tahoe-clock-time { font-family: "SF Pro Display", sans-serif; font-size: 48px; font-weight: 300; }
+.tahoe-clock-time-large { font-size: 56px; }
+.tahoe-clock-ampm { font-size: 15px; font-weight: 600; padding: 0 0 10px 3px; }
+.tahoe-clock-datetime { spacing: 12px; }
+
+/* calendar */
+.tahoe-cal-daynum { font-family: "SF Pro Display", sans-serif; font-size: 52px; font-weight: 400; }
+.tahoe-cal-events { spacing: 6px; }
+.tahoe-cal-event { spacing: 6px; }
+.tahoe-cal-event-bar { width: 3px; border-radius: 2px; background-color: #ff453a; }
+.tahoe-cal-event-title { font-size: 12px; font-weight: 600; }
+.tahoe-cal-event-time { font-size: 11px; }
+.tahoe-widget-calendar-month .tahoe-widget-content { padding: 14px 12px 12px 12px; }
+.tahoe-cal-month { spacing: 4px; }
+.tahoe-cal-month .tahoe-widget-accent { padding-left: 4px; }
+.tahoe-cal-weekday { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.tahoe-widget-light .tahoe-cal-weekday { color: rgba(28, 28, 30, 0.55); }
+.tahoe-cal-date { font-size: 11px; font-weight: 600; min-width: 18px; min-height: 18px; text-align: center; }
+.tahoe-cal-weekend { color: rgba(255, 255, 255, 0.6); }
+.tahoe-widget-light .tahoe-cal-weekend { color: rgba(28, 28, 30, 0.55); }
+.tahoe-cal-today { background-color: #ff453a; color: #ffffff; border-radius: 9px; }
+.tahoe-widget-light .tahoe-cal-today { color: #ffffff; }
+.tahoe-cal-medium { spacing: 16px; }
+.tahoe-cal-medium .tahoe-cal-day { width: 130px; }

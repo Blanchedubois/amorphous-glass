@@ -1,0 +1,8 @@
+{
+  "uuid": "tahoe-control-center@cachyos-tahoe",
+  "name": "Tahoe Control Center",
+  "description": "macOS Tahoe's Control Center in place of quick settings: Wi-Fi, Bluetooth and Night Light pills, the player card, Dark Style, Lock, Displays and Screenshot, Focus, Display and Sound cards, every piece in Blur My Shell's Liquid Glass.",
+  "shell-version": ["51"],
+  "url": "https://github.com/Blanchedubois/cachyos-tahoe-theme",
+  "version": 1
+}

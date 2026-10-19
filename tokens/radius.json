@@ -1,0 +1,21 @@
+{
+  "_comment": "Rounding scale in CSS pixels at 1x. Every generator and config snippet reads from here. widget and menu_item follow the Mystical Blue Kvantum style, which draws its own tiles; they are recorded here for reference, not applied by a generator.",
+  "window": 20,
+  "popup": 20,
+  "widget": 3,
+  "menu_item": 3,
+  "tooltip": 8,
+  "icon_squircle_n": 5,
+  "titlebar_height": 32,
+  "titlebar_button": 14,
+  "titlebar_button_spacing": 8,
+  "frame": {
+    "note": "20 px on the Rounded Corners effect for every window; the Klassy decoration draws square and never rounds, so the effect owns the corner and the hairline from one path. One bright 1 px light hairline on the edge. No border, no inset."
+  },
+  "titlebar_buttons": {
+    "decoration": "Klassy",
+    "icons": "Material",
+    "background": "never",
+    "hover": "icon colour only: traffic-light colours, muted toward the titlebar at rest and full on hover"
+  }
+}

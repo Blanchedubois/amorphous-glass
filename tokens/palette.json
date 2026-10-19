@@ -1,0 +1,20 @@
+{
+  "_comment": "Category palette. base = bottom gradient stop, top = top stop. Hex, sRGB.",
+  "outline": "#141414",
+  "glass_tint": "#1c1c1e",
+  "glass_tint_alpha": 0.72,
+  "glyph": "#ffffff",
+  "categories": {
+    "system":    { "label": "System and settings",     "base": "#5a5f66", "top": "#80868e" },
+    "files":     { "label": "Files",                   "base": "#2f7cf6", "top": "#5b9bff" },
+    "dev":       { "label": "Terminal and dev tools",  "base": "#1f2937", "top": "#374151" },
+    "media":     { "label": "Media",                   "base": "#ff6b35", "top": "#ff8f5c" },
+    "comms":     { "label": "Communication",           "base": "#34c759", "top": "#5fd97a" },
+    "internet":  { "label": "Internet",                "base": "#0a84ff", "top": "#4da3ff" },
+    "games":     { "label": "Games and compatibility", "base": "#c13b3b", "top": "#e05a5a" },
+    "utilities": { "label": "Utilities",               "base": "#8e8e93", "top": "#aeaeb2" },
+    "hardware":  { "label": "Hardware and printing",   "base": "#6e5acb", "top": "#8f7ee0" },
+    "security":  { "label": "Security and storage",    "base": "#b58900", "top": "#d4a827" },
+    "cachyos":   { "label": "CachyOS branded",         "base": "#1aa3c6", "top": "#45bfe0" }
+  }
+}

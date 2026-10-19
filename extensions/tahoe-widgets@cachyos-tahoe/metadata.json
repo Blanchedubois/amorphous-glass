@@ -1,0 +1,8 @@
+{
+  "uuid": "tahoe-widgets@cachyos-tahoe",
+  "name": "Tahoe Widgets",
+  "description": "macOS Tahoe style Liquid Glass widgets on the desktop, drawn with Blur My Shell's glass.",
+  "shell-version": ["51"],
+  "url": "https://github.com/Blanchedubois/cachyos-tahoe-theme",
+  "version": 1
+}

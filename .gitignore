@@ -1,0 +1,5 @@
+# SF Symbols glyphs traced from Apple's SF fonts: Apple's licence does not allow redistributing
+# them, so each machine makes its own from the user's own SF download (see README).
+extensions/tahoe-menu-bar@cachyos-tahoe/icons/*.svg
+*.pyc
+__pycache__/

@@ -1,0 +1,7 @@
+{
+  "uuid": "tahoe-probe@cachyos-tahoe",
+  "name": "Tahoe frame probe",
+  "description": "Temporary: logs shell frame timing around every popup open and close (glass-tuning Phase 0).",
+  "shell-version": ["51"],
+  "version": 2
+}
