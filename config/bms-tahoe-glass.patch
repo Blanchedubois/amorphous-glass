@@ -656,10 +656,10 @@ index 3130fdd..058815e 100644
  };
 diff --git a/src/components/popup/surface/motion.js b/src/components/popup/surface/motion.js
 new file mode 100644
-index 0000000..b798602
+index 0000000..f024c62
 --- /dev/null
 +++ b/src/components/popup/surface/motion.js
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,248 @@
 +import GLib from 'gi://GLib';
 +import Meta from 'gi://Meta';
 +import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
@@ -851,6 +851,13 @@ index 0000000..b798602
 +        return group ? [...group.surfaces].map(surface => ({
 +            target: surface.target,
 +            corner_radius: surface.get_corner_radius(),
++            /// the glass's rectangle in the target's coordinates, once it has been placed
++            glass_rect: () => {
++                const local = surface.placement.local;
++                return local
++                    ? { x: local.x, y: local.y, width: local.width, height: local.height }
++                    : { x: 0, y: 0, width: surface.target.width, height: surface.target.height };
++            },
 +            set_reveal: reveal => surface.set_reveal(reveal),
 +        })) : [];
 +    },

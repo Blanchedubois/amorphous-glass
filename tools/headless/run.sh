@@ -20,6 +20,11 @@ for uuid in ${TAHOE_TEST_EXTS:-}; do
   [ -d "$ext/$uuid/schemas" ] && glib-compile-schemas "$ext/$uuid/schemas" 2>/dev/null
   extra="$extra, '$uuid'"
 done
+# TAHOE_TEST_EXT_DIRS="/path/uuid ...": extensions from a checkout (no settings of their own)
+for dir in ${TAHOE_TEST_EXT_DIRS:-}; do
+  cp -r "$dir" "$ext/"
+  extra="$extra, '$(basename "$dir")'"
+done
 export TAHOE_TEST_EXTRA="$extra"
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 - "$kf" <<'PY'
