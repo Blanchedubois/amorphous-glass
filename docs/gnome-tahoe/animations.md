@@ -310,6 +310,41 @@ so none of the BoxPointer work above reaches them.
   the edge nearest the pointer, usually the top); with the keyboard, from the middle of that edge.
   Circle size fixed at a header-button capsule (about 34 px), since the widget's size is unknown.
 
+### Phase 4 result (headless shell with the user's glass, 2026-10-19; not installed yet)
+
+`extensions/tahoe-motion@cachyos-tahoe` (`scripts/tahoe-motion.sh on|off|status`, kept on by
+`tahoe-repair` while switched on). It wraps `BoxPointer.open/close`, the quick settings submenus'
+`open/close` (prototype taken from a live toggle, GNOME 51 does not export it) and the message
+tray's banner show and hide, and listens to the window manager's `map` for app menus. One
+`Clutter.Timeline` per popup on its frame clock; springs in `spring.js` (open: damping 0.75, about
+3 % overshoot, 260 ms; close: critically damped, 160 ms); durations follow GNOME's slow-down factor.
+With animations off, reduced motion, or no glass API, GNOME's own code runs.
+
+- **Shape:** each glass surface's reveal goes from a circle to its card, corners from round to the
+  card radius. Menus, calendar, dock and desktop menus: the circle is the clicked icon's capsule
+  (24 to 48 px, 34 for the desktop menu's pointer), at the point of the card's edge nearest the
+  icon. Quick settings: each piece from a circle half its height at its own centre, 12 ms apart,
+  nearest the clicked icon first. Submenus: from the toggle's capsule, widening while the height
+  opens on the same spring (the pieces below slide with it); GNOME's height ease and row fade are
+  replaced. Banners: from a capsule at their top centre. App menus: from the pointer, pinned to the
+  facing edge.
+- **Content** (user's choice mid-way: morph with the glass rather than fade): the whole target,
+  its own fill and edge included (a checked toggle's white fill, the capsules' 1 px line), is
+  scaled with one uniform scale that fits inside the shape, centred on it; it fades only over the
+  first quarter of the growth. Blur My Shell keeps the glass at rest under the scaled target
+  (`_tahoe_glass_transform_free`: the target's own scale and translation are taken out while the
+  glass is placed) and ignores the target's fade (`_tahoe_glass_opacity_free`).
+- The popup's opacity fades over the first and last fifth, so the circle neither pops in nor out.
+- Interrupting (reopening while closing, a banner dismissed while coming in) continues from where
+  the shape is.
+- **Cost:** frame times as Phase 1: quick settings open p95 11.6 ms, close 9.7, submenus 10.9 /
+  10.3, calendar 8.8, desktop menu 8.8.
+- **Not covered:** closing app menus (their windows are destroyed at once; animating it means
+  taking over GNOME's window-destroy handling), and app menus are not tested headless (no app to
+  click in the headless shell).
+- Stills, animation slowed 10x: `shots/motion-calendar.png`, `motion-quick-settings.png`,
+  `motion-submenu.png`, `motion-banner.png`.
+
 ### Phase 5: tune by eye, then real desktop
 
 Durations, spring stiffness, the circle's start size, and the content fade point, tuned with the

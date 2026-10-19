@@ -7,6 +7,7 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const OUT = GLib.getenv('TAHOE_TEST_OUT');
@@ -153,6 +154,65 @@ export default class Driver extends Extension {
                 ['qs', qs, () => qs._boxPointer]];
             const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
             if (bg) cases.push(['desktop', bg, () => bg._boxPointer ?? bg.actor]);
+            if (GLib.getenv('TAHOE_TEST_STRIP') === 'banner') {
+                const notify = () => {
+                    // a source goes when its last notification does: a new one each time
+                    const source = new MessageTray.Source({ title: 'Glass test', iconName: 'dialog-information-symbolic' });
+                    Main.messageTray.add(source);
+                    const n = new MessageTray.Notification({ source, title: 'Liquid Glass', body: 'A banner growing out of a glass circle', isTransient: true });
+                    source.addNotification(n);
+                    return n;
+                };
+                // one unslowed, to frame the stills
+                let n = notify();
+                await sleep(800);
+                const bin = Main.messageTray._bannerBin;
+                write('log.jsonl', { banner: { state: Main.messageTray._notificationState, mapped: bin.mapped, opacity: bin.opacity, y: bin.y, size: bin.get_transformed_size(), pos: bin.get_transformed_position(), banner: Boolean(Main.messageTray._banner), dnd: Main.messageTray._busy ?? null } });
+                const box = stageBox(Main.messageTray._bannerBin);
+                n.destroy();
+                await sleep(800);
+                settings.slow_down_factor = slow;
+                n = notify();
+                for (let i = 0; i < 8; i++) {
+                    const b = Main.messageTray._bannerBin;
+                    write('log.jsonl', { i, state: Main.messageTray._notificationState, op: b.opacity, y: b.y, banner: Boolean(Main.messageTray._banner), queue: Main.messageTray.queueCount ?? Main.messageTray._notificationQueue?.length });
+                    await shotRect(`strip-banner-open-${i}`, box);
+                    await sleep(30 * slow);
+                }
+                // what the banner's timeout does (headless, the user counts as idle, so it never fires)
+                Main.messageTray._hideNotification(true);
+                for (let i = 0; i < 6; i++) {
+                    await shotRect(`strip-banner-close-${i}`, box);
+                    await sleep(25 * slow);
+                }
+                settings.slow_down_factor = 1;
+                write('log.jsonl', { done: true });
+                return;
+            }
+            if (GLib.getenv('TAHOE_TEST_STRIP') === 'sub') {
+                const toggle = qs._grid.get_children().find(c => c.menu && c.visible);
+                qs.open(false);
+                await sleep(500);
+                toggle.menu.open({ animate: false });
+                await sleep(500);
+                const box = stageBox(qs._boxPointer);
+                toggle.menu.close({ animate: false });
+                await sleep(400);
+                settings.slow_down_factor = slow;
+                toggle.menu.open({ animate: true });
+                for (let i = 0; i < 8; i++) {
+                    await shotRect(`strip-sub-open-${i}`, box);
+                    await sleep(30 * slow);
+                }
+                toggle.menu.close({ animate: true });
+                for (let i = 0; i < 6; i++) {
+                    await shotRect(`strip-sub-close-${i}`, box);
+                    await sleep(25 * slow);
+                }
+                settings.slow_down_factor = 1;
+                write('log.jsonl', { done: true });
+                return;
+            }
             for (const [label, menu, actor] of cases) {
                 // open once unslowed so the layout exists, to frame the stills
                 menu.open(false);
