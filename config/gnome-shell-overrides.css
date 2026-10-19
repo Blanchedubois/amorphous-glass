@@ -1,5 +1,6 @@
 /* tahoe-overrides: appended to ~/.themes/MacTahoe-Dark/gnome-shell/gnome-shell.css
-   by gnome-setup.sh and tahoe-repair.sh (idempotent, keyed on this header).
+   by gnome-setup.sh, glass-bar.sh and tahoe-repair.sh (idempotent, keyed on this header),
+   rendered through scripts/glass-tokens.py: tokens in double braces, for one mode.
    Quick settings: larger glyphs (24 px) in the toggles and the system row. */
 .quick-settings .button StIcon,
 .quick-toggle .quick-toggle-icon,
@@ -12,43 +13,39 @@
 .popup-menu-item .popup-menu-icon { icon-size: 18px !important; }
 .quick-toggle-icon { min-height: 44px !important; min-width: 44px !important; }
 
-/* Top-bar dropdowns (calendar, Now Playing, every panel menu) and
-   notification banners in a grey tint, never blurred (tahoe-repair keeps
-   Blur my Shell's popup module off):
-   warm grey at 80 % with a 1 px white outline at 30 % and a faint inner glow, in
-   place of the theme's 92 % dark grey and 75 % black outline. The buttons
-   and submenus of quick settings below take the same. */
+/* Liquid Glass dropdowns (docs/STANDARD.md, radii from tokens/radius.json via
+   scripts/glass-tokens.py): top bar menus, dock and desktop menus, the calendar and
+   notification banners. Blur My Shell draws the glass, its tint and its rim light; the
+   theme's own fill shows only when the menu glass is off. No outline, no glow: the rim
+   light is the only edge. The radius matches the glass under it. */
 .popup-menu-content,
-.notification-banner {
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  background-color: rgba(70, 65, 66, 0.8) !important;
-  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.12) !important;
-}
-/* The calendar dropdown at the 20 px popup radius (tokens/radius.json); the
-   theme rounds it at 22 px. */
-.datemenu-popover { border-radius: 20px !important; }
-/* A step darker than the other dropdowns: it is the largest, and the same
-   tint read lighter over that much area. */
-.popup-menu-content.datemenu-popover { background-color: rgba(54, 49, 50, 0.86) !important; }
-/* Its cards (events, world clocks, weather) and the notifications in it:
-   outline only, on the dropdown's own tint, in place of the theme's opaque
-   greys. A fill of their own stacked up and washed the dropdown out; it
-   shows only under the pointer. Stacked notifications draw nothing. */
+.notification-banner { border: none !important; box-shadow: none !important; }
+.popup-menu-content { border-radius: {{menu.radius}}px !important; }
+.notification-banner, .notification-banner .message { border-radius: {{notification.radius}}px !important; }
+/* The calendar: a large panel at {{calendar.radius}} px, its cards (events, world clocks,
+   weather, notifications) {{calendar.card}} px, concentric across the {{calendar.gap}} px between. */
+.datemenu-popover { border-radius: {{calendar.radius}}px !important; }
+/* Its cards: a faint lift on the glass, no outline (a fill of their own stacked up and
+   washed the dropdown out). Stacked notifications draw nothing. */
 .events-button, .world-clocks-button, .weather-button,
 .popup-menu .message {
-  background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  background-color: {{mode.card}} !important;
+  border: none !important;
   box-shadow: none !important;
+  border-radius: {{calendar.card}}px !important;
 }
 .events-button:hover, .world-clocks-button:hover, .weather-button:hover,
 .events-button:focus, .world-clocks-button:focus, .weather-button:focus,
-.popup-menu .message:hover, .popup-menu .message:focus { background-color: rgba(255, 255, 255, 0.06) !important; }
+.popup-menu .message:hover, .popup-menu .message:focus { background-color: {{mode.hover}} !important; }
 .events-button:active, .world-clocks-button:active, .weather-button:active,
-.popup-menu .message:active { background-color: rgba(255, 255, 255, 0.1) !important; }
+.popup-menu .message:active { background-color: {{mode.pressed}} !important; }
 .message:second-in-stack { background-color: transparent !important; box-shadow: none !important; }
 .message:lower-in-stack { background-color: transparent !important; box-shadow: none !important; }
-.datemenu-today-button:hover, .datemenu-today-button:focus { background-color: rgba(255, 255, 255, 0.06) !important; }
-.datemenu-today-button:active { background-color: rgba(255, 255, 255, 0.1) !important; }
+.datemenu-today-button:hover, .datemenu-today-button:focus { background-color: {{mode.hover}} !important; }
+.datemenu-today-button:active { background-color: {{mode.pressed}} !important; }
+/* The notification list's Clear button: a soft lift, no outline (dropdowns have none). */
+.message-list-clear-button { border: none !important; box-shadow: none !important; background-color: {{mode.card}} !important; }
+.message-list-clear-button:hover, .message-list-clear-button:focus { background-color: {{mode.hover}} !important; }
 
 /* Quick settings (the Control Center): no card behind the panel, so the
    toggles, sliders and system buttons stand on their own. Two classes to
@@ -58,17 +55,9 @@
   border: none !important;
   box-shadow: none !important;
 }
-/* Its toggles, sliders and system buttons in the dropdowns' tint, in
-   place of the theme's 15 % white, outline included. A toggle that is on keeps the theme's
+/* Its toggles, sliders and system buttons: each its own capsule of glass (Blur My Shell
+   draws it, with the 1 px edge), no fill painted here. A toggle that is on keeps the theme's
    white fill; the halves inside a split toggle draw nothing of their own. */
-.quick-toggle,
-.quick-toggle-has-menu,
-.quick-slider,
-.quick-settings-system-item .icon-button {
-  background-color: rgba(70, 65, 66, 0.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.12) !important;
-}
 /* Capsules and circles, set outright: 9999 px rounds each to its shorter
    side (the theme's slider stopped at 24 px). */
 .quick-toggle,
@@ -80,16 +69,16 @@
 .quick-toggle-menu .header .icon { border-radius: 9999px !important; }
 .quick-toggle:hover,
 .quick-toggle-has-menu:hover,
-.quick-settings-system-item .icon-button:hover { background-color: rgba(90, 85, 86, 0.84) !important; }
+.quick-settings-system-item .icon-button:hover { background-color: {{mode.hover}} !important; }
 .quick-toggle:active,
 .quick-toggle-has-menu:active,
-.quick-settings-system-item .icon-button:active { background-color: rgba(106, 101, 102, 0.88) !important; }
-/* Split toggles that are on (Wi-Fi, Bluetooth, power mode): the theme's
-   :checked rule outweighs the tint and put the 15 % white back. The pill
-   stays tinted; the white icon circle shows the state. */
-.quick-toggle-has-menu:checked { background-color: rgba(70, 65, 66, 0.8) !important; }
-.quick-toggle-has-menu:checked:hover { background-color: rgba(90, 85, 86, 0.84) !important; }
-.quick-toggle-has-menu:checked:active { background-color: rgba(106, 101, 102, 0.88) !important; }
+.quick-settings-system-item .icon-button:active { background-color: {{mode.pressed}} !important; }
+/* Split toggles that are on (Wi-Fi, Bluetooth, power mode): the theme's :checked rule
+   would put its 15 % white back. The pill stays clear glass; the white icon circle shows
+   the state. */
+.quick-toggle-has-menu:checked { background-color: transparent !important; }
+.quick-toggle-has-menu:checked:hover { background-color: {{mode.hover}} !important; }
+.quick-toggle-has-menu:checked:active { background-color: {{mode.pressed}} !important; }
 .quick-toggle-has-menu .quick-toggle { border: none !important; }
 /* Plain toggles (Dark Style, Night Light, Do Not Disturb) start their icon
    where a split toggle starts its circle, 12 px in: the theme put 12 px of
@@ -110,18 +99,16 @@
 .quick-toggle-has-menu .quick-toggle:active .quick-toggle-icon,
 .quick-toggle-has-menu .quick-toggle-menu-button:active { background-color: rgba(255, 255, 255, 0.2) !important; }
 .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon { background-color: white !important; }
-/* Submenus (power off, Wi-Fi, Bluetooth, power mode, volume output): the
-   dropdowns' tint in place of the theme's 25 % white card. GNOME gives the
-   power submenu no class of its own, so they all change together. */
+/* Submenus (power off, Wi-Fi, Bluetooth, power mode, volume output): a dropdown of glass,
+   no fill and no outline, in place of the theme's 25 % white card (which shows only with the
+   menu glass off). GNOME gives the power submenu no class of its own, so they all change
+   together. The curve of the toggles beside them: a 64 px toggle is a capsule with 32 px
+   ends. The padding keeps the items clear of those corners; items at 6 px by 8 px. */
 .quick-toggle-menu {
-  background-color: rgba(70, 65, 66, 0.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.12) !important;
-  /* The curve of the toggles beside them: a 64 px toggle is a capsule with
-     32 px ends. 12 px padding keeps the items clear of those corners; items
-     at 6 px by 8 px like the other dropdowns. */
-  border-radius: 32px !important;
-  padding: 12px !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: {{submenu.radius}}px !important;
+  padding: {{submenu.gap}}px !important;
 }
 .quick-toggle-menu .header { padding: 6px 8px !important; }
 .quick-toggle-menu .popup-menu-item { padding: 6px 8px !important; }
@@ -131,8 +118,8 @@
 }
 .quick-toggle-menu .popup-menu-item:focus,
 .quick-toggle-menu .popup-menu-item:hover,
-.quick-toggle-menu .popup-menu-item:selected { background-color: rgba(255, 255, 255, 0.12) !important; }
-.quick-toggle-menu .popup-menu-item:active { background-color: rgba(255, 255, 255, 0.18) !important; }
+.quick-toggle-menu .popup-menu-item:selected { background-color: {{mode.hover}} !important; }
+.quick-toggle-menu .popup-menu-item:active { background-color: {{mode.pressed}} !important; }
 
 /* Now Playing Card (nowplaying@epogonii.github.io) as macOS Tahoe's Now
    Playing: one glass surface, 12 px artwork, white title over a dimmed
@@ -168,13 +155,17 @@
 .np-placeholder, .np-volume-icon { color: rgba(255, 255, 255, 0.55) !important; }
 .np-equalizer, .np-card-equalizer { color: #ffffff !important; }
 
-/* Menu rows concentric with their glass card (glass-tuning session): the row radius is the
-   card radius minus the gap around the row. Top bar and desktop menus: Blur My Shell rounds the
-   card at 20 px, rows sit 4 px in, so 16 px. Quick settings submenus: 32 px card, 12 px padding,
-   so 20 px. An expanded submenu block closes with the same 16 px as the row above it. */
-.popup-menu-item, .popup-sub-menu .popup-menu-item { border-radius: 16px !important; }
-.popup-menu-item:checked { border-radius: 16px 16px 0 0 !important; }
-.popup-sub-menu, .popup-sub-menu > StBoxLayout { border-radius: 0 0 16px 16px !important; }
-.quick-toggle-menu .popup-menu-item { border-radius: 20px !important; }
+/* Menu rows concentric with their glass card: the row radius is the card radius minus the gap
+   around the row (tokens/radius.json). Top bar, dock and desktop menus: {{menu.radius}} px card,
+   rows {{menu.gap}} px in, so {{menu.row}} px. Quick settings submenus: {{submenu.radius}} px card,
+   {{submenu.gap}} px padding, so {{submenu.row}} px. An expanded submenu block closes with the
+   same radius as the row above it. Rows draw no focus outline; hover is a soft lift. */
+.popup-menu-item, .popup-sub-menu .popup-menu-item { border-radius: {{menu.row}}px !important; border: none !important; box-shadow: none !important; }
+.popup-menu-item:checked { border-radius: {{menu.row}}px {{menu.row}}px 0 0 !important; }
+.popup-sub-menu, .popup-sub-menu > StBoxLayout { border-radius: 0 0 {{menu.row}}px {{menu.row}}px !important; }
+.quick-toggle-menu .popup-menu-item { border-radius: {{submenu.row}}px !important; }
+.popup-menu-item:hover, .popup-menu-item:focus, .popup-menu-item:selected { background-color: {{mode.hover}} !important; }
+.popup-menu-item:active { background-color: {{mode.pressed}} !important; }
+.popup-separator-menu-item .popup-separator-menu-item-separator { background-color: {{mode.separator}} !important; }
 
 /* end tahoe-overrides */

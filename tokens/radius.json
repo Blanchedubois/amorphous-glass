@@ -1,21 +1,21 @@
 {
-  "_comment": "Rounding scale in CSS pixels at 1x. Every generator and config snippet reads from here. widget and menu_item follow the Mystical Blue Kvantum style, which draws its own tiles; they are recorded here for reference, not applied by a generator.",
-  "window": 20,
-  "popup": 20,
-  "widget": 3,
-  "menu_item": 3,
-  "tooltip": 8,
-  "icon_squircle_n": 5,
-  "titlebar_height": 32,
-  "titlebar_button": 14,
-  "titlebar_button_spacing": 8,
-  "frame": {
-    "note": "20 px on the Rounded Corners effect for every window; the Klassy decoration draws square and never rounds, so the effect owns the corner and the hairline from one path. One bright 1 px light hairline on the edge. No border, no inset."
-  },
-  "titlebar_buttons": {
-    "decoration": "Klassy",
-    "icons": "Material",
-    "background": "never",
-    "hover": "icon colour only: traffic-light colours, muted toward the titlebar at rest and full on hover"
+  "_comment": "Liquid Glass radii, logical px (docs/STANDARD.md). scripts/glass-bar.sh writes Blur My Shell's keys and the CSS from here. 'gap' is the padding between a surface's edge and its rows or cards; rows are rounded at radius - gap. A row is a capsule at most (half its height), so radius = min(row, height / 2) + gap.",
+  "menu":         { "radius": 18, "gap": 4,  "row": 14, "_comment": "shell menus: rows are about 28 px tall, so a row capsule rounds at 14 at most" },
+  "app_menu":     { "radius": 17, "gap": 4,  "row": 13, "_comment": "GTK app menus: rows are 26 px tall, so a row capsule rounds at 13 at most" },
+  "submenu":      { "radius": 32, "gap": 16, "row": 16, "_comment": "quick settings submenus: rows are 32 px tall, a capsule at 16; the card matches a 64 px toggle's 32 px ends, so the gap is 16" },
+  "calendar":     { "radius": 32, "gap": 12, "card": 20 },
+  "notification": { "radius": 20 },
+  "window":       { "radius": 24 },
+  "widget":       { "radius": 24 },
+  "dock":         { "radius": 28 },
+  "capsule":      { "radius": 9999 },
+  "tooltip":      { "radius": 8 },
+  "blur_my_shell": {
+    "popup/menu-corner-radius": "menu.radius",
+    "applications/menu-corner-radius": "app_menu.radius",
+    "popup/submenu-corner-radius": "submenu.radius",
+    "popup/calendar-corner-radius": "calendar.radius",
+    "popup/notification-corner-radius": "notification.radius",
+    "applications/corner-radius": "window.radius"
   }
 }

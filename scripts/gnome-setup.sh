@@ -152,14 +152,9 @@ if compgen -G "$ROOT/overrides/*.desktop" >/dev/null; then mkdir -p "$HOME/.loca
 gsettings set org.gnome.desktop.interface icon-theme 'Tahoe-Material'
 ln -sfn "$ROOT/icons/Tahoe-Material-KDE" "$HOME/.local/share/icons/Tahoe-Material-KDE"
 kwriteconfig6 --file kdeglobals --group Icons --key Theme Tahoe-Material-KDE
-CSS="$HOME/.themes/MacTahoe-Dark/gnome-shell/gnome-shell.css"
-# Replace the block, not append once, so a rerun picks up new rules.
-python3 - "$CSS" "$ROOT/config/gnome-shell-overrides.css" <<'PY'
-import sys,re
-css=open(sys.argv[1]).read(); ov=open(sys.argv[2]).read()
-css=re.sub(r"\n/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n","\n",css,flags=re.S)
-open(sys.argv[1],"w").write(css.rstrip()+"\n\n"+ov)
-PY
+# The shell CSS overrides, rendered with the Liquid Glass tokens into both shell themes
+# (replaces the block, so a rerun picks up new rules).
+bash "$ROOT/scripts/glass-bar.sh" overrides
 # GTK3: round the bottom corners too (theme ships 24px 24px 0 0).
 for f in "$HOME"/.themes/MacTahoe-*/gtk-3.0/gtk.css "$HOME"/.themes/MacTahoe-*/gtk-3.0/gtk-dark.css; do [[ -f "$f" ]] && sed -i 's/border-radius: 24px 24px 0 0/border-radius: 24px/g' "$f"; done
 # Modal dialogs out of Blur my Shell's popup surfaces (whole-screen blur otherwise).

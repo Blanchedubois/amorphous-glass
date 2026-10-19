@@ -152,25 +152,14 @@ fi
 if [[ "$GLASS_MODE" == light ]] && ! grep -qs "tahoe-overrides:" "$HOME/.themes/MacTahoe-Light/gnome-shell/gnome-shell.css"; then
   log "shell overrides missing from MacTahoe Light: re-applying the light mode"; bash "$ROOT/scripts/glass-bar.sh" mode light >/dev/null
 fi
-# 5b. shell CSS overrides (quick settings icon size, Now Playing card) survive
-#     a theme rebuild, and pick up rules added to the repo copy since
+# 5b. shell CSS overrides (quick settings icon size, Now Playing card, the Liquid Glass radii and
+#     row colours from tokens/) survive a theme rebuild, and pick up rules added to the repo
+#     copy since; glass-bar.sh renders them with the tokens into both shell themes
 CSS="$HOME/.themes/MacTahoe-Dark/gnome-shell/gnome-shell.css"
-ov_stale() {
-  python3 - "$CSS" "$ROOT/config/gnome-shell-overrides.css" <<'PY'
-import sys,re
-m=re.search(r"/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/",open(sys.argv[1]).read(),flags=re.S)
-sys.exit(0 if not m or m.group(0).strip()!=open(sys.argv[2]).read().strip() else 1)
-PY
-}
-if [[ -f "$CSS" && -f "$ROOT/config/gnome-shell-overrides.css" ]] && { ov_stale || grep -q '.lightbox { background-color: transparent; }' "$CSS"; }; then
-  log "re-applying shell CSS overrides"
-  python3 - "$CSS" "$ROOT/config/gnome-shell-overrides.css" <<'PY'
-import sys,re
-css=open(sys.argv[1]).read(); ov=open(sys.argv[2]).read()
-css=re.sub(r"\n/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n","\n",css,flags=re.S)
-open(sys.argv[1],"w").write(css.rstrip()+"\n"+ov)
-PY
-  gsettings set org.gnome.shell.extensions.user-theme name ''; sleep 1; gsettings set org.gnome.shell.extensions.user-theme name 'MacTahoe-Dark'
+if [[ -f "$CSS" && -f "$ROOT/config/gnome-shell-overrides.css" ]]; then
+  grep -q '.lightbox { background-color: transparent; }' "$CSS" && sed -i '/tahoe-overrides:/,/end tahoe-overrides/d' "$CSS"
+  out=$(bash "$ROOT/scripts/glass-bar.sh" overrides 2>&1) || log "shell CSS overrides failed: $out"
+  [[ -n "$out" ]] && log "re-applied shell CSS overrides"
 fi
 
 # 5b2. No popup blur: the Control Center and every dropdown use the plain
@@ -371,6 +360,12 @@ PY
        || ! gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell pipelines | grep -q pipeline_glassbar_menus; then
       log "glass menus drifted: re-applying"; bash "$ROOT/scripts/glass-bar.sh" menus on >/dev/null
     fi
+    # the glass at the CSS shape's radius (tokens/radius.json, docs/STANDARD.md)
+    while read -r sec key want; do
+      if [[ "$(gsettings --schemadir "$BS" get "org.gnome.shell.extensions.blur-my-shell.$sec" "$key")" != "$want" ]]; then
+        log "glass radius $sec/$key drifted: re-applying the tokens"; bash "$ROOT/scripts/glass-bar.sh" radii >/dev/null; break
+      fi
+    done < <(python3 "$ROOT/scripts/glass-tokens.py" bms)
   else
     # Popups (quick settings, menus, notifications) are not blurred: they
     # use the plain tint in the shell overrides.
@@ -446,7 +441,9 @@ fi
 # 12. icon theme contents: the generated set must exist and carry the current
 #     layout (symbolic places for Files' sidebar, KDE companion). Regenerate
 #     from the repo tokens when it does not; glyphs are fetched if missing.
-if [[ -d "$ROOT/scripts" ]] && { [[ ! -f "$ROOT/icons/Tahoe-Material/symbolic/places/user-home-symbolic.svg" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material-KDE/index.theme" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material/apps/scalable/org.gnome.Nautilus.svg" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material/places/scalable/folder-documents.svg" ]]; }; then
+# (only in a checkout that carries the icon generator: liquid-glass leaves the icons to
+#  cachyos-tahoe-theme, where the installed theme links)
+if [[ -f "$ROOT/scripts/gen-app-icons.py" ]] && { [[ ! -f "$ROOT/icons/Tahoe-Material/symbolic/places/user-home-symbolic.svg" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material-KDE/index.theme" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material/apps/scalable/org.gnome.Nautilus.svg" ]] || [[ ! -f "$ROOT/icons/Tahoe-Material/places/scalable/folder-documents.svg" ]]; }; then
   log "icon theme incomplete: regenerating from tokens"
   ( cd "$ROOT" && python3 scripts/fetch-glyphs.py >/dev/null 2>&1; python3 scripts/gen-action-icons.py >/dev/null 2>&1; python3 -W ignore scripts/gen-app-icons.py --no-sheet >/dev/null 2>&1 )
   gtk-update-icon-cache -q -t -f "$HOME/.local/share/icons/Tahoe-Material" 2>/dev/null || true

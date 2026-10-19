@@ -23,7 +23,8 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `extensions/tahoe-widgets@cachyos-tahoe` | Desktop widgets in glass (live) |
 | `extensions/tahoe-control-center@cachyos-tahoe` | Tahoe Control Center panel (built, switched off) |
 | `extensions/tahoe-menu-bar@cachyos-tahoe` | Tahoe menu bar contents (built, not applied) |
-| `tokens/` | Radius and palette tokens |
+| `tokens/` | Radius, glass colour and palette tokens (`scripts/glass-tokens.py` reads them) |
+| `docs/STANDARD.md` | The Liquid Glass standard: radius, gap, rows, tint and edge per surface |
 | `docs/liquid-glass.md` | Measured macOS Tahoe glass values |
 | `docs/gnome-tahoe/` | Refraction shader study, menu bar and Control Center port, animation plan |
 | `docs/GLASS_MENUS_PLAN.md` | Plan for glass menus in GTK apps |
@@ -41,8 +42,9 @@ A snapshot taken 2026-10-19 from the cachyos-tahoe-theme checkout:
 Left out: the KDE Plasma theme, Kvantum, Konsole and the Tahoe-Material icon theme. The scripts
 skip the icon theme when it is missing; it still lives in cachyos-tahoe-theme.
 
-The live desktop still runs from `~/Projects/cachyos-tahoe-theme`. tahoe-repair, the login
-autostart and the Blur My Shell build all point there. Moving them to this repo is a separate step.
+The live desktop runs from this repo: the login autostart runs `scripts/tahoe-repair.sh` here, and
+Blur My Shell is built from `config/bms-tahoe-glass.patch` here. The glass standard is
+`docs/STANDARD.md`; its radii and colours are in `tokens/`.
 
 ## SF glyphs
 

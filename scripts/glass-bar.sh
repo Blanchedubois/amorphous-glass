@@ -19,6 +19,8 @@
 #   bash glass-bar.sh apps off   app windows back to how they were before 'apply' (instant)
 #   bash glass-bar.sh mode light Tahoe light (light apps), 'mode dark' Tahoe dark, 'mode milky' the
 #                                pre-mode look: milky glass over dark apps (docs/liquid-glass.md)
+#   bash glass-bar.sh overrides  the shell CSS overrides, rendered with tokens/, into both shell themes
+#   bash glass-bar.sh radii      Blur My Shell's corner radius keys from tokens/radius.json
 #   bash glass-bar.sh rebuild    rebuild and reinstall the patched Blur My Shell, then log out and back in
 #   bash glass-bar.sh status     whether the patched Blur My Shell is the one installed
 #   bash glass-bar.sh undo       put everything back exactly as before 'apply', then log out and back in
@@ -36,6 +38,9 @@ EXT="$HOME/.local/share/gnome-shell/extensions"
 EXT_PATH=/org/gnome/shell/extensions/
 # patch on top of BMS_COMMIT: quick settings pieces blurred one by one (no card), brighter glass edges
 BMS_PATCH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config/bms-tahoe-glass.patch"
+# Liquid Glass tokens (docs/STANDARD.md): radii and per-mode colours, and the shell CSS they fill in
+TOKENS_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/glass-tokens.py"
+OVERRIDES_CSS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config/gnome-shell-overrides.css"
 OPENBAR_PRESET_URL=https://raw.githubusercontent.com/kayozxo/GNOME-macOS-Tahoe/6eb17c244fdefb02e81e77128ac5f1be1bb162ee/.config/extensions/openBar/Tahoe-Dark
 
 if [ "$(id -u)" -eq 0 ]; then echo "Run this as yourself, not root."; exit 1; fi
@@ -259,9 +264,13 @@ gtk_glass() { # light | dark | off
   [ "$1" = off ] && return 0
   f="$GTK4_DIR/gtk-$([ "$1" = light ] && echo Light || echo Dark).css"
   [ -f "$f" ] || return 0
-  python3 - "$f" "$1" "$GTK_BEGIN" "$GTK_END" "$(glass_edge_alpha)" <<'PY'
-import re, sys
-path, mode, begin, end, edge_a = sys.argv[1:6]
+  python3 - "$f" "$1" "$GTK_BEGIN" "$GTK_END" "$TOKENS_PY" <<'PY'
+import re, subprocess, sys
+path, mode, begin, end, tokens = sys.argv[1:6]
+def tok(name):  # Liquid Glass tokens (docs/STANDARD.md)
+    return subprocess.run([sys.executable, tokens, 'get', name, mode], capture_output=True, text=True, check=True).stdout.strip()
+menu_r, menu_gap, menu_row = tok('app_menu.radius'), tok('app_menu.gap'), tok('app_menu.row')
+row_hover, row_pressed, separator = tok('hover'), tok('pressed'), tok('separator')
 css = open(path).read()
 T = {  # docs/liquid-glass.md, "Tokens used here"
   'light': dict(window='rgba(250, 250, 252, 0.62)', view='rgba(255, 255, 255, 0.95)',
@@ -318,18 +327,28 @@ vars_ += ' --headerbar-bg-color: transparent; --headerbar-backdrop-color: transp
 B = ':not(.flat):not(.link):not(.titlebutton):not(.close):not(.minimize):not(.maximize):not(.suggested-action):not(.destructive-action)'
 W = 'window' + NOT_FILES
 # menus and popovers (Files' too): the shell menus' glass, drawn behind them by the patched Blur My
-# Shell; no fill of their own, the menus' edge, 20 px corners and 16 px rows (as the shell menus).
+# Shell; no fill and no edge of their own (the glass's rim light is the only edge, docs/STANDARD.md),
+# the menu radius and padding, concentric rows with a soft hover (tokens/).
 # The selectors outrank the theme's popover rules copied above (which would paint them opaque).
+# The popover node itself is cleared too: it has the .background class, so the scoped window
+# rule above gave it the window tint, a square over the whole popup, arrow strip included.
+# The theme's 1 px border on contents and arrow and its focus ring on the first row are cleared:
+# with them the menu read as a second box inside the glass (docs/GLASS_MENUS_PLAN.md, Phase 0).
 extra = f"""{W} {{ {vars_} }}
 window.csd{NOT_FILES}, window.csd{NOT_FILES}:backdrop {{ outline: 1px solid {T['outline']}; outline-offset: -1px; }}
 window.csd.maximized, window.csd.fullscreen, window.csd.tiled {{ outline: none; }}
 {W} button{B} {{ background-color: {T['fill']}; background-image: none; box-shadow: inset 0 0 0 1px {T['rim']}; }}
 {W} button{B}:hover {{ background-color: {T['hover']}; }}
 {W} button{B}:active, {W} button{B}:checked {{ background-color: {T['press']}; }}
-window:not(.tahoe-glass) popover.background:not(.magnifier) > contents, window:not(.tahoe-glass) popover.background:not(.magnifier) > contents:backdrop, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > contents, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > contents:backdrop {{ background-color: transparent; background-image: none; border-radius: 20px; padding: 4px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, {edge_a}); }}
+window:not(.tahoe-glass) popover.background:not(.magnifier) > contents, window:not(.tahoe-glass) popover.background:not(.magnifier) > contents:backdrop, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > contents, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > contents:backdrop {{ background-color: transparent; background-image: none; border: none; border-radius: {menu_r}px; padding: {menu_gap}px; box-shadow: none; }}
 window:not(.tahoe-glass) popover.background:not(.magnifier) > contents stack scrolledwindow:not(.view) > viewport {{ background-color: transparent; }}
-window:not(.tahoe-glass) popover.background:not(.magnifier) > arrow, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > arrow {{ background-color: transparent; background-image: none; border-color: rgba(255, 255, 255, {edge_a}); }}
-window popover.menu modelbutton, window popover.menu modelbutton.flat {{ border-radius: 16px; }}"""
+window:not(.tahoe-glass) popover.background:not(.magnifier), window:not(.tahoe-glass) popover.background:not(.magnifier):backdrop {{ background-color: transparent; background-image: none; }}
+window:not(.tahoe-glass) popover.background:not(.magnifier) > arrow, window:not(.tahoe-glass) popover.menu.background:not(.magnifier) > arrow {{ background-color: transparent; background-image: none; border: none; }}
+window popover.menu modelbutton, window popover.menu modelbutton.flat {{ border-radius: {menu_row}px; }}
+window popover.menu modelbutton:focus {{ box-shadow: none; outline: none; }}
+window popover.menu modelbutton:hover, window popover.menu modelbutton:selected {{ background-color: {row_hover}; }}
+window popover.menu modelbutton:active {{ background-color: {row_pressed}; }}
+window popover.menu.background separator, window popover.background > contents separator {{ background-color: {separator}; margin: 4px 10px; }}"""
 block = '\n'.join([begin, f'/* mode: {mode}; menus: glass; {len(out)} theme rules scoped to every window but Files */',
                    *out, extra, end])
 open(path, 'a').write('\n' + block + '\n')
@@ -337,25 +356,41 @@ print(f'  GTK4 glass ({mode}): {len(out)} theme rules scoped, Files excluded')
 PY
 }
 
+# shell_overrides: config/gnome-shell-overrides.css rendered with the tokens (scripts/glass-tokens.py)
+# into both shell themes: MacTahoe Light with the light mode's colours, MacTahoe Dark with the dark
+# or milky mode's. Replaces the marked block, so a rerun picks up new rules. Prints 'changed' when
+# a theme file was rewritten (the caller reloads the shell theme).
+shell_overrides() {
+  local mode dark_mode f; mode=$(glass_mode)
+  dark_mode=$([ "$mode" = light ] && echo dark || echo "$mode")
+  for f in Dark:"$dark_mode" Light:light; do
+    local css="$HOME/.themes/MacTahoe-${f%%:*}/gnome-shell/gnome-shell.css"
+    [ -f "$css" ] || continue
+    python3 "$TOKENS_PY" render "$OVERRIDES_CSS" "${f#*:}" | python3 -c '
+import re, sys
+p = sys.argv[1]; ov = sys.stdin.read().strip()
+css = open(p).read()
+m = re.search(r"/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/", css, flags=re.S)
+if m and m.group(0).strip() == ov:
+    sys.exit(0)
+css = re.sub(r"\n*/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n?", "\n", css, flags=re.S)
+open(p, "w").write(css.rstrip() + "\n\n" + ov + "\n")
+print("changed")' "$css"
+  done
+}
+
 # shell_theme MODE: Tahoe puts dark text on light glass, so light mode uses the MacTahoe Light
-# shell theme (with the same overrides as Dark: quick settings icon sizes, pill shapes, ...)
-# and dark text on the top bar; dark and milky keep MacTahoe Dark and white text.
+# shell theme (with the same overrides as Dark, in the light mode's colours) and dark text on
+# the top bar; dark and milky keep MacTahoe Dark and white text.
 shell_theme() {
-  local dark_css="$HOME/.themes/MacTahoe-Dark/gnome-shell/gnome-shell.css"
   local light_css="$HOME/.themes/MacTahoe-Light/gnome-shell/gnome-shell.css"
   local OBS="$EXT/openbar@neuromorph/schemas" name=MacTahoe-Dark fg="['1.0', '1.0', '1.0']"
+  shell_overrides >/dev/null
   if [ "$1" = light ] && [ -f "$light_css" ]; then
-    python3 - "$dark_css" "$light_css" <<'PY'
-import re, sys
-dark, light = sys.argv[1:3]
-m = re.search(r"/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/", open(dark).read(), flags=re.S)
-if m:
-    css = open(light).read()
-    css = re.sub(r"\n/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n?", "\n", css, flags=re.S)
-    open(light, 'w').write(css.rstrip() + "\n" + m.group(0) + "\n")
-PY
     name=MacTahoe-Light; fg="['0.11', '0.11', '0.12']"
   fi
+  # the theme is read again only when its name changes
+  gsettings set org.gnome.shell.extensions.user-theme name '' 2>/dev/null && sleep 1
   gsettings set org.gnome.shell.extensions.user-theme name "$name" 2>/dev/null ||
     gsettings --schemadir /usr/share/gnome-shell/extensions/user-theme@gnome-shell-extensions.gcampax.github.com/schemas \
       set org.gnome.shell.extensions.user-theme name "$name"
@@ -379,7 +414,16 @@ gtk_theme() {
 }
 
 # The glass edge per mode: Tahoe light has a bright rim, dark a quiet one; milky the bar's 12 %.
-glass_edge_alpha() { case "$(glass_mode)" in light) echo 0.25 ;; dark) echo 0.16 ;; *) echo 0.12 ;; esac; }
+glass_edge_alpha() { python3 "$TOKENS_PY" get edge_alpha "$(glass_mode)"; }
+
+# bms_radii: Blur My Shell's corner radius keys from tokens/radius.json (menus, quick settings
+# submenus, calendar, notifications, app windows), so the glass has the CSS shape's radius
+bms_radii() {
+  local section key value
+  while read -r section key value; do
+    gsettings --schemadir "$EXT/$BMS_UUID/schemas" set "org.gnome.shell.extensions.blur-my-shell.$section" "$key" "$value"
+  done < <(python3 "$TOKENS_PY" bms)
+}
 
 # shell_edges: set the edge in the installed Blur My Shell glass stylesheet (menus, quick settings
 # pieces, dock) and on the top bar (Open Bar's border); only the glass part of the stylesheet changes
@@ -426,7 +470,9 @@ PY
   local win hair
   if [ "$1" = light ]; then win='rgba(250, 250, 252, 0.62)'; hair='rgba(0, 0, 0, 0.08)'
   else win='rgba(36, 36, 40, 0.62)'; hair='rgba(255, 255, 255, 0.08)'; fi
-  local edge; edge="rgba(255, 255, 255, $(glass_edge_alpha))"
+  # Liquid Glass tokens (docs/STANDARD.md): menu radius, padding and rows; the rim light is the only edge
+  local r gap row; r=$(python3 "$TOKENS_PY" get app_menu.radius); gap=$(python3 "$TOKENS_PY" get app_menu.gap)
+  row=$(python3 "$TOKENS_PY" get app_menu.row)
   local W='window.background.csd:not(.popup):not(.tooltip)' T='window.csd > .titlebar'
   cat >> "$GTK3_CSS" <<EOF
 
@@ -435,9 +481,9 @@ $GTK3_BEGIN
 $W, $W:backdrop { background-color: $win; background-image: none; }
 $T, $T:backdrop, $T headerbar, $T headerbar:backdrop, window.csd headerbar.titlebar, window.csd headerbar.titlebar:backdrop { background-color: transparent; background-image: none; border-bottom-color: transparent; box-shadow: inset 0 -1px $hair; }
 window.csd.popup, window.csd.popup:backdrop, window.popup menu, window.popup .menu, window.popup .context-menu { background-color: transparent; background-image: none; }
-window.csd.popup decoration, window.csd.popup:backdrop decoration { border-radius: 20px; background-color: transparent; box-shadow: inset 0 0 0 1px $edge; }
-window.popup menu, window.popup .menu, window.popup .context-menu { border-radius: 20px; padding: 4px; border: none; }
-window.popup menu menuitem, window.popup .menu menuitem { border-radius: 16px; }
+window.csd.popup decoration, window.csd.popup:backdrop decoration { border-radius: ${r}px; background-color: transparent; box-shadow: none; border: none; }
+window.popup menu, window.popup .menu, window.popup .context-menu { border-radius: ${r}px; padding: ${gap}px; border: none; box-shadow: none; }
+window.popup menu menuitem, window.popup .menu menuitem { border-radius: ${row}px; outline: none; }
 $GTK3_END
 EOF
 }
@@ -455,8 +501,8 @@ apps() { # on | off : live Liquid Glass behind the whitelisted app windows (File
     gsettings --schemadir "$BS" set $S static-blur false
     gsettings --schemadir "$BS" set $S pipeline pipeline_glassbar_apps
     # the theme rounds windows at 24 px (GTK4 window.csd, and Rounded Window Corners for the
-    # rest); square when maximised or fullscreen, as the windows are
-    gsettings --schemadir "$BS" set $S corner-radius 24
+    # rest; tokens/radius.json window.radius); square when maximised or fullscreen, as the windows are
+    bms_radii
     gsettings --schemadir "$BS" set $S rounded-corners 0
     gsettings --schemadir "$BS" set $S corner-when-maximized false
     # light/dark: the GTK4 layer model makes the backgrounds translucent, so the window stays
@@ -527,6 +573,7 @@ PY
     # so the shared default (windows) stays as it is
     glass_pipeline pipeline_glassbar_menus 'Glass menus' 18.0
     gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.popup pipeline pipeline_glassbar_menus
+    bms_radii
   fi
   echo "  menus: $mode"
 }
@@ -710,6 +757,14 @@ case "${1:-}" in
       *) echo "usage: mode light|dark|milky"; exit 1 ;;
     esac ;;
   rebuild) step "Blur My Shell v76, patched"; build_bms; step "Done. LOG OUT AND BACK IN to load it." ;;
+  radii) bms_radii; echo "  Blur My Shell radii: from tokens/radius.json" ;;
+  overrides)  # the shell CSS overrides, rendered with the tokens, into both shell themes
+    if [ -n "$(shell_overrides)" ]; then
+      name=$(gsettings get org.gnome.shell.extensions.user-theme name | tr -d "'")
+      gsettings set org.gnome.shell.extensions.user-theme name ''; sleep 1
+      gsettings set org.gnome.shell.extensions.user-theme name "$name"
+      echo "  shell overrides: re-applied"
+    fi ;;
   menus)
     case "${2:-}" in
       on|off) menus "$2"; set_state menus "$2" ;;
@@ -721,5 +776,5 @@ case "${1:-}" in
       off) bar_blur plain; set_state bar plain ;;
       *) echo "usage: glass on|off"; exit 1 ;;
     esac ;;
-  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
