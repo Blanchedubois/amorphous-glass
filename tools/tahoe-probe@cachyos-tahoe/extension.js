@@ -1,11 +1,13 @@
-// Tahoe frame probe v2 (glass-tuning Phase 0, temporary, not shipped).
+// Tahoe frame probe v3 (glass-tuning Phase 0, temporary, not shipped).
 // For every popup open/close (top bar menus, quick settings and its submenus, dock menus,
-// the desktop right-click menu) it records, over a fixed window after the call:
+// the desktop right-click menu, and app dropdowns: GTK popovers, popover menus, drop-down
+// lists and GTK3 popup menus, which are popup windows of their own) it records, over a fixed window after the call:
 // frame intervals, CPU time per frame update, first-frame latency, and Blur My Shell's
 // tahoe_prof counters when present. One JSON line per event in ~/.cache/tahoe-probe.jsonl.
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
+import Meta from 'gi://Meta';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -146,14 +148,32 @@ export default class Probe extends Extension {
             this._subPatched = true;
         };
         this._patchSubmenus();
+        // app dropdowns map and unmap as windows (GNOME fades them in and out)
+        const isMenuWindow = w => [Meta.WindowType.DROPDOWN_MENU, Meta.WindowType.POPUP_MENU,
+            Meta.WindowType.MENU, Meta.WindowType.COMBO].includes(w.get_window_type());
+        const appLabel = w => {
+            const parent = w.get_transient_for();
+            const app = parent?.get_gtk_application_id() ?? parent?.get_wm_class() ?? w.get_wm_class() ?? '?';
+            const kinds = { [Meta.WindowType.DROPDOWN_MENU]: 'dropdown', [Meta.WindowType.POPUP_MENU]: 'popup',
+                [Meta.WindowType.MENU]: 'menu', [Meta.WindowType.COMBO]: 'combo' };
+            return `app:${app}:${kinds[w.get_window_type()] ?? w.get_window_type()}`;
+        };
+        this._wmIds = [
+            global.window_manager.connect('map', (_, actor) => {
+                try { if (isMenuWindow(actor.meta_window)) this._begin(null, 'open', null, appLabel(actor.meta_window)); } catch (e) {}
+            }),
+            global.window_manager.connect('destroy', (_, actor) => {
+                try { if (isMenuWindow(actor.meta_window)) this._begin(null, 'close', null, appLabel(actor.meta_window)); } catch (e) {}
+            }),
+        ];
         write({ probe: 'enabled', at: new Date().toISOString(), signals: this._sigNames, refresh: refreshRate(), bms: bmsPopupSettings(), prof: Boolean(prof) });
     }
 
-    _begin(menu, kind, animate) {
+    _begin(menu, kind, animate, label = null) {
         if (!this._subPatched) this._patchSubmenus();
         const now = GLib.get_monotonic_time();
         this._windows.push({
-            label: labelFor(menu), kind, animate: animate === undefined ? null : animate,
+            label: label ?? labelFor(menu), kind, animate: animate === undefined ? null : animate,
             start: now, end: now + (kind === 'open' ? OPEN_WINDOW_US : CLOSE_WINDOW_US),
             frames: [], prof0: snapProf(), surfaces: null,
         });
@@ -222,6 +242,8 @@ export default class Probe extends Extension {
         this._subPatched = false;
         submenuProto = null;
         for (const id of this._ids ?? []) global.stage.disconnect(id);
+        for (const id of this._wmIds ?? []) global.window_manager.disconnect(id);
+        this._wmIds = [];
         this._ids = [];
         this._windows = [];
         if (globalThis.__tahoeProf) globalThis.__tahoeProf.on = false;
