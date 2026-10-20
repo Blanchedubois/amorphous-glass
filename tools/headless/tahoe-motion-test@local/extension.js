@@ -146,6 +146,79 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'vitals') {
+            const vitals = Main.panel.statusArea.vitalsMenu?.menu;
+            vitals.open(true);
+            await sleep(900);
+            await shotRect('vitals-open', stageBox(vitals._boxPointer));
+            const glass = globalThis.__tahoeGlass;
+            write('log.jsonl', { surfaces: glass.surfaces(vitals._boxPointer).length, root: Boolean(glass.root_of(vitals.box)) });
+            // one switch, as the pointer slides to the clock, slowed 6x
+            St.Settings.get().slow_down_factor = 6;
+            Main.panel.menuManager._changeMenu(date);
+            for (let i = 0; i < 8; i++) {
+                await shotRect(`switch-${i}`, [1000, 0, 1560, 620]);
+                await sleep(25 * 6);
+            }
+            St.Settings.get().slow_down_factor = 1;
+            date.close(false);
+            await sleep(500);
+            vitals.open(false);
+            await sleep(600);
+            write('log.jsonl', { surfaces2: glass.surfaces(vitals._boxPointer).length });
+            await shotRect('vitals-open2', stageBox(vitals._boxPointer));
+            write('log.jsonl', { done: true });
+            return;
+        }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'skim') {
+            // sliding across the top bar as a hand does, through GNOME's own menu manager
+            const manager = Main.panel.menuManager;
+            const menus = ['vitalsMenu', 'dateMenu', 'quickSettings']
+                .map(key => Main.panel.statusArea[key]?.menu).filter(Boolean);
+            write('log.jsonl', { note: `menus: ${menus.length}` });
+            const shots = GLib.getenv('TAHOE_TEST_SKIM_SHOTS') === '1';
+            for (const [label, gap] of [['skim-fast-first', 70], ['skim-fast-again', 70], ['skim-slow', 450]]) {
+                menus[0].open(true);
+                await sleep(500);
+                const p0 = prof();
+                this._frames = [];
+                const start = GLib.get_monotonic_time();
+                let shot = 0;
+                for (let round = 0; round < 2; round++) {
+                    for (const menu of [...menus.slice(1), ...menus.slice(0, -1).reverse()]) {
+                        manager._changeMenu(menu);
+                        if (shots && label === 'skim-fast' && round === 0) {
+                            await shotRect(`${label}-${shot++}`, [0, 0, 2560, 700]);
+                            await sleep(Math.max(0, gap - 40));
+                        } else {
+                            await sleep(gap);
+                        }
+                    }
+                }
+                await sleep(600);
+                const frames = this._frames;
+                this._frames = null;
+                const iv = [];
+                for (let i = 1; i < frames.length; i++) iv.push((frames[i][0] - frames[i - 1][0]) / 1000);
+                const slow = [];
+                for (let i = 1; i < frames.length; i++) {
+                    const gapMs = (frames[i][0] - frames[i - 1][0]) / 1000;
+                    if (gapMs <= 12.5) continue;
+                    const d = {};
+                    for (const k of Object.keys(frames[i][2] ?? {})) {
+                        const v = ((frames[i][2][k] ?? 0) - (frames[i - 1][2]?.[k] ?? 0)) / 1000;
+                        if (v > 0.3) d[k] = Math.round(v * 10) / 10;
+                    }
+                    slow.push({ at: Math.round((frames[i][0] - start) / 1000), gapMs: Math.round(gapMs), d });
+                }
+                write('log.jsonl', { label, slow });
+                write('log.jsonl', { label, kind: 'skim', first_ms: (frames[0]?.[0] - start) / 1000, iv: iv.map(x => Math.round(x * 100) / 100), cpu: frames.map(f => Math.round(f[1] / 10) / 100), prof: diff(p0, prof()) });
+                manager.activeMenu?.close(false);
+                await sleep(400);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'iconfx') {
             qs.open(true);
             await sleep(1500);
@@ -159,7 +232,7 @@ export default class Driver extends Extension {
                 samples.push(`${icon.scale_x.toFixed(2)}/${icon.opacity}`);
                 await sleep(10 * 10);
             }
-            write('log.jsonl', { samples: samples.join(' ') });
+            write('log.jsonl', { samples: samples.join(' '), pressedProp: Boolean(toggle.constructor.find_property?.('pressed') ?? ('pressed' in toggle)) });
             St.Settings.get().slow_down_factor = 1;
             write('log.jsonl', { checked: toggle.checked, done: true });
             return;
@@ -240,7 +313,8 @@ export default class Driver extends Extension {
                 return;
             }
             if (GLib.getenv('TAHOE_TEST_STRIP') === 'sub') {
-                const toggle = qs._grid.get_children().find(c => c.menu && c.visible);
+                const want = GLib.getenv('TAHOE_TEST_TOGGLE');
+                const toggle = qs._grid.get_children().find(c => c.menu && c.visible && (!want || c.constructor.name === want));
                 qs.open(false);
                 await sleep(500);
                 toggle.menu.open({ animate: false });

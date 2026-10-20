@@ -110,3 +110,42 @@ own get a small push at most every 400 ms. No effects while the panel itself is 
 
 - Install (`tahoe-motion.sh on`, logout), the user tries it, the probe measures the after; tune
   by eye from the user's notes.
+
+## Round 2: the user's notes after trying it (2026-10-19 night)
+
+1. "Looks great, just a bit slow ... too silky": everything one step faster. Cards use M3's
+   spatial **fast** spring up to 600 x 500 px and default above (was default and slow); mass 1
+   (was 1.15); the popup's elastic grows from 0.9 on damping 0.6 / stiffness 700 (was 0.86 on
+   0.55 / 380); rows 30 ms apart, the whole stagger within 150 ms (was 50 / 240); quick settings
+   rows 45 ms apart within 200 ms (was 70 / 320), parts 35 ms; the drop falls at most 32 px and
+   spreads at 40 % of its fall.
+2. "Opening Wi-Fi, Bluetooth or Power glitches": the submenu's height still followed the old
+   progress value, which the liquid card no longer has: the height went to NaN (full at once),
+   the buttons below jumped and their glass lagged a frame (ghost capsules). The height now
+   follows the glass's poured edge; the card also gathers back into the toggle's own capsule (it
+   gathered into a square). Stills: `shots/motion4-wifi-submenu.png`.
+3. "Skimming the menu bar, the previous liquid glass collides with the next": GNOME opens and
+   closes with a fade-only flag when the pointer slides from one menu to the next
+   (`PopupMenuManager._changeMenu`). Those now hand over instead of morphing: the menu being left
+   fades out on an effects spring (gone in about 50 ms), the next one is there at once, fading in
+   from 35 % with a light elastic settle from 0.96 about its icon. The full pour stays for a
+   click. Two liquid bodies never meet.
+4. Material toggles, from material-web's switch (`switch/internal/_handle.scss`: the pressed
+   handle changes size over 100 ms, the handle travels with an overshoot easing over 300 ms,
+   colours over 67 ms): while a quick settings button is held, the whole button (glass included)
+   gives a little, wider and shorter (1.035 x 0.92, critically damped, about 100 ms), and springs
+   back past its size on release (spatial fast); the on / off fill crossfades (St
+   `transition-duration: 120ms` in the shell overrides); the icon does its Replace.
+5. Fast and slow use, tested headless through GNOME's own menu manager (`skim`: Vitals, calendar,
+   quick settings and back, twice; Vitals and Open Bar loaded):
+
+   | Pace | p95 (ms) | Worst | Frames over 12.5 ms |
+   |---|---|---|---|
+   | fast (a menu every 70 ms), first time in a session | 24.3 | 106.5 | 5 |
+   | fast, again | 11.8 | 33.9 | 2 |
+   | slow (every 450 ms) | 9.0 | 51 | 0 |
+
+   The first fast skim after the shell starts pays once for quick settings' first open (its
+   glass textures, GNOME's own first-open work); the one-time setup of tahoe-motion (23 ms) now
+   runs while idle 3 s after the shell starts. Normal opens and closes, p95: quick settings
+   9.7 / 9.3, submenus 10.2 / 10.2, calendar 9.0 / 8.6, desktop menu 9.0 / 8.5.

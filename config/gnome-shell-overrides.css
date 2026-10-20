@@ -31,6 +31,13 @@
 /* While tahoe-motion morphs a card (circle, bar, card), the glass's reveal is its edge: the
    card's own outline waits until it is open. */
 #uiGroup .tahoe-morphing { box-shadow: none !important; }
+/* Quick settings buttons crossfade their fill when they turn on or off, or are hovered or held,
+   instead of flipping (after Material's switch: colours over 67 to 150 ms; tahoe-motion adds the
+   spring squish and the icon replace). */
+.quick-toggle,
+.quick-toggle-has-menu .quick-toggle-menu-button,
+.quick-settings-system-item .icon-button,
+.quick-slider .slider-bin { transition-duration: 120ms; }
 .popup-menu-content { border-radius: {{menu.radius}}px !important; }
 .notification-banner, .notification-banner .message { border-radius: {{notification.radius}}px !important; }
 /* The calendar: a large panel at {{calendar.radius}} px, its cards (events, world clocks,

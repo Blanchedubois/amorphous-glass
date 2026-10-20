@@ -21,8 +21,8 @@ export const EXPRESSIVE = {
     },
 };
 
-/// the glass is a little heavier than a UI panel: it starts softly and settles without a stop
-export const LIQUID_MASS = 1.15;
+/// the glass's mass (1.15 felt too silky on the desktop; M3's own is 1)
+export const LIQUID_MASS = 1.0;
 
 const REST_DISTANCE = 0.0015;
 const REST_SPEED = 0.02;
