@@ -456,7 +456,32 @@ Gates with the glass:
   over 10 cycles in the throwaway shell). The glass does not slow unlocking. The churn test now
   waits for the real unlock instead of a fixed 1.2 s, which was too short there.
 
-Still to do in Phase 4:
+Later the same day:
+- **Corners:** "not softened" (corner softening off, SF Pro's own corners).
+- **Dark-mode tint:** "tinted light since it's hard to see". Dark mode now gets a light tint
+  (milk 0.24, brightness +0.07) in place of the darker tint; light mode is unchanged.
+  [phase4-glass-clock.png](lockscreen/shots/phase4-glass-clock.png).
+
+More gates:
+- **Glass failure:** with the mask forced to fail (test switch `_failForTest`), the journal gets
+  one line, the plain clock shows at full opacity, the glass is removed, and the rest of the lock
+  screen keeps running with the password usable.
+- **G4 with the glass:** 50 cycles, all clean.
+  - at every lock: the frame running with both actors and the password usable;
+  - at every unlock: clean;
+  - actors flat;
+  - unlock median 2.81 s, the same as without the extension;
+  - no JS errors.
+- **Frame cost, 10 clock-to-password round trips:**
+
+  | | With the glass | Without the extension |
+  |---|---|---|
+  | Stage update p95 | 1.34 to 1.39 ms | 1.63 to 1.72 ms |
+  | Worst frame | 3.0 to 3.3 ms | 14 to 17 ms |
+
+  Switching the blur off saves more than the glass costs.
+
+Still to do in Phase 4 (superseded by the next request):
 - the user's pick of face A or B;
 - a full G4 churn with the glass;
 - a G2 case for the glass failing to paint (plain clock takes over);

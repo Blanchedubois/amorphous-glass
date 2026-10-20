@@ -132,6 +132,35 @@ async function lockAndPrompt() {
     return dialog;
 }
 
+// Frame cost: page changes (clock <-> password) while locked, the moments the glass repaints with
+// the whole lock screen. Logs the time each stage update takes and the frame intervals.
+async function runPerf() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    await sleep(1000);
+    const updates = [], intervals = [];
+    let t0 = 0, last = 0;
+    const ids = [
+        global.stage.connect('before-update', () => { t0 = GLib.get_monotonic_time(); }),
+        global.stage.connect('after-update', () => {
+            const now = GLib.get_monotonic_time();
+            if (t0) updates.push((now - t0) / 1000);
+            if (last) intervals.push((now - last) / 1000);
+            last = now;
+        }),
+    ];
+    for (let i = 0; i < 10; i++) {
+        dialog._showClock();
+        await sleep(700);
+        dialog._showPrompt();
+        await sleep(700);
+    }
+    ids.forEach(id => global.stage.disconnect(id));
+    const pct = (a, q) => { const b = a.slice().sort((x, y) => x - y); return Math.round(b[Math.min(b.length - 1, Math.floor(q * b.length))] * 100) / 100; };
+    write({ label: 'perf', frames: updates.length, updateP50: pct(updates, 0.5), updateP95: pct(updates, 0.95), updateMax: pct(updates, 1),
+        intervalP95: pct(intervals.filter(x => x < 50), 0.95), frame: frameState().frame });
+}
+
 // G2 for our own code: a broken later phase, injected through the frame's own API
 async function runOurs(kind) {
     await sleep(3000);
@@ -381,7 +410,7 @@ export default class Driver extends Extension {
     enable() {
         if (this._started) return;
         this._started = true;
-        (GATE === 'churn' ? runChurn() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
