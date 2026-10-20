@@ -14,7 +14,11 @@ lockrun() {
   cp -r "$M/tools/lockscreen/." "$copy/"
   sed -i "s/--virtual-monitor 2560x1440@120/--virtual-monitor ${LOCK_MONITOR:-2560x1440}@60/" "$copy/run.sh"
   grep -q -- "--virtual-monitor ${LOCK_MONITOR:-2560x1440}@60" "$copy/run.sh" || { echo "lock harness: monitor not patched" >&2; return 1; }
+  # never the real GDM: its unlock prompt would start real PAM checks (sysbus.sh)
+  . "$H/sysbus.sh"
+  sysbus_start || return 1
   "$copy/run.sh" "$@"
+  sysbus_stop
   rm -rf "$copy"
 }
 W=$M/extensions/tahoe-widgets@cachyos-tahoe
