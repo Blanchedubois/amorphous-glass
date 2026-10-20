@@ -88,10 +88,11 @@ export const VARIANTS = {
     A2: {...DESKTOP, bend: 3},   // frosted, a touch of liquid at the edge
     A3: {...DESKTOP, bend: 9},   // frosted, today's bend
 };
-// the test shells pick a variant (tools/gdm, tools/lockscreen: TAHOE_GLASS_VARIANT); unset: today's
-const VARIANT = VARIANTS[GLib.getenv('TAHOE_GLASS_VARIANT') ?? ''];
-if (VARIANT)
-    Object.assign(MATERIAL, VARIANT);
+// the user's pick (2026-10-20): A1 on both screens. The test shells may try another
+// (TAHOE_GLASS_VARIANT=A2|A3); 'old' is the glass before Phase A.
+const VARIANT_NAME = GLib.getenv('TAHOE_GLASS_VARIANT') || 'A1';
+if (VARIANTS[VARIANT_NAME])
+    Object.assign(MATERIAL, VARIANTS[VARIANT_NAME]);
 
 export function darkScheme() {
     if (GLASS_LOOK !== 'scheme')
