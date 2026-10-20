@@ -135,6 +135,8 @@ Files: `gdm/tahoe-gdm.css` (the greeter rules), `scripts/gdm-theme.sh build|comm
 - Lock screen check: main's tahoe-lockscreen rendered with the old and the new gresource
   (tools/lockscreen/run.sh dark, `GNOME_SHELL_DATADIR` swapped): clock, entry and full screenshots
   identical (0 pixels differ).
+- The user's choice (2026-10-20): 24 h clock on the login screen, Space Grotesk installed
+  system-wide (`GDM_CLOCK_FORMAT=24h GDM_FONTS=1 scripts/gdm-theme.sh commands`).
 - Install: `scripts/gdm-theme.sh commands` (with the options chosen) prints the commands; the user
   runs them (they need the sudo password). Shows at the next logout or boot.
 
