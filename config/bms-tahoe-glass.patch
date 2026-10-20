@@ -304,10 +304,17 @@ index 0ca7acc..2adcb7b 100644
          const listed = this.settings.applications.ENABLE_ALL
              ? !matches_any(wm_class, this.blacklist)
 diff --git a/src/components/popup/index.js b/src/components/popup/index.js
-index 4d16af5..eed8f3d 100644
+index 4d16af5..cfa98f7 100644
 --- a/src/components/popup/index.js
 +++ b/src/components/popup/index.js
-@@ -13,6 +13,14 @@ import {
+@@ -1,5 +1,6 @@
+ import GLib from 'gi://GLib';
+ import Meta from 'gi://Meta';
++import St from 'gi://St';
+ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+ 
+ import { get_component_style, connect_system_style_changes } from '../../conveniences/style.js';
+@@ -13,6 +14,14 @@ import {
  } from './targets.js';
  import { PopupBlurSurface } from './surface/blur_surface.js';
  import { PopupBlurMessageStacks } from './message_stacks.js';
@@ -322,7 +329,7 @@ index 4d16af5..eed8f3d 100644
  
  const KEYBOARD_STYLE_CLASS = 'bms-keyboard-surface';
  const BACKGROUND_STYLE_CLASSES = [...POPUP_BACKGROUND_STYLES, ...POPUP_SURFACE_STYLES];
-@@ -33,9 +41,63 @@ export const PopupBlur = class PopupBlur {
+@@ -33,9 +42,63 @@ export const PopupBlur = class PopupBlur {
          this.queue_id = 0;
          this.follow_up_queue_id = 0;
          this.reset_id = 0;
@@ -386,7 +393,7 @@ index 4d16af5..eed8f3d 100644
      enable() {
          if (this.enabled) {
              this._log("blur already enabled");
-@@ -69,8 +131,20 @@ export const PopupBlur = class PopupBlur {
+@@ -69,8 +132,23 @@ export const PopupBlur = class PopupBlur {
          this.track_container(Main.layoutManager.screenShieldGroup);
          this.track_container(Main.messageTray._bannerBin);
          this.track_container(Main.panel.statusArea.quickSettings.menu._overlay);
@@ -401,23 +408,94 @@ index 4d16af5..eed8f3d 100644
 +            this
 +        );
          this.track_container(global.window_group);
++        // tahoe glass: the app grid's folder tiles live deep in the overview, out of reach of the
++        // containers tracked above: they are looked for each time it opens
++        Main.overview.connectObject('showing', () => this.blur_folder_tiles(), this);
          this.track_keyboard();
 +        if (!this.settings.popup.STATIC_BLUR)
 +            this.warm_up_shaders();
      }
  
      track_container(container) {
-@@ -351,6 +425,8 @@ export const PopupBlur = class PopupBlur {
+@@ -95,6 +173,48 @@ export const PopupBlur = class PopupBlur {
+         });
+     }
+ 
++    /// tahoe glass: a glass of its own under each folder tile of the app grid (few: one per folder)
++    blur_folder_tiles() {
++        const display = Main.overview._overview?.controls?._appDisplay;
++        if (!display)
++            return;
++        const stack = [display];
++        while (stack.length > 0) {
++            const actor = stack.pop();
++            if (actor instanceof St.Widget && actor.has_style_class_name('app-folder')) {
++                this.try_blur(actor);
++                this.follow_scrolling(actor);
++            } else {
++                stack.push(...actor.get_children());
++            }
++        }
++    }
++
++    /// The app grid turns its pages by scrolling, a transform applied as it paints that no signal
++    /// tells the glass about: a folder tile's glass is placed again whenever its scroll view moves
++    /// (it stayed where the tile had been, under another app, until the overview closed).
++    follow_scrolling(tile) {
++        let view = tile.get_parent();
++        while (view && !(view instanceof St.ScrollView))
++            view = view.get_parent();
++        if (!view)
++            return;
++        this.scroll_tiles ??= new Map();
++        let tiles = this.scroll_tiles.get(view);
++        if (!tiles) {
++            tiles = new Set();
++            this.scroll_tiles.set(view, tiles);
++            const update = () => tiles.forEach(t => this.surfaces.get(t)?.queue_update());
++            [view.hadjustment, view.vadjustment].filter(Boolean).forEach(adjustment =>
++                this.connections.connect(adjustment, 'notify::value', update));
++            this.connections.connect(view, 'destroy', () => this.scroll_tiles?.delete(view));
++        }
++        if (!tiles.has(tile)) {
++            tiles.add(tile);
++            this.connections.connect(tile, 'destroy', () => tiles.delete(tile));
++        }
++    }
++
+     track_keyboard() {
+         const keyboard_box = Main.layoutManager.keyboardBox;
+         this.track_container(keyboard_box);
+@@ -228,6 +348,16 @@ export const PopupBlur = class PopupBlur {
+             return { parent, sibling };
+         }
+ 
++        // tahoe glass: an actor of the overview (a folder tile) has its glass in the overview's own
++        // layer, under the overview's content and over its backdrop
++        const overview_group = Main.layoutManager.overviewGroup;
++        if (overview_group?.contains(target) && target !== overview_group) {
++            let sibling = target;
++            while (sibling.get_parent() !== overview_group)
++                sibling = sibling.get_parent();
++            return { parent: overview_group, sibling };
++        }
++
+         const overlay_groups = [
+             Main.uiGroup,
+             Main.layoutManager.modalDialogGroup,
+@@ -351,6 +481,10 @@ export const PopupBlur = class PopupBlur {
          }
  
          this.cancel_queued_blurs();
 +        this.finish_warm_up();
 +        Main.panel.statusArea.quickSettings?.menu?.disconnectObject(this);
++        Main.overview.disconnectObject(this);
++        this.scroll_tiles = null;
  
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..9a6f722 100644
+index 5a891b9..7ac0d63 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -427,7 +505,7 @@ index 5a891b9..9a6f722 100644
  
  import { DynamicPipeline } from '../../../render/dynamic_surface.js';
  import { has_any_style_class, has_style_class } from '../actors.js';
-@@ -10,8 +11,14 @@ import { PopupBlurSurfaceStyle } from './style.js';
+@@ -10,10 +11,16 @@ import { PopupBlurSurfaceStyle } from './style.js';
  import { PopupBlurSurfaceTransitions } from './transitions.js';
  import { PopupBlurStaticActor } from '../static_actor.js';
  import { getSurfaceSibling, registerSurface, unregisterSurface } from './stack.js';
@@ -440,8 +518,11 @@ index 5a891b9..9a6f722 100644
 +    'quick-toggle', 'quick-toggle-has-menu', 'quick-slider', 'icon-button', 'power-item',
 +];
  const FULL_GEOMETRY_STYLE_CLASSES = [
-     'popup-menu-content', 'candidate-popup-content',
+-    'popup-menu-content', 'candidate-popup-content',
++    'popup-menu-content', 'candidate-popup-content', 'app-folder',
      'quick-settings', 'quick-toggle-menu', 'screenshot-ui-panel',
+     'notification-banner', 'snap-assistant',
+     'osd-window', 'resize-popup', 'workspace-switcher',
 @@ -52,6 +59,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.pipeline = null;
          this.blur_actor = null;
@@ -1099,7 +1180,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..6dcf49b 100644
+index 0dce45a..6b08747 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1108,12 +1189,14 @@ index 0dce45a..6dcf49b 100644
  
  import { has_any_style_class, is_internal_actor } from './actors.js';
  
-@@ -6,9 +7,24 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
+@@ -6,9 +7,26 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
  const POPUP_TARGET_STYLE_CLASSES = [
      'popup-menu-content', 'quick-settings', 'quick-toggle-menu', 'notification-banner',
      'candidate-popup-content', 'screenshot-ui-panel', 'bms-keyboard-surface',
 +    // tahoe glass: the dock's app name on hover, a glass capsule
 +    'dash-label',
++    // tahoe glass: the app grid's folder tiles, the glass of the folder popup they open into
++    'app-folder',
  ];
 +// tahoe glass: capsules whatever their height
 +const CAPSULE_STYLE_CLASSES = ['dash-label'];
@@ -1133,7 +1216,17 @@ index 0dce45a..6dcf49b 100644
  
  export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
  export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
-@@ -95,6 +111,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -29,7 +47,8 @@ export const POPUP_CORNER_RADII = [
+     {
+         key: 'calendar-corner-radius',
+         property: 'CALENDAR_CORNER_RADIUS',
+-        style_classes: ['datemenu-popover'],
++        // tahoe glass: app grid folder tiles share the calendar's 32 (tokens/radius.json 'folder')
++        style_classes: ['datemenu-popover', 'app-folder'],
+     },
+     {
+         key: 'notification-corner-radius',
+@@ -95,6 +114,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
  
          const box = actor._delegate?.box;
@@ -1149,7 +1242,7 @@ index 0dce45a..6dcf49b 100644
          if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
              targets.add(box);
  
-@@ -143,6 +168,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -143,6 +171,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
                  }
              }
  
@@ -1161,7 +1254,7 @@ index 0dce45a..6dcf49b 100644
              if (this.is_blur_target_actor(child)) {
                  targets.add(child);
                  continue;
-@@ -152,6 +182,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -152,6 +185,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
      }
  
@@ -1187,7 +1280,7 @@ index 0dce45a..6dcf49b 100644
      push_children(stack, children) {
          for (let index = children.length - 1; index >= 0; index--)
              stack.push({ actor: children[index], fallback_count: null });
-@@ -167,6 +216,12 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -167,6 +219,12 @@ export const PopupBlurTargets = class PopupBlurTargets {
      }
  
      get_corner_radius(target, root_actor) {
