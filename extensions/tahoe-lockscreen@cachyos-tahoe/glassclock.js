@@ -41,6 +41,9 @@ export const MATERIAL = {
     brightness: 0.05,   // a slight lift, so the glass reads lighter than what is behind it
     milk: 0.06,         // how much white is laid over the backdrop
     rim: 0.22,          // rim light toward the top left
+    rimLine: 2,         // logical px: the edge's crisp line (C, as every glass surface)
+    rimGlow: 5,         // logical px: the softer glow inside it
+    glow: 0.35,         // the glow's strength against the line's
     rimBase: 0.08,      // rim light all round
     shade: 0.04,        // darkening of the edge facing away from the light
     split: 0.05,        // colour split, as a fraction of the bend
@@ -67,6 +70,10 @@ uniform float split;
 uniform float date_milk;
 uniform float date_scale;
 uniform float dark_tint;
+uniform float edge_px;
+uniform float rim_line_px;
+uniform float rim_glow_px;
+uniform float glow;
 
 vec3 tahoe_backdrop(vec2 uv) {
     vec2 b = vec2(blur_px * px_x, blur_px * px_y);
@@ -104,7 +111,13 @@ const SHADER = `
     c = mix(c, vec3(0.0), dark_tint);
     // the rim: lit from the top left, a little shade on the far side
     float facing = dot(-n, normalize(vec2(-1.0, -1.0)));
-    float r = smoothstep(0.55, 1.0, x) * m.b;   // the rim scales with the glyph
+    // the edge, as every glass surface (docs/UNIFIED_LOCK_PLAN.md, the user's C): a crisp line
+    // rim_line_px wide and a softer glow rim_glow_px in; px inside the stroke from the depth ramp
+    // (it reaches 1 at edge_px for the time, at edge_px times the bend strength for the date)
+    float inside = m.g * edge_px * m.b;
+    float line_ = 1.0 - smoothstep(rim_line_px * 0.6, rim_line_px, inside);
+    float halo = glow * (1.0 - smoothstep(0.0, rim_glow_px, inside));
+    float r = max(line_, halo) * step(0.001, m.r);
     c += r * (rim_base + rim * max(facing, 0.0));
     c *= 1.0 - shade * r * max(-facing, 0.0);
     c = clamp(c, 0.0, 1.0);
@@ -134,6 +147,8 @@ class TahoeLockGlyphGlassEffect extends Clutter.OffscreenEffect {
             brightness: dark ? M.darkBrightness : M.brightness, dark_tint: dark ? M.darkTint : 0,
             milk: dark ? M.darkMilk : M.milk, rim: M.rim, rim_base: M.rimBase, shade: M.shade, split: M.split,
             date_milk: M.dateMilk, date_scale: M.dateScale,
+            edge_px: M.edge * sizeScale * scale, rim_line_px: M.rimLine * scale,
+            rim_glow_px: M.rimGlow * scale, glow: M.glow,
         };
         this.queue_repaint();
     }

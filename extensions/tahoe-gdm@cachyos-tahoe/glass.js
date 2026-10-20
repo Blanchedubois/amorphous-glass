@@ -162,8 +162,7 @@ class TahoeGdmGlassEffect extends Clutter.OffscreenEffect {
 
     // shape: {sdf: true, pad, radius} (physical px) or {mask: Cogl.Texture2D}; width, height: the
     // texture's size (the shape plus pad on every side), physical px
-    setShape(shape, width, height, scale, dark) {
-        const M = MATERIAL;
+    setShape(shape, width, height, scale, dark, M = MATERIAL) {
         const look = dark ? M.dark : M.light;
         this._mask = shape.mask ?? blankTexture();
         this._pipeline = null;
@@ -220,13 +219,13 @@ const PAD = Math.ceil(MATERIAL.bend) + 4;
 
 // A mask for a shape that is not a rounded rectangle (glyphs). width, height: the shape, physical
 // px; pad: physical px on every side; path(cr, x, y, w, h): draws the shape's path.
-export function buildMask(width, height, path, scale, pad = 0) {
+export function buildMask(width, height, path, scale, pad = 0, edge = MATERIAL.edge, bend = 1) {
     const surface = new Cairo.ImageSurface(Cairo.Format.RGB24, width + 2 * pad, height + 2 * pad);
     const cr = new Cairo.Context(surface);
     cr.setSourceRGB(0, 0, 0);
     cr.paint();
     path(cr, pad, pad, width, height);
-    cr.setSourceRGB(1, 0, 1);
+    cr.setSourceRGB(1, 0, bend);
     cr.fill();
     // green, depth: the shape eaten from the outline inwards a step at a time (as glassclock.js)
     path(cr, pad, pad, width, height);
@@ -235,7 +234,7 @@ export function buildMask(width, height, path, scale, pad = 0) {
     cr.setSourceRGB(0, 1, 0);
     cr.fillPreserve();
     cr.setOperator(Cairo.Operator.DEST_OUT);
-    const steps = Math.max(2, Math.round(2 * MATERIAL.edge * scale));
+    const steps = Math.max(2, Math.round(2 * edge * scale));
     for (let k = 1; k <= steps; k++) {
         cr.setSourceRGBA(0, 0, 0, 1 / k);
         cr.setLineWidth(k);
@@ -264,14 +263,17 @@ export function buildMask(width, height, path, scale, pad = 0) {
 }
 
 // A pane of glass that fills its parent's slot (in a BinLayout). radius: logical px, 'capsule' for
-// half the height, or {path(cr, x, y, w, h)} for any other shape (drawn into a mask). backdrop: a Gio.File (the picture, drawn at monitor size), a
+// half the height, or {path(cr, x, y, w, h), bend} for any other shape (drawn into a mask; bend:
+// the shape's bend and bevel strength, 1 by default). material: overrides of MATERIAL for this
+// pane (a clock's glass is clearer than a card's). reshape() redraws the mask (new text).
+// backdrop: a Gio.File (the picture, drawn at monitor size), a
 // Clutter.Actor covering the monitor (cloned, e.g. the lock screen's own background), or a
 // function returning that actor (looked up again at each layout: GNOME rebuilds the lock
 // backgrounds when monitors change, and a clone of the old one would be empty).
 export const GlassPane = GObject.registerClass({
     Signals: {'mask-failed': {}},
 }, class TahoeGdmGlassPane extends St.Widget {
-    _init(backdrop, radius) {
+    _init(backdrop, radius, material = {}) {
         super._init({
             name: 'tahoe-gdm-glass',
             reactive: false,
@@ -279,6 +281,9 @@ export const GlassPane = GObject.registerClass({
             y_expand: true,
         });
         this._radius = radius;
+        this._material = {...MATERIAL, ...material};
+        // room around the shape for the bend and the edge: PAD, more for a bigger bend (a clock)
+        this._pad = Math.max(PAD, Math.ceil(this._material.bend) + 4);
         // the glass itself: PAD px bigger than this pane on every side (the pane does not clip),
         // holding the backdrop and running the effect over its own allocation
         this._glass = new St.Widget({reactive: false, clip_to_allocation: true});
@@ -312,6 +317,12 @@ export const GlassPane = GObject.registerClass({
             St.Settings.get().disconnect(this._schemeId);
             this._unwatch();
         });
+    }
+
+    // the shape changed without a size change (a clock's new minute): draw it again
+    reshape() {
+        this._shapeKey = '';
+        this.queue_relayout();
     }
 
     _unwatch() {
@@ -366,8 +377,8 @@ export const GlassPane = GObject.registerClass({
     vfunc_allocate(box) {
         this.set_allocation(box);
         const g = new Clutter.ActorBox();
-        g.set_origin(-PAD, -PAD);
-        g.set_size(box.get_width() + 2 * PAD, box.get_height() + 2 * PAD);
+        g.set_origin(-this._pad, -this._pad);
+        g.set_size(box.get_width() + 2 * this._pad, box.get_height() + 2 * this._pad);
         this._glass.allocate(g);
         if (this._sourceOf) {
             const current = this._sourceOf();
@@ -380,7 +391,7 @@ export const GlassPane = GObject.registerClass({
         const [fx, fy, fw, fh] = this._frame();
         const [sx, sy] = this.get_transformed_position();
         const b = new Clutter.ActorBox();
-        b.set_origin(fx - (sx - PAD), fy - (sy - PAD));
+        b.set_origin(fx - (sx - this._pad), fy - (sy - this._pad));
         b.set_size(fw, fh);
         this._backdrop.allocate(b);
 
@@ -398,11 +409,12 @@ export const GlassPane = GObject.registerClass({
                 try {
                     if (MATERIAL._failForTest)   // set only by tools/gdm (GDM_FAIL_MASK)
                         throw new Error('test: mask failed');
-                    const pad = PAD * scale;
+                    const pad = this._pad * scale;
+                    const M = this._material;
                     const shape = typeof this._radius === 'object'
-                        ? {mask: buildMask(pw, ph, this._radius.path, scale, pad)}
+                        ? {mask: buildMask(pw, ph, this._radius.path, scale, pad, M.edge, this._radius.bend ?? 1)}
                         : {sdf: true, pad, radius: this._radius === 'capsule' ? ph / 2 : Math.min(this._radius * scale, ph / 2, pw / 2)};
-                    this._effect.setShape(shape, pw + 2 * pad, ph + 2 * pad, scale, darkScheme());
+                    this._effect.setShape(shape, pw + 2 * pad, ph + 2 * pad, scale, darkScheme(), M);
                     this._shapeKey = `${pw}x${ph}`;
                 } catch (e) {
                     this.failed = `${e}`;
