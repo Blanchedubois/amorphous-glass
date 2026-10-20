@@ -40,6 +40,12 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
 | GTK3 popovers (inside their window, cannot blur) | 17 | 4 | rows 13 | none | opaque popover token |
 | App windows and header bars | **24** | | buttons pill | `applications corner-radius` 24 | theme `window.csd` 24, Rounded Window Corners 24 |
 | Desktop widgets | **24** | 16 to 18 | | widgets extension `RADIUS` 24 | `.tahoe-widget` 24 |
+| App folder popup (overview) | **32** | | | appfolder pipeline `pipeline_glassbar_menus`; radius read from the CSS | `.app-folder-dialog` 32, no fill |
+| Alt-Tab and workspace switcher | **28** | 8 | items **20** | `popup osd-corner-radius` 28 | `.switcher-list` 28, `.item-box` 20 |
+| Volume / brightness OSD | capsule | | | `popup osd-window-corner-radius` 9999 | `.osd-window` 9999, lifted 112 px over the dock |
+| Dock app names (hover) | capsule, real glass | | | popup glass (`dash-label`, patch) | `.dash-label` 9999, no fill |
+| Overview search field, window captions | capsule, glass look in CSS (over the overview's blur, no glass surface of their own) | | | | `#overview .search-entry`, `.window-caption` |
+| Run dialog field (Alt+F2) | capsule | | | tint and edge in the patch's popup styles | `.run-dialog-entry` 9999 |
 | Tooltips | 8, not glass | | | | |
 
 ## Glass per mode (every surface above, one recipe)

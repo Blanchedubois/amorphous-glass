@@ -9,6 +9,9 @@
   "widget":       { "radius": 24 },
   "dock":         { "radius": 28 },
   "capsule":      { "radius": 9999 },
+  "switcher":     { "radius": 28, "gap": 8, "item": 20, "_comment": "Alt-Tab and the workspace switcher: items concentric, 28 - 8" },
+  "osd":          { "radius": 9999, "_comment": "volume and brightness HUD: a glass capsule" },
+  "folder":       { "radius": 32, "_comment": "the app folder popup in the overview, as the calendar" },
   "tooltip":      { "radius": 8 },
   "blur_my_shell": {
     "popup/menu-corner-radius": "menu.radius",
@@ -16,6 +19,8 @@
     "popup/submenu-corner-radius": "submenu.radius",
     "popup/calendar-corner-radius": "calendar.radius",
     "popup/notification-corner-radius": "notification.radius",
-    "applications/corner-radius": "window.radius"
+    "applications/corner-radius": "window.radius",
+    "popup/osd-corner-radius": "switcher.radius",
+    "popup/osd-window-corner-radius": "osd.radius"
   }
 }

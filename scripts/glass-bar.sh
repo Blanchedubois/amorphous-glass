@@ -573,7 +573,14 @@ PY
     # so the shared default (windows) stays as it is
     glass_pipeline pipeline_glassbar_menus 'Glass menus' 18.0
     gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.popup pipeline pipeline_glassbar_menus
+    # the app folder popup in the overview: the same Liquid Glass (its radius comes from the CSS)
+    gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.appfolder pipeline pipeline_glassbar_menus
     bms_radii
+  else
+    # the app folder's pipeline from before 'apply'
+    local folder_pipe
+    folder_pipe=$(sed -n '/^\[blur-my-shell\/appfolder\]/,/^\[/{s/^pipeline=//p}' "$b/extensions.dconf" | head -1)
+    gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.appfolder pipeline "${folder_pipe:-'pipeline_default'}"
   fi
   echo "  menus: $mode"
 }

@@ -186,4 +186,85 @@
 .popup-menu-item:active { background-color: {{mode.pressed}} !important; }
 .popup-separator-menu-item .popup-separator-menu-item-separator { background-color: {{mode.separator}} !important; }
 
+
+/* Liquid Glass everywhere, phase 1 (docs/gnome-tahoe/glass-everywhere-workshop.md). */
+/* A1: the app folder popup: Blur My Shell's app folder glass with the menus' Liquid Glass
+   (glass-bar.sh / tahoe-repair.sh set its pipeline), at {{folder.radius}} px like the calendar.
+   Blur My Shell takes the glass's radius from this CSS radius. No fill of its own; the dark edge. */
+.app-folder-dialog {
+  background-color: transparent !important;
+  border-radius: {{folder.radius}}px !important;
+  box-shadow: {{mode.dropdown_edge}} !important;
+}
+/* A4: the overview's search field, a glass capsule (Spotlight's): over the overview's blur, a
+   light tint, the 1 px edge and a top highlight; no focus ring. */
+#overview .search-entry {
+  border-radius: {{capsule.radius}}px !important;
+  min-height: 34px !important;
+  padding: 0 14px !important;
+  background-color: {{mode.card}} !important;
+  border: none !important;
+  box-shadow: inset 0 0 0 1px {{mode.edge}}, inset 0 1px 0 0 rgba(255, 255, 255, 0.18) !important;
+}
+#overview .search-entry:hover { background-color: {{mode.hover}} !important; }
+#overview .search-entry:focus {
+  background-color: {{mode.hover}} !important;
+  box-shadow: inset 0 0 0 1px {{mode.edge}}, inset 0 1px 0 0 rgba(255, 255, 255, 0.22) !important;
+}
+/* A6: window titles in the overview: glass-look capsules (they sit over window thumbnails, so a
+   denser tint for the text). */
+.window-caption {
+  background-color: {{mode.chip}} !important;
+  color: {{mode.chip_text}} !important;
+  border-radius: {{capsule.radius}}px !important;
+  padding: 5px 12px !important;
+  box-shadow: inset 0 0 0 1px {{mode.edge}} !important;
+}
+/* C8: the dock's app names: real glass capsules (Blur My Shell popup glass, 'dash-label');
+   no fill of their own, the dark edge. */
+.dash-label {
+  background-color: transparent !important;
+  border-radius: {{capsule.radius}}px !important;
+  padding: 6px 14px !important;
+  box-shadow: {{mode.dropdown_edge}} !important;
+}
+/* C3: Alt-Tab and the workspace switcher: the glass at {{switcher.radius}} px, the items
+   concentric at {{switcher.item}} px; the selected one a glass lift instead of the accent. */
+.switcher-list, .workspace-switcher-container { border-radius: {{switcher.radius}}px !important; }
+.switcher-list .item-box { border-radius: {{switcher.item}}px !important; border: none !important; }
+.switcher-list .item-box:outlined { background-color: {{mode.hover}} !important; }
+.switcher-list .item-box:selected { background-color: {{mode.pressed}} !important; color: {{mode.chip_text}} !important; }
+/* C5: the run dialog (Alt+F2): its field a large glass capsule, Spotlight's bar. Its tint, edge and
+   focus (no accent ring) are in the patched Blur My Shell's popup styles, which outrank the theme. */
+.run-dialog .run-dialog-entry {
+  border-radius: {{capsule.radius}}px !important;
+  min-height: 40px !important;
+  padding: 8px 18px !important;
+  font-size: 1.25em !important;
+  border: none !important;
+}
+.run-dialog .run-dialog-entry:focus { border: none !important; }
+/* C7: the screenshot toolbar's buttons: glass chips like quick settings' capsules (the photo/video
+   switch keeps Blur My Shell's segmented look: its selected half white). */
+.screenshot-ui-type-button, .screenshot-ui-show-pointer-button {
+  background-color: {{mode.card}} !important;
+  box-shadow: inset 0 0 0 1px {{mode.edge}} !important;
+}
+.screenshot-ui-type-button { border-radius: {{calendar.card}}px !important; }
+.screenshot-ui-show-pointer-button { border-radius: {{capsule.radius}}px !important; }
+.screenshot-ui-type-button:hover, .screenshot-ui-show-pointer-button:hover { background-color: {{mode.hover}} !important; }
+.screenshot-ui-type-button:checked, .screenshot-ui-show-pointer-button:checked {
+  background-color: {{mode.pressed}} !important;
+  color: {{mode.chip_text}} !important;
+}
+/* C1: the volume and brightness OSD: a glass capsule HUD, lifted clear of the dock (it sat on it),
+   its level a white bar. */
+.osd-window {
+  border-radius: {{osd.radius}}px !important;
+  border: none !important;
+  box-shadow: {{mode.dropdown_edge}} !important;
+  padding: 10px 18px !important;
+  margin-bottom: 112px !important;
+}
+.osd-window .level { -barlevel-height: 6px; -barlevel-active-background-color: white; border-radius: {{capsule.radius}}px !important; }
 /* end tahoe-overrides */

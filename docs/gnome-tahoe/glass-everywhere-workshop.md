@@ -114,3 +114,31 @@ done, and its effort and risk. The mechanisms are:
 - C1: OSD at the top right under the menu bar (macOS Tahoe), or keep it at the bottom above the
   dock?
 - D1 Launchpad and D2 glass overview: worth their cost?
+
+## Phase 1 result (2026-10-20, headless; not installed yet)
+
+| # | Surface | Done | Before → after |
+|---|---|---|---|
+| A1 | App folder popup | Blur My Shell's app folder glass on the menus' Liquid Glass pipeline (`glass-bar.sh menus on`, kept by `tahoe-repair.sh`), radius 32 from the CSS, no fill, dark edge | `shots/phase1-folder.jpg` |
+| A4 | Overview search field | glass-look capsule in CSS: tint, 1 px edge, top highlight, no focus ring | `shots/phase1-search.jpg` |
+| A6 | Overview window captions | glass-look capsules in CSS (`chip` tokens; they sit over thumbnails) | — (hover only) |
+| C8 | Dock app names | real glass capsules: `dash-label` is a popup glass target in the patch | `shots/phase1-dock-label.jpg` |
+| C3 | Alt-Tab, workspace switcher | glass and CSS both 28 (the glass was 28 under a 24 shape), items 20, selected a glass lift instead of the accent | `shots/phase1-alt-tab.jpg` |
+| C5 | Run dialog field | a large glass capsule, no accent ring (the ring came from Blur My Shell's own popup styles, which outrank the theme; fixed in the patch's styles for this field only, so password fields keep their focus ring) | `shots/phase1-run.jpg` |
+| C7 | Screenshot toolbar | mode and pointer buttons as glass chips; the photo/video switch keeps Blur My Shell's segmented look | `shots/phase1-screenshot.jpg` |
+| C1 | Volume / brightness OSD | a glass capsule (glass 9999, it was 48 under a 24 shape), lifted clear of the dock, white level bar; kept at the bottom (top right under the bar is a later choice) | `shots/phase1-osd.jpg` |
+
+Tokens: `switcher`, `osd`, `folder` radii and their Blur My Shell keys in `tokens/radius.json`, `chip` and `chip_text` in `tokens/glass.json`; `docs/STANDARD.md` lists the new surfaces.
+
+Stress, current main → phase 1, same harness run side by side:
+
+| Case | Frame p95 | Slow frames | Handlers, actors |
+|---|---|---|---|
+| dock label hover ×30 | 9.0 → 9.0 ms | 0 → 1 | flat |
+| volume OSD ×30 | 9.5 → 9.3 ms | 1 → 1 | flat |
+| app folder open/close ×20 (with the overview) | 11.0 → 11.1 ms | 82 → 84 (the overview's own animation, both) | flat |
+| desktop right-click ×50 | 9.1 → 9.1 ms | 1 → 1 | flat |
+
+Full suite on phase 1: nothing stuck, no JS errors. Found on the way: the "desktop right-clicks stop" of
+earlier stress runs was the test shell itself. GNOME sometimes opens the overview at startup,
+and over the desktop it took the desktop's clicks. The driver now closes it before each case.
