@@ -6,3 +6,6 @@ __pycache__/
 
 # throwaway headless shell folders (tools/headless/run.sh); gvfs may write into one after the run
 tools/headless/root.*/
+
+# built GDM theme (scripts/gdm-theme.sh build)
+build/

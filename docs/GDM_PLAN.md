@@ -17,14 +17,21 @@ If the login screen is broken (blank, crashing, no password field):
    sudo systemctl restart gdm
    ```
 
+   Phase 1 also added greeter settings (time-only clock, no logo) and maybe a font; to remove them:
+   ```bash
+   sudo rm -rf /etc/dconf/db/gdm.d /etc/dconf/db/gdm /etc/dconf/profile/gdm
+   sudo dconf update
+   sudo rm -rf /usr/local/share/fonts/SpaceGrotesk && sudo fc-cache -f
+   ```
    (`restart gdm` ends any graphical session, so run it only from the text console.)
+   `scripts/gdm-theme.sh commands` prints the same undo block.
 3. Stock GNOME theme instead (what Arch ships): `sudo pacman -S gnome-shell` reinstalls the package
    file. The stock file is also kept at `gnome-shell-theme.gresource.bak` (MacTahoe's backup, Oct 14).
 4. Phase 2 only (extension): also
    ```bash
-   sudo rm -f /etc/dconf/db/gdm.d/90-tahoe-gdm
-   sudo dconf update
    sudo rm -rf /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe
+   sudo rm -rf /etc/dconf/db/gdm.d /etc/dconf/db/gdm /etc/dconf/profile/gdm
+   sudo dconf update
    sudo systemctl restart gdm
    ```
 5. If even the text console is unusable: in the Limine boot menu, edit the entry and add
@@ -96,22 +103,40 @@ No root, nothing installed. Limit: there is no GDM daemon, so the user list and 
 empty; phase 1 adds a test driver that shows them (AccountsService is reachable). The real login is
 checked last, by the user, after approving screenshots.
 
-## Phase 1: theme only (proposed, waiting for OK)
+## Phase 1: theme only (built and tested headless, not installed)
 
-1. Copy the current gresource's files into `gdm/theme/` in the repo (generated, or extracted by a
-   script), append `gdm/tahoe-gdm.css` scoped to the greeter: capsule 48 px with the concentric
-   32 px arrow and the eye fix (from lockscreen.css, `.login-dialog` instead of `.unlock-dialog`),
-   64 px avatar and SF/system name label, prompt moved toward the bottom, panel clock large and
-   centred near the top, transparent panel, sharp background (fold-l converted to a 2560×1440 PNG).
-2. `scripts/gdm-theme.sh build` compiles the gresource into the repo's build folder (no root);
-   `tools/gdm/run.sh` takes screenshots for the user.
-3. After the user approves the screenshots, install (needs OK, commands shown first):
-   ```bash
-   sudo cp -a /usr/share/gnome-shell/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource.pre-gdm-tahoe
-   sudo install -m 644 build/gdm/gnome-shell-theme.gresource /usr/share/gnome-shell/gnome-shell-theme.gresource
-   ```
-   It shows at the next logout or boot (the lock screen uses it from the next lock; checked with
-   tools/lockscreen/run.sh first). Undo: recovery step 2.
+Files: `gdm/tahoe-gdm.css` (the greeter rules), `scripts/gdm-theme.sh build|commands`,
+`tools/gdm/run.sh` + `tools/gdm/gdm-shot@local` (harness). Shots: `docs/gdm/phase1-login.png`,
+`docs/gdm/phase1-prompt-zoom.png`.
+
+- `build` takes the base theme (the `.pre-gdm-tahoe` backup once installed, else the installed file;
+  refuses a base that is already ours), appends `gdm/tahoe-gdm.css` to every stylesheet, adds the
+  lock picture (`org.gnome.desktop.screensaver picture-uri`, fold-l) cropped to 2560×1440 as
+  `tahoe-gdm-background.jpg`, and compiles `build/gdm/gnome-shell-theme.gresource` (2.1 MB). No root.
+- Clock: GNOME's panel clock, time only (gdm dconf `clock-show-date=false`), in the lock screen's
+  type, size and place from main's tahoe-lockscreen (12 % digits, `CLOCK.digits 0.12`): Space
+  Grotesk SemiBold 237 px, digits measured at y 207–380 (173 px), the lock screen's exact spot.
+  Translucent white (0.58) instead of the lock screen's glass (no shader in the greeter).
+  GNOME's 12 h clock always shows "PM" (the lock screen leaves it out); 24 h for the login screen
+  only is an option (`GDM_CLOCK_FORMAT=24h`).
+- Avatar 64 px and the password capsule from lockscreen.css (48/24 capsule, 32/16 arrow 8 px in,
+  eye left of the arrow), avatar centre at 82.5 % like the lock screen. The user list sits at the
+  same height.
+- No distribution logo (gdm dconf `org.gnome.login-screen logo=''`): it sat behind the password field.
+- Findings on the way:
+  - St drops a quoted font-family list ("Couldn't parse family"); unquoted works. The lock screen's
+    lockscreen.css uses quoted lists (only its fallback labels, hidden under the glass).
+  - LoginDialog moves the prompt into a right-hand column when the prompt's box reaches into the
+    banner area under the panel and the prompt is narrower than a third of the screen. The prompt
+    is padded to 907 px wide (empty sides) so it stays centred. St ignores negative margins.
+  - Fonts: the greeter only sees system fonts. Without Space Grotesk the clock falls back to Adwaita
+    Sans (shot 4). `GDM_FONTS=1 scripts/gdm-theme.sh commands` adds copying Space Grotesk (OFL)
+    to `/usr/local/share/fonts`. SF Pro is not copied (Apple's licence); the name label falls back.
+- Lock screen check: main's tahoe-lockscreen rendered with the old and the new gresource
+  (tools/lockscreen/run.sh dark, `GNOME_SHELL_DATADIR` swapped): clock, entry and full screenshots
+  identical (0 pixels differ).
+- Install: `scripts/gdm-theme.sh commands` (with the options chosen) prints the commands; the user
+  runs them (they need the sudo password). Shows at the next logout or boot.
 
 ## Phase 2: gdm-mode extension (only if wanted after phase 1)
 
