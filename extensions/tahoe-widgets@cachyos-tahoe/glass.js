@@ -55,7 +55,8 @@ export function scaleFactor() {
 }
 
 export class GlassCard {
-    constructor(monitorIndex) {
+    // bare: no rim and no fallback fill, for widgets that cut the glass to their own shape
+    constructor(monitorIndex, {bare = false} = {}) {
         this._monitorIndex = monitorIndex;
         this._glass = null;
 
@@ -73,10 +74,21 @@ export class GlassCard {
             x_expand: true, y_expand: true,
         });
         this.actor.add_child(this.content);
+        if (bare)
+            this.actor.add_style_class_name('tahoe-widget-bare');
 
         // the wallpaper copy follows the card while it is dragged
         for (const prop of ['x', 'y', 'width', 'height'])
             this.actor.connect(`notify::${prop}`, () => this._syncBackdrop());
+    }
+
+    // an effect over the glass, e.g. a mask; it stays across glass rebuilds
+    addBackdropEffect(name, effect) {
+        this._backdrop.add_effect_with_name(name, effect);
+    }
+
+    get hasGlass() {
+        return this._glass !== null;
     }
 
     get monitorIndex() {

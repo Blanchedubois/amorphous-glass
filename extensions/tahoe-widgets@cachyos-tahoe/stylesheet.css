@@ -106,3 +106,13 @@
 .tahoe-widget-light .tahoe-music-lyric { color: rgba(28, 28, 30, 0.35); }
 .tahoe-music-lyric-current { font-size: 19px; color: #ffffff; }
 .tahoe-widget-light .tahoe-music-lyric-current { color: #1c1c1e; }
+
+/* glass text clock: a bare card, the glass is cut to the glyphs by a shader (glasstext.js);
+   the labels show only without Blur My Shell */
+.tahoe-widget-bare .tahoe-widget-content { border-width: 0; }
+.tahoe-widget-bare.tahoe-widget-fallback { background-color: transparent; }
+.tahoe-glasstext-fallback { color: transparent; spacing: 4px; }
+.tahoe-widget-fallback .tahoe-glasstext-fallback { color: rgba(255, 255, 255, 0.55); }
+.tahoe-widget-fallback.tahoe-widget-light .tahoe-glasstext-fallback { color: rgba(28, 28, 30, 0.45); }
+.tahoe-glasstext-day { font-family: "SF Pro Rounded", sans-serif; font-size: 26px; font-weight: 600; }
+.tahoe-glasstext-time { font-family: "SF Pro Rounded", sans-serif; font-size: 100px; font-weight: 700; }
