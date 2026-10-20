@@ -438,10 +438,11 @@ class MusicWidget {
 
     // the Large widget's column (also the Extra Large ones'): the cover across the width, the
     // song with the app at its right, the progress with times, the controls
-    _buildPlayer(box) {
+    _buildPlayer(box, {spacer = true} = {}) {
         this._art = new Art(LARGE_ART);
         box.add_child(this._art.actor);
-        box.add_child(new St.Widget({y_expand: true}));
+        if (spacer)
+            box.add_child(new St.Widget({y_expand: true}));
         this._title.add_style_class_name('tahoe-music-title-large');
         this._artist.add_style_class_name('tahoe-music-artist-large');
         const titleRow = new St.BoxLayout({style_class: 'tahoe-music-title-row tahoe-music-title-row-large'});
@@ -639,5 +640,38 @@ export class MusicLyrics extends MusicWidget {
             this._followLyrics();
             return GLib.SOURCE_REMOVE;
         });
+    }
+}
+
+// Extra Large Wide: the Large widget's column on the left, the lyrics filling the full height on
+// the right (user's pick, 2026-10-20); 728 = two large widths and the 16 px gap between them
+export class MusicExtraLargeWide extends MusicLyrics {
+    static size = 'large';
+    static width = 728;
+    static height = 504;
+
+    _build() {
+        this.actor.orientation = Clutter.Orientation.HORIZONTAL;
+        this.actor.add_style_class_name('tahoe-music-xl');
+        const player = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, width: LARGE_ART * scaleFactor()});
+        this._buildPlayer(player);
+        this.actor.add_child(player);
+        this._lyrics = new LyricsView();
+        this._lyrics.actor.add_style_class_name('tahoe-music-lyrics-xl-wide');
+        this.actor.add_child(this._lyrics.actor);
+    }
+}
+
+// Extra Large Tall: the Large widget on top, about nine lines of lyrics under it
+export class MusicExtraLargeTall extends MusicLyrics {
+    static size = 'large';
+    static height = 864;
+
+    _build() {
+        this.actor.add_style_class_name('tahoe-music-xl');
+        this._buildPlayer(this.actor, {spacer: false});
+        this._lyrics = new LyricsView();
+        this._lyrics.actor.add_style_class_name('tahoe-music-lyrics-xl-tall');
+        this.actor.add_child(this._lyrics.actor);
     }
 }
