@@ -270,6 +270,24 @@ async function runNpIdle() {
         frame: frameState().frame, stillLocked: Main.sessionMode.isLocked, dialog: !!dialog });
 }
 
+// music mode's background swirl: it moves while something plays, holds still after 35 s without
+// input (nowplaying.js' gate), and moves again on the next input
+async function runMusicIdle() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    await sleep(2500);                        // the 1.2 s cross-fade done
+    const music = await import(`${lockExt().dir.get_uri()}/musicmode.js`);
+    const running = () => music.musicFramesRunning();
+    const active = running();
+    await sleep(35000);                       // no input
+    const idle = running();
+    await typeKeys('x');                      // input again
+    await sleep(800);
+    const again = running();
+    write({ label: 'music-idle', framesRunningActive: active, framesRunningAfter35sIdle: idle, framesRunningAfterInput: again,
+        frame: frameState().frame, stillLocked: Main.sessionMode.isLocked, dialog: !!dialog });
+}
+
 // G2 for our own code: a broken later phase, injected through the frame's own API
 async function runOurs(kind) {
     await sleep(3000);
@@ -659,7 +677,7 @@ export default class Driver extends Extension {
         isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
