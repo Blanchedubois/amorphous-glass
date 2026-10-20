@@ -1,7 +1,8 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phase 0 (plan and mockups), waiting for your picks.** A new small (2 x 2, 170 x 170)
-widget, "Calendar: Schedule", that shows what is left of today from your Google Calendar's
+**Status: Phase 0 (plan and mockups), waiting for your picks.** Two new widgets, "Calendar:
+Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
+way, which fits most of the iOS Calendars widget). Both show what is left of today from your Google Calendar's
 private ICS address. The existing Calendar widgets (Evolution Data Server) stay as they are.
 It is desktop only: it is not in `tools/lockscreen/shared.list`, so the lock screen never shows it.
 
@@ -22,7 +23,7 @@ Google's "Secret address in iCal format" lets anyone who has it read the whole c
   still locked, the widget does not ask to unlock it; it shows "Calendar locked" and tries again
   at the next refresh.
 
-## Layout (2 x 2, 16 px top and bottom, 18 px sides, radius 24)
+## Small layout (170 x 170, 16 px top and bottom, 18 px sides, radius 24)
 
 Mockups (shown in the session; ASCII here):
 
@@ -65,7 +66,49 @@ States:
 - **No link set**: `No calendar link` with `tahoe-widgets.sh calendar-url` under it.
 - **Keyring locked**: `Calendar locked` with `Unlock to show events`.
 
-Colours, in order: the event's own `COLOR` (RFC 7986), the calendar's `COLOR`,
+## Large layout (356 x 356, same padding and radius)
+
+320 x 324 px inside the padding; the same row style as the small one, bigger:
+
+```
++--------------------------------------+
+| 20  October                          |
+|     Today, Tuesday                   |
+|                                      |
+| MON TUE WED THU FRI SAT SUN          |
+|  19 (20) 21  22  23  24  25          |
+|  .       .       .       .           |
+|--------------------------------------|
+| | 10:30 AM - 11:45 AM   in 8 min     |
+| | Gym                                |
+| | 1:15 - 2:15 PM                     |
+| | Lunch with Sam                     |
+| | 2:30 - 2:45 PM                     |
+| | Design review                      |
+| | 4:00 - 5:00 PM                     |
+| | Dentist                            |
+| +1 more                              |
++--------------------------------------+
+```
+
+- Header, 48 px: the day number, SF Pro Display 46 px semibold; beside it the month (15 px
+  semibold) over `Today, Tuesday` (15 px secondary).
+- Week strip, about 50 px: this week from GNOME's first weekday (as `calendar.js` `weekStart()`),
+  weekday labels 11 px bold, numbers 15 px; today in the widgets' red circle (28 px, as the
+  month widget's today), weekend days dimmer. A small dot under a day that has events, from the
+  helper's 7-day list (days before today in this week: question 5).
+- A separator (the mode's separator colour), then up to 4 events, 38 px each, 10 px apart: a
+  4 px bar, the time range 12 px secondary with the relative time after it in italics, and the
+  title 15 px semibold. A range fits here: `10:30 AM - 11:45 AM   in 8 min` is about 200 px.
+- All-day, in progress, `+N more`, past events and every state: as the small one; the footer
+  (`Can't reach calendar · updated 9:41`, `+1 more`) sits on the bottom line.
+- Empty: `No more events today` (15 px semibold) centred in the event area, with tomorrow's first
+  event under it if question 3 says so. The header and week strip stay.
+
+Both sizes share one feed client, one helper run and one event list; only the rows differ
+(`ScheduleSmall` and `ScheduleLarge` in `schedule.js`).
+
+Colours (both sizes), in order: the event's own `COLOR` (RFC 7986), the calendar's `COLOR`,
 `X-APPLE-CALENDAR-COLOR` or `X-OUTLOOK-COLOR`, then a stable palette of Apple's system colours
 (orange, green, blue, purple, pink, teal, yellow, indigo) picked by a hash of the event's UID, so a
 recurring event always has the same colour. Google's feeds carry no colour, so in practice it is
@@ -142,7 +185,7 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
    moved and cancelled overrides, `STATUS:CANCELLED`, a 5 MB generated feed for timing, a broken
    file. `tools/widgets-stress/ics-test.js` runs the helper with a fixed "today" and time zone
    (`TZ=` and a `--today` flag) and compares with expected JSON.
-3. **The widget at 2 x 2**, light, dark and milky, in the headless shell with fixture data.
+3. **The widgets, small and Large**, light, dark and milky, in the headless shell with fixture data.
 4. **Live behaviour:** next event and relative time, now and past, midnight rollover, all-day and
    overflow, empty, offline-with-cache, offline, no link, locked keyring and invalid link states.
    The harness can set the clock (`STRESS_NOW=`) for the rollover check.
@@ -156,12 +199,14 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
 
 ## Questions for you (Phase 0)
 
-1. Layout A, B or C?
+1. Small layout A, B or C? And the Large one as mocked up, or changes?
 2. Bar colours: one colour per event by its UID (as in the mockup), or one colour for the whole
    calendar (your Google calendar's colour, which the feed does not include, set by hand)?
 3. Empty state: also show tomorrow's first event (`Tomorrow 9:30 AM`), or only "No more events today"?
 4. One calendar link, or several (work and personal) merged in one list? One is planned; several
    is small extra work in Phase 1.
+5. Large week strip: dots on days that have events (past days of this week too, which needs the
+   helper to keep the whole week), or no dots?
 
 # App button and Extra Large music widgets (2026-10-20)
 
