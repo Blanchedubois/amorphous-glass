@@ -2,8 +2,9 @@
 // landscape lock screen): small desktop widgets stacked on the left, each on Liquid Glass over
 // the lock background (and so over music mode's swirl when it plays). As many as fit the monitor.
 //
-// Privacy: everything here is readable by anyone at the locked machine. "calendar-day" lists the
-// rest of today's events (titles); leave it out of WIDGET_STACK.kinds to keep them private.
+// Privacy: everything here is readable by anyone at the locked machine. The user's choice
+// (2026-10-20): no event titles on the lock screen, so the column is the weather and the month;
+// "calendar-day" (today with the rest of today's event titles) stays available but is not used.
 // The weather widget updates over the network while locked (GNOME's weather client, the
 // location set in GNOME Weather); "weather-small" out of the list stops that.
 
@@ -15,7 +16,7 @@ import {CalendarDay, CalendarMonth} from './widgets/calendar.js';
 import {GlassPane} from './widgets/paneglass.js';
 import {WeatherSmall} from './widgets/weather.js';
 
-export const WIDGET_STACK = {kinds: ['weather-small', 'calendar-day', 'calendar-month']};
+export const WIDGET_STACK = {kinds: ['weather-small', 'calendar-month']};
 
 const KINDS = {'weather-small': WeatherSmall, 'calendar-day': CalendarDay, 'calendar-month': CalendarMonth};
 const SIZE = 170;          // tahoe-widgets SIZES.small, logical px
