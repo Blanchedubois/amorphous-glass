@@ -17,6 +17,37 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const RADIUS = 24;   // tokens/radius.json widget; the menu's own corner when the theme has one
+const SUBMENU_RADIUS = 32;   // tokens/radius.json submenu (docs/STANDARD.md)
+
+// In the system menu (and the accessibility menu, also a quick settings menu) every piece is its
+// own glass, as on the desktop: toggles, sliders and round buttons capsules, an open submenu at the
+// submenu radius (the walk of tahoe-lockscreen's former menuglass.js). Each piece once: what is
+// inside a piece belongs to it.
+function pieces(root) {
+    const out = [];
+    const walk = (actor, inside) => {
+        const cls = name => actor.has_style_class_name?.(name);
+        let radius = null;
+        if (!inside) {
+            if (cls('quick-toggle-has-menu') || cls('quick-toggle') || cls('quick-slider') || cls('icon-button'))
+                radius = 'capsule';
+            else if (cls('quick-toggle-menu'))
+                radius = SUBMENU_RADIUS;
+        }
+        if (radius !== null)
+            out.push({actor, radius});
+        for (const child of actor.get_children())
+            walk(child, inside || radius !== null);
+    };
+    walk(root, false);
+    return out;
+}
+
+function isQuickSettings(actor) {
+    if (actor.has_style_class_name?.('quick-settings'))
+        return true;
+    return actor.get_children().some(isQuickSettings);
+}
 
 export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
     const followed = new Map();   // BoxPointer -> its pane
@@ -30,6 +61,7 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
         const w = box?.get_width() ?? 0, h = box?.get_height() ?? 0;
         if (!opacity || !(w > 0 && h > 0)) {
             pane.hide();
+            hidePieces(pane);
             return;
         }
         const [x, y] = content.get_transformed_position();
@@ -48,6 +80,61 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
         pane.set_scale(tw / w, th / h);
         pane.opacity = opacity;
         pane.show();
+        followPieces(pointer, pane, opacity);
+    };
+
+    // the pieces' glass, between the menu's frosted pane and the menu
+    const hidePieces = pane => pane._pieces?.forEach(p => p.hide());
+    const followPieces = (pointer, pane, opacity) => {
+        if (!(pane._isQuick ??= isQuickSettings(pointer)))
+            return;
+        pane._pieces ??= new Map();
+        const parent = pane.get_parent();
+        const [px, py] = parent.get_transformed_position();
+        const seen = new Set();
+        // the whole menu: a quick settings menu's submenus open in an overlay of the menu's own
+        // actor (the box pointer's parent, not the UI group)
+        const menuActor = pointer.get_parent() === Main.layoutManager.uiGroup ? pointer : pointer.get_parent();
+        for (const {actor: piece, radius} of pieces(menuActor)) {
+            seen.add(piece);
+            let glass = pane._pieces.get(piece);
+            if (!glass) {
+                glass = new GlassPane(backdrop, radius);
+                glass.connect('mask-failed', () => ext._fail(`menu glass: ${glass.failed}`));
+                parent.insert_child_below(glass, pointer);
+                pane._pieces.set(piece, glass);
+                let glassGone = false;
+                glass.connect('destroy', () => (glassGone = true));
+                const ids = [piece.connect('notify::allocation', () => schedule(pointer, pane)),
+                    piece.connect('notify::visible', () => schedule(pointer, pane))];
+                const forget = () => {
+                    ids.forEach(id => {
+                        try {
+                            piece.disconnect(id);
+                        } catch {}
+                    });
+                    pane._pieces?.delete(piece);
+                    if (!glassGone)
+                        glass.destroy();
+                };
+                piece.connect('destroy', forget);
+                glass._forget = forget;
+            }
+            const [x, y] = piece.get_transformed_position();
+            const [w, h] = piece.get_transformed_size();
+            if (!piece.mapped || !(w >= 1 && h >= 1)) {
+                glass.hide();
+                continue;
+            }
+            glass.set_size(Math.round(w), Math.round(h));
+            glass.set_position(Math.round(x - px), Math.round(y - py));
+            glass.opacity = opacity;
+            glass.show();
+        }
+        for (const [piece, glass] of pane._pieces) {
+            if (!seen.has(piece))
+                glass.hide();
+        }
     };
     // not from inside a layout pass: once, just before the next frame
     const schedule = (pointer, pane) => {
@@ -91,8 +178,14 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
             .map(prop => [pointer, pointer.connect(`notify::${prop}`, update)]);
         ids.push([pointer.bin, pointer.bin.connect('notify::allocation', update)]);
         // GNOME may destroy a menu (the session menu is rebuilt): its pane goes with it
+        const dropPieces = () => {
+            for (const glass of pane._pieces?.values() ?? [])
+                glass._forget?.();
+            pane._pieces?.clear();
+        };
         ids.push([pointer, pointer.connect('destroy', () => {
             followed.delete(pointer);
+            dropPieces();
             if (!paneGone)
                 pane.destroy();
         })]);
@@ -104,6 +197,7 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
             });
             if (followed.get(pointer) === pane) {
                 followed.delete(pointer);
+                dropPieces();
                 if (!paneGone)
                     pane.destroy();
             }

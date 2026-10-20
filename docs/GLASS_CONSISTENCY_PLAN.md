@@ -155,3 +155,16 @@ gaps; text centring measured from the pixels):
 - Hover and pressed: a light fill on every button, both screens (`phaseC-buttons-hover.png`).
 Gates: fault (both screens back to GNOME's), verifying, churn 25 cycles (the only growth is
 GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
+
+## Phase D results (2026-10-20)
+
+- One menu module on both screens (tahoe-gdm menus.js, the lock screen's widgets/glassmenus.js):
+  a frosted pane under each menu, and in the system and accessibility menus every toggle, slider
+  and round button its own glass capsule, an open submenu its own glass at 32 (docs/STANDARD.md),
+  all in the cards' A1 glass. Super+L's Blur My Shell piece glass (menuglass.js) is retired, so
+  both screens draw the same thing; on toggles in the accent colour on both.
+- Submenus open in an overlay of the menu's own actor: the walk covers the whole menu.
+- `phaseD-menus.png`: the desktop's submenu and calendar next to Super+L's menu and submenu and the
+  login screen's menu, submenu, accessibility menu and calendar.
+- Gates: the lock screen's qs and qs-sub (glass on every piece, the submenu included), the fault
+  gates on both screens.

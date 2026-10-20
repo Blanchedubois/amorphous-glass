@@ -286,14 +286,22 @@
   background-color: rgba(255, 255, 255, 0.14);
 }
 .tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button,
-.tahoe-gdm-glass-menus .quick-settings .icon-button,
-.tahoe-gdm-glass-menus .quick-toggle,
 .tahoe-gdm-glass-menus .quick-toggle-menu .header .icon {
   background-color: rgba(255, 255, 255, 0.12);
 }
+/* the system menu's pieces are each their own glass (menus.js): no fill of their own, a light one
+   on hover; their capsule shape matches the glass */
+.tahoe-gdm-glass-menus .quick-settings .icon-button,
+.tahoe-gdm-glass-menus .quick-toggle,
+.tahoe-gdm-glass-menus .quick-slider,
+.tahoe-gdm-glass-menus .quick-toggle-menu {
+  background-color: transparent;
+  box-shadow: none;
+}
+.tahoe-gdm-glass-menus .quick-toggle-menu { border-radius: 32px; }
 .tahoe-gdm-glass-menus .quick-toggle:hover,
 .tahoe-gdm-glass-menus .quick-settings .icon-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.12);
 }
 .tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today {
   background-color: -st-accent-color;
