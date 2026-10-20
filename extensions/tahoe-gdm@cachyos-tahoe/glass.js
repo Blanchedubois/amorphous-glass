@@ -28,6 +28,7 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -46,6 +47,9 @@ export const MATERIAL = {
     rim: 0.45,          // light toward the top left
     rimBase: 0.16,      // light all round
     shade: 0.05,        // darkening of the edge facing away from the light
+    // the desktop widgets' edge model (DESKTOP below): off here
+    desk: 0, frost: 0, band: 12.6, hair: 1, hairAlpha: {light: 0.25, dark: 0.16},
+    rimLight: 0.55, rimLightWidth: 0.45, ao: 0.30, aoWidth: 0.20, shadow: 0.20,
     light: {brightness: 0.03, milk: 0.10, tint: [0, 0, 0], tintAmount: 0},
     // the desktop's dark glass: tokens/glass.json dark chip rgba(34, 34, 38, 0.62)
     dark: {brightness: -0.02, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
@@ -65,6 +69,29 @@ export const MENU_GLASS = {
 // dark glass on both screens over the dark picture (the user, 2026-10-20: light glass, white
 // toggles and dark menus together looked mixed: "make it all darkmode")
 export const GLASS_LOOK = 'dark';
+
+// The desktop widgets' glass (docs/STANDARD.md, scripts/glass-bar.sh glass_params, the dock
+// pipeline the widgets use; docs/GLASS_CONSISTENCY_PLAN.md Phase A): a frosted backdrop, the
+// dark tint, a 1 px hairline, a soft rim light and inner edge shadow (the edge model of the
+// project's Blur My Shell refraction patch, tahoeRimLight / tahoeInnerShadow), a slight darkening
+// toward the bottom. bend: the refraction at the edge, the one thing the variants differ in.
+const DESKTOP = {
+    desk: 1, frost: 18, blur: 0, edge: 10, split: 0.06, contrast: 1.0, saturation: 1.0,
+    band: 12.6,            // the rim band: edge_size 12 x 0.35 x rim_width 3, logical px
+    hair: 1, hairAlpha: {light: 0.25, dark: 0.16},
+    rimLight: 0.55, rimLightWidth: 0.45, ao: 0.30, aoWidth: 0.20, shadow: 0.20,
+    light: {brightness: 0, milk: 0, tint: [1, 1, 1], tintAmount: 0.18},
+    dark: {brightness: 0, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
+};
+export const VARIANTS = {
+    A1: {...DESKTOP, bend: 0},   // frosted, no bend: closest to the desktop widgets
+    A2: {...DESKTOP, bend: 3},   // frosted, a touch of liquid at the edge
+    A3: {...DESKTOP, bend: 9},   // frosted, today's bend
+};
+// the test shells pick a variant (tools/gdm, tools/lockscreen: TAHOE_GLASS_VARIANT); unset: today's
+const VARIANT = VARIANTS[GLib.getenv('TAHOE_GLASS_VARIANT') ?? ''];
+if (VARIANT)
+    Object.assign(MATERIAL, VARIANT);
 
 export function darkScheme() {
     if (GLASS_LOOK !== 'scheme')
@@ -96,6 +123,24 @@ uniform float sd_w;
 uniform float sd_h;
 uniform float sd_pad;
 uniform float sd_r;
+uniform float desk;
+uniform float band_px;
+uniform float hair_px;
+uniform float hair_alpha;
+uniform float aa_px;
+uniform float rim_light;
+uniform float rim_light_w;
+uniform float ao;
+uniform float ao_w;
+uniform float shadow;
+
+// the desktop's rim light (the Blur My Shell refraction patch, tahoeLensSlope / tahoeRimLight)
+float tahoe_lens_slope(float t) {
+    float n = 3.6;
+    float u = clamp(1.0 - t, 0.0, 1.0);
+    float inner = max(1.0 - pow(u, n), 1e-4);
+    return pow(inner, 1.0 / n - 1.0) * pow(u, n - 1.0);
+}
 
 vec3 tahoe_backdrop(vec2 uv) {
     vec2 b = vec2(blur_px * px_x, blur_px * px_y);
@@ -162,13 +207,34 @@ const SHADER = `
     c = mix(vec3(luma), c, saturation);
     c = mix(c, vec3(1.0), milk);
     c = mix(c, tint, tint_amount);
-    // the edge: a crisp line rim_line_px wide, a softer glow rim_glow_px in
-    float line_ = 1.0 - smoothstep(rim_line_px * 0.6, rim_line_px, inside);
-    float halo = glow * (1.0 - smoothstep(0.0, rim_glow_px, inside));
-    float r = max(line_, halo) * bend_k;
-    float facing = dot(-n, normalize(vec2(-1.0, -1.0)));
-    c += r * (rim_base + rim * max(facing, 0.0));
-    c *= 1.0 - shade * r * max(-facing, 0.0);
+    if (desk > 0.5) {
+        // the desktop widgets' edge: inner shadow, rim light, a 1 px hairline, darker at the bottom
+        float aow = max(band_px * ao_w, 0.5);
+        c *= 1.0 - (1.0 - smoothstep(0.0, aow, inside)) * ao;
+        float w = max(band_px * rim_light_w, 1.0);
+        float t = clamp(inside / w, 0.0, 1.0);
+        vec3 nn = normalize(vec3(-n * tahoe_lens_slope(t) * 2.5, 1.0));
+        float fres = pow(1.0 - nn.z, 3.0);
+        vec3 light = normalize(vec3(cos(45.0), sin(45.0), 0.38));
+        float lit = pow(abs(dot(nn, light)), 1.9);
+        float eb = 1.0 - smoothstep(0.0, w, inside);
+        float g = clamp(mix(pow(eb, 0.85), fres, 0.55) * eb * lit * rim_light, 0.0, 1.0);
+        c = 1.0 - (1.0 - c) * (1.0 - g);
+        // the hairline: hair_px wide, its inner side anti-aliased over a whole pixel
+        float hl = clamp((hair_px - inside) / aa_px + 0.5, 0.0, 1.0);
+        c = mix(c, vec3(1.0), hl * hair_alpha);
+        float ly = sdf > 0.5 ? clamp((uv.y * sd_h - sd_pad) / max(sd_h - 2.0 * sd_pad, 1.0), 0.0, 1.0) : uv.y;
+        c *= 1.0 - smoothstep(0.25, 1.0, ly) * shadow * 0.20;
+    } else {
+        // the edge: a crisp line rim_line_px wide, a softer glow rim_glow_px in; the line's inner
+        // side anti-aliased over a whole pixel (it stepped on curves: the user, 2026-10-20)
+        float line_ = clamp((rim_line_px - inside) / aa_px + 0.5, 0.0, 1.0);
+        float halo = glow * (1.0 - smoothstep(0.0, rim_glow_px, inside));
+        float r = max(line_, halo) * bend_k;
+        float facing = dot(-n, normalize(vec2(-1.0, -1.0)));
+        c += r * (rim_base + rim * max(facing, 0.0));
+        c *= 1.0 - shade * r * max(-facing, 0.0);
+    }
     c = clamp(c, 0.0, 1.0);
     cogl_color_out = vec4(c * cov, cov) * cogl_color_in.a;
 `;
@@ -209,6 +275,9 @@ class TahoeGdmGlassEffect extends Clutter.OffscreenEffect {
             rim: M.rim, rim_base: M.rimBase, shade: M.shade,
             edge_px: M.edge * scale, rim_line_px: M.rimLine * scale, rim_glow_px: M.rimGlow * scale, glow: M.glow,
             sdf: shape.sdf ? 1 : 0, sd_w: width, sd_h: height, sd_pad: shape.pad ?? 0, sd_r: shape.radius ?? 0,
+            desk: M.desk ? 1 : 0, band_px: M.band * scale, hair_px: M.hair * scale,
+            hair_alpha: dark ? M.hairAlpha.dark : M.hairAlpha.light, aa_px: Math.max(1, scale),
+            rim_light: M.rimLight, rim_light_w: M.rimLightWidth, ao: M.ao, ao_w: M.aoWidth, shadow: M.shadow,
         };
         this._tint = look.tint;
         this.queue_repaint();
@@ -246,6 +315,45 @@ function roundedRect(cr, x, y, w, h, r) {
 }
 
 export {roundedRect};
+
+// The frosted backdrop: one blurred copy per backdrop actor (GNOME Shell's own blur, done once a
+// frame however many panes read it), shared by every pane over that actor. The copy is not drawn
+// itself (opacity 0); the panes' clones draw it.
+const frostCopies = new Map();   // backdrop actor -> {actor, users, id}
+
+function takeFrost(source, radius) {
+    let entry = frostCopies.get(source);
+    if (!entry) {
+        const actor = new Clutter.Clone({source, opacity: 0, reactive: false, name: 'tahoe-glass-frost'});
+        actor.add_constraint(new Clutter.BindConstraint({source, coordinate: Clutter.BindCoordinate.SIZE}));
+        actor.add_effect_with_name('tahoe-glass-frost', new Shell.BlurEffect({
+            radius: Math.round(radius * St.ThemeContext.get_for_stage(global.stage).scale_factor),
+            brightness: 1.0, mode: Shell.BlurMode.ACTOR,
+        }));
+        global.stage.add_child(actor);
+        entry = {actor, users: 0, id: source.connect('destroy', () => dropFrost(source))};
+        frostCopies.set(source, entry);
+    }
+    entry.users++;
+    return entry.actor;
+}
+
+function dropFrost(source) {
+    const entry = frostCopies.get(source);
+    if (!entry)
+        return;
+    frostCopies.delete(source);
+    try {
+        source.disconnect(entry.id);
+    } catch {}
+    entry.actor.destroy();
+}
+
+function releaseFrost(source) {
+    const entry = frostCopies.get(source);
+    if (entry && --entry.users <= 0)
+        dropFrost(source);
+}
 
 // The glass is drawn PAD logical px bigger than its shape on every side: the bend near the edge
 // samples the backdrop just outside the shape, and the shape's anti-aliased edge and rim must lie
@@ -325,9 +433,15 @@ export const GlassPane = GObject.registerClass({
         this.add_child(this._glass);
         this._sourceOf = typeof backdrop === 'function' ? backdrop : null;
         const actor = this._sourceOf ? this._sourceOf() : backdrop;
+        // the actor the glass lies over (its place on screen), and, when frosted, the blurred
+        // copy of it that the glass shows
+        this._origin = null;
+        this._frosted = null;
         this._backdrop = this._sourceOf || actor instanceof Clutter.Actor
-            ? new Clutter.Clone({source: actor ?? null})
+            ? new Clutter.Clone()
             : new St.Widget({style: `background-image: url("${backdrop.get_uri()}"); background-size: cover;`});
+        if (this._backdrop instanceof Clutter.Clone)
+            this._setOrigin(actor ?? null);
         this._glass.add_child(this._backdrop);
         this._effect = new GlassEffect();
         this._glass.add_effect_with_name('tahoe-gdm-glass', this._effect);
@@ -355,7 +469,26 @@ export const GlassPane = GObject.registerClass({
             this._failId = 0;
             St.Settings.get().disconnect(this._schemeId);
             this._unwatch();
+            if (this._frosted)
+                releaseFrost(this._frosted);
+            this._frosted = null;
         });
+    }
+
+    // the backdrop actor to lie over: the glass shows it, or its frosted copy
+    _setOrigin(actor) {
+        if (actor === this._origin)
+            return;
+        if (this._frosted)
+            releaseFrost(this._frosted);
+        this._frosted = null;
+        this._origin = actor;
+        let shown = actor;
+        if (actor && this._material.frost > 0) {
+            shown = takeFrost(actor, this._material.frost);
+            this._frosted = actor;
+        }
+        this._backdrop.source = shown;
     }
 
     // the shape changed without a size change (a clock's new minute): draw it again
@@ -393,7 +526,7 @@ export const GlassPane = GObject.registerClass({
     }
 
     _frame() {
-        const source = this._backdrop.source;
+        const source = this._backdrop instanceof Clutter.Clone ? this._origin : null;
         const of = actor => {
             const [x, y] = actor.get_transformed_position();
             const [w, h] = actor.get_transformed_size();
@@ -420,9 +553,7 @@ export const GlassPane = GObject.registerClass({
         g.set_size(box.get_width() + 2 * this._pad, box.get_height() + 2 * this._pad);
         this._glass.allocate(g);
         if (this._sourceOf) {
-            const current = this._sourceOf();
-            if (current !== this._backdrop.source)
-                this._backdrop.source = current ?? null;
+            this._setOrigin(this._sourceOf() ?? null);
         }
         // the backdrop lies exactly over the real background, wherever this pane is: a cloned
         // actor at that actor's own place and size (one monitor's lock background); the picture

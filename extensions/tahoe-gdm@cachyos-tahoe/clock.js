@@ -32,6 +32,7 @@ function clockMaterial(timeSize, date) {
     const k = timeSize / 192 * (date ? 0.3 : 1);   // the date's bevel and bend: 0.3 of the time's
     const milk = date ? 0.30 : 0;                  // the date's thin strokes a little frosted
     return {
+        desk: 0, frost: 0,   // the clock keeps its own glass (Phase B decides it)
         edge: 6 * k, bend: 10 * k, blur: 0, contrast: 1.0, saturation: 1.0, split: 0.05,
         rim: 0.22, rimBase: 0.08, shade: 0.04,
         light: {brightness: 0.05, milk: 0.06 + milk, tint: [0, 0, 0], tintAmount: 0},
