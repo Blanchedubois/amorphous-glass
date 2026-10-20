@@ -51,14 +51,15 @@ function log(message) {
 // Knows when an actor is destroyed, so undo never touches a disposed object (the dialog and its
 // children are destroyed by GNOME at unlock, possibly before our extension is disabled).
 class Watch {
-    constructor(actor) {
-        this.actor = actor;
-        this.gone = false;
-        this._id = actor.connect('destroy', () => (this.gone = true));
+    // target: an actor, or an effect or constraint (watched through the actor it is on)
+    constructor(target) {
+        this.actor = target instanceof Clutter.Actor ? target : target.get_actor?.() ?? null;
+        this.gone = !this.actor;
+        this._id = this.actor?.connect('destroy', () => (this.gone = true)) ?? 0;
     }
 
     release() {
-        if (!this.gone)
+        if (!this.gone && this._id)
             this.actor.disconnect(this._id);
     }
 }
@@ -74,11 +75,18 @@ export class Frame {
         this._undo = [];                // whole-session changes, undone last-in first-out
         this._dialogUndo = [];          // changes tied to the current dialog
         this._dialog = null;
-        this._checks = [];              // extra watchdog checks registered by later phases
+        this._checks = [];              // extra watchdog checks, per dialog
+        this._builders = [];            // fn(frame, dialog), run for each unlock dialog
         this._checkId = 0;
         this._unsettled = 0;
         this.failed = false;
         this.reason = null;
+    }
+
+    // Register what to build on each unlock dialog (GNOME can replace the dialog while locked).
+    // Call before start(). A builder that throws sends the lock screen back to GNOME's own.
+    onDialog(builder) {
+        this._builders.push(builder);
     }
 
     // Start watching for GNOME's unlock dialog. Throws if the shield is not shaped as expected;
@@ -110,7 +118,6 @@ export class Frame {
                 log(`undo failed: ${e}`);
             }
         }
-        this._checks = [];
     }
 
     // Run fn; any exception sends the lock screen back to GNOME's own until the next lock.
@@ -154,24 +161,44 @@ export class Frame {
         return actor;
     }
 
-    // Move one of GNOME's actors without changing GNOME's layout: translations are not part of
-    // the allocation, so GNOME's own geometry stays as it computed it. Errors (see
-    // ANIMATED_BY_GNOME) send the lock screen back to GNOME's own.
-    setTranslationY(actor, y) {
+    // Set a property on one of GNOME's actors; the first change remembers the old value for undo.
+    // Errors (see ANIMATED_BY_GNOME) send the lock screen back to GNOME's own.
+    set(actor, prop, value) {
         this.guard(() => {
-            this._remember(actor, 'translation_y');
-            actor.translation_y = y;
-            this.scheduleCheck();
+            this._remember(actor, prop);
+            if (actor[prop] !== value) {
+                actor[prop] = value;
+                this.scheduleCheck();
+            }
         });
+    }
+
+    // Move one of GNOME's actors without changing GNOME's layout: translations are not part of
+    // the allocation, so GNOME's own geometry stays as it computed it.
+    setTranslationY(actor, y) {
+        this.set(actor, 'translation_y', y);
     }
 
     // Hide one of GNOME's actors by opacity, keeping it in place.
     hide(actor) {
-        this.guard(() => {
-            this._remember(actor, 'opacity');
-            actor.opacity = 0;
-            this.scheduleCheck();
+        this.set(actor, 'opacity', 0);
+    }
+
+    // Connect to a signal for as long as the current dialog lives; the handler runs guarded.
+    connect(gobject, signal, handler) {
+        const token = {};
+        const watch = gobject instanceof Clutter.Actor ? new Watch(gobject) : null;
+        gobject.connectObject(signal, (...args) => this.guard(() => handler(...args)), token);
+        this._dialogUndo.push(() => {
+            watch?.release();
+            if (!watch?.gone)
+                gobject.disconnectObject(token);
         });
+    }
+
+    // Anything else to undo when the dialog goes or the frame stops.
+    addUndo(fn) {
+        this._dialogUndo.push(fn);
     }
 
     // record a property's value before our first change to it, and how to put it back
@@ -224,6 +251,11 @@ export class Frame {
             'child-added', () => this.scheduleCheck(),
             'notify::visible', () => this.scheduleCheck(),
             this);
+        for (const build of this._builders) {
+            if (this.failed)
+                return;
+            build(this, dialog);
+        }
         this.scheduleCheck();
     }
 
@@ -237,6 +269,7 @@ export class Frame {
                 log(`undo failed: ${e}`);
             }
         }
+        this._checks = [];
         if (dialog && !destroyed) {
             try {
                 dialog.disconnectObject(this);

@@ -13,8 +13,8 @@ Apple's macOS Tahoe press image the user picked (see "The target" below).
 | 0 | Research, possibility report, risk assessment | done (d225f3a, 24db9fe) |
 | 1 | The unlock arrow covered the password eye | done (7b28b83), not installed |
 | 2 | Safety frame: guards and tests, nothing visible changes | done, not installed |
-| 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | next |
-| 4 | The Liquid Glass clock | |
+| 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | done, not installed; waiting on the user's look |
+| 4 | The Liquid Glass clock | in the workshop: clear glass, sharp wallpaper, dark-mode tint |
 | 5 | Now Playing: GNOME's own media card as a Tahoe glass card | |
 | 6 | Motion: lock, page change and unlock animations | |
 | 7 | Shipping: VM check, install, tahoe-repair, merge | each step needs the user's go-ahead |
@@ -313,6 +313,53 @@ GNOME version or a reshaped dialog needs a VM image or a GNOME 52 build, so it w
 Workshop: screenshots of both pages in light and dark against the reference; the user picks the
 sizes and positions. Exit: G1 to G5.
 
+**Result (2026-10-20).** `layout.js`, run by the frame for each unlock dialog:
+- **Clock:** our own actor is a child of the dialog, pinned to the primary monitor, above GNOME's
+  layout and non-reactive. It shows the date above the time on both pages, follows the 12h/24h
+  setting (12h without AM/PM) and ticks with GNOME's `WallClock`, once a minute.
+- **Placement by the letters:** the clock is placed by its letters, not its line boxes, and
+  measured on the screenshots:
+
+  | | Ours | Reference |
+  |---|---|---|
+  | Date letters top | 10.8 % of the height | 10.8 % |
+  | Date letter height | 1.8 % | about 1.75 % |
+  | Digits top | 14.0 % | 14.3 % |
+  | Digit height | 9.8 % | 9.8 % |
+  | Gap, date to digits | 1.46 % | 1.4 % |
+- **GNOME's clock:** its time, date and "Click or press a key" labels are hidden (`visible`
+  false), not the clock box, which GNOME animates.
+- **Prompt:** moved down by translating GNOME's `_stack`, computed from GNOME's own allocations so
+  the avatar centre sits at 82.5 %. It is clamped above the bottom margin and above GNOME's
+  notification column, and re-placed when the stack or a new prompt is re-allocated.
+- **CSS:**
+  - avatar 64 px;
+  - the name in SF Pro Text semibold;
+  - the capsule in white glass (fill white 0.14, 0.18 when focused, 1 px white 0.16 edge), with no
+    blue focus ring;
+  - "Switch User…" as a glass capsule.
+- **Watchdog clock check:** the clock must be shown, not cut off (allocation at least the text's
+  own width) and on screen. Otherwise GNOME's clock comes back.
+
+Gates:
+
+| Gate | Result |
+|---|---|
+| G1 | Light and dark: frame running, every key in the field, the eye and the arrow each hit themselves; capsule at y 1265 to 1313 of 1440. |
+| G2 | All eight own-code faults fail safe, the clock-cut-off case included. After each: our clock gone, GNOME's labels back, stack translation 0, stylesheet unloaded, password usable. |
+| G4 | 50 cycles: frame running and the prompt usable at every lock, clean after every unlock, actors flat (2,597 from cycle 10 on), no JS errors. Memory over 100 cycles: with the extension, a one-off +18 MB over the first 25 locks (most likely font caches for the 190 px digits), then +4.5 MB over the next 50, the same rate as without the extension (+4.6 MB from lock 1 to 75). The steady growth is GNOME's own. |
+| G5 | [phase3-layout.png](lockscreen/shots/phase3-layout.png) (reference, both pages, light and dark). Capsule, arrow and Switch User corners checked at 4x: round, concentric, 1 px edge. |
+
+Two things found while building it:
+- **The clock check had a gap:** a label given a fixed width reports that width as its natural
+  width, so the check now measures the text inside the label.
+- **The `cover` fault test** had been placing its cover where the prompt used to be. It now covers
+  the field wherever the layout puts it.
+
+For the user to decide (workshop): on Tahoe the avatar and "Enter Password" already show on the
+clock screen. GNOME shows the prompt only after a key press or click, because that is when it
+starts the password conversation. Keeping GNOME's behaviour is the safe default.
+
 ### Phase 4: the Liquid Glass clock
 
 The look: the digits and the date are glass. The wallpaper shows through them, a little lighter
@@ -373,6 +420,47 @@ and milkier, bent at the edges of each stroke, with a soft rim.
 
 Workshop: side-by-side sheets (reference, ours on the same Tahoe-like wallpaper, ours on the
 user's fold wallpaper) in light and dark; the material is tuned in rounds. Exit: G1 to G5.
+
+**Workshop so far (2026-10-20):**
+
+- **First glass:** `glassclock.js`. A `Clutter.Clone` of GNOME's own lock background, cropped to
+  the clock's box, is run through one shader with a glyph mask (Cairo/Pango, redrawn once a
+  minute). The Phase 3 labels stay underneath as the fallback, and hide only after the glass has
+  really painted. A glass failure brings back the plain clock, not GNOME's lock screen.
+- **The user's choices so far:**
+  - **Clearer glass:** "less tinted, more glass-like, transparent". The material is now clear:
+    contrast 1, saturation 1, milk 0.06, no blur. The shape comes from the bend at the stroke
+    edges (22 px) and the rim, lit from the top left.
+  - **Sharp wallpaper:** "not a blurred background". While locked, the frame switches off the
+    lock background's effects, Blur My Shell's `DualKawaseBlurEffect` or GNOME's own blur and
+    dimming, and switches them back on at unlock or on any failure. The user's Blur My Shell
+    settings are untouched.
+  - **Font:** first "SF Pro Display Bold" (picked from
+    [phase4-font-options.png](lockscreen/shots/phase4-font-options.png)), then "heavy and slightly
+    rounded". The default is now SF Pro Display Heavy with its corners softened 2.5 px: the mask
+    grows the glyphs with round joins. SF Pro Rounded Heavy is the alternative. See
+    [phase4-clear-glass.png](lockscreen/shots/phase4-clear-glass.png).
+  - **Darker in dark mode:** with GNOME's dark style, the glass is pulled 16 % toward black, and
+    the rim stays bright. It follows the setting live.
+    [phase4-dark-tint.png](lockscreen/shots/phase4-dark-tint.png).
+- **The date:** its strokes are much thinner than the digits', so it gets 0.3 of their bevel,
+  bend and rim, plus a little frost to stay legible. The mask's blue channel carries each glyph's
+  scale.
+- **Fixed on the way:** the glass now picks the primary monitor's background by position. Blur My
+  Shell inserts the backgrounds in reverse order.
+
+Gates with the glass:
+- **G2:** all eight own-code faults fail safe.
+- **G1:** the frame is running with our two actors (the clock and the glass).
+- **Unlock time:** it is the same with and without the extension (median 2.80 s against 2.78 s
+  over 10 cycles in the throwaway shell). The glass does not slow unlocking. The churn test now
+  waits for the real unlock instead of a fixed 1.2 s, which was too short there.
+
+Still to do in Phase 4:
+- the user's pick of face A or B;
+- a full G4 churn with the glass;
+- a G2 case for the glass failing to paint (plain clock takes over);
+- a check of frame cost while the clock repaints.
 
 ### Phase 5: Now Playing
 
