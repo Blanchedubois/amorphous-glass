@@ -114,10 +114,21 @@ function tokens(kind, speed) {
     }
 }
 
+/// GNOME rebuilds some rows while their popup is up (network lists, calendar events): a row
+/// destroyed under a running animation is left alone from then on (writing to it filled the log
+/// with a stack trace a frame, found in the stress test). One handler per actor, ever.
+function watchGone(actor) {
+    if (!actor._tahoeWatched) {
+        actor._tahoeWatched = true;
+        actor.connect('destroy', () => (actor._tahoeGone = true));
+    }
+}
+
 /// One part arriving: from hidden to its place on its springs.
 export class Item {
     constructor(actor, rect, kind, speed = 'default') {
         this.actor = actor;
+        watchGone(actor);
         this.rect = rect;
         this.kind = kind;
         this.speed = speed;
@@ -179,6 +190,8 @@ export class Item {
 
     apply(p, fade, direction) {
         const actor = this.actor;
+        if (actor._tahoeGone)
+            return;
         actor.opacity = Math.round(this.saved.opacity * Math.min(1, Math.max(0, fade)));
         switch (this.kind) {
         case 'row': {
@@ -208,6 +221,8 @@ export class Item {
     restore() {
         const { opacity, pivot, scale_x, scale_y, translation_x, translation_y } = this.saved;
         const actor = this.actor;
+        if (actor._tahoeGone)
+            return;
         actor.opacity = opacity;
         actor.set_pivot_point(pivot.x, pivot.y);
         actor.set_scale(scale_x, scale_y);
