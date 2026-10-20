@@ -323,6 +323,31 @@ async function runDemo() {
     write({ label: 'demo', frames: n, fps: Math.round(real * 100) / 100, frame: frameState().frame });
 }
 
+// a submitted password being checked: GNOME makes the field insensitive and spins in the arrow's
+// place (AuthPrompt.updateSensitivity(false), startSpinning) until PAM answers. The frame must
+// keep running (the real lock screen fell back to GNOME's here, 2026-10-20), and the field must be
+// usable again after a wrong password (updateSensitivity(true)).
+async function runVerifying() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    const prompt = dialog._authPrompt;
+    if (!prompt._entryArea.visible)
+        prompt.setQuestion('Enter Password');
+    await typeKeys('secret');
+    await sleep(800);
+    const before = frameState().frame;
+    prompt.updateSensitivity({sensitive: false});
+    prompt.startSpinning?.({animate: true});
+    lockExt()?.stateObj?._frame?.scheduleCheck?.();
+    await sleep(2500);                         // several watchdog checks while "verifying"
+    const during = frameState().frame;
+    prompt.stopSpinning?.({animate: true});
+    prompt.updateSensitivity({sensitive: true});
+    await sleep(1200);
+    const after = { ...frameState(), ...(await usable(dialog)) };
+    write({ label: 'verifying', before, during, after });
+}
+
 // G2 for our own code: a broken later phase, injected through the frame's own API
 async function runOurs(kind) {
     await sleep(3000);
@@ -724,7 +749,7 @@ export default class Driver extends Extension {
         isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'verifying' ? runVerifying() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}

@@ -123,6 +123,7 @@ export function buildNowPlaying(frame, dialog, onResize) {
     const known = new Set();
     let wanted = false;
     let suppressed = false;
+    const wantedListeners = [];
     const sync = () => {
         const cards = mediaCards(list);
         const show = cards.some(gnomeWouldShow);
@@ -143,9 +144,14 @@ export function buildNowPlaying(frame, dialog, onResize) {
             if (show && c.visible)
                 c.visible = false;
         }
+        const wantedChanged = wanted !== show;
         wanted = show;
         const was = card.actor.visible;
         card.actor.visible = show && !suppressed;
+        // music mode decides again (GNOME adds its card a moment after the player appears: without
+        // this, music mode could miss that it should be on, 2026-10-20)
+        if (wantedChanged)
+            wantedListeners.forEach(fn => fn());
         if (was !== card.actor.visible) {
             syncTick();
             onResize?.();
@@ -194,6 +200,10 @@ export function buildNowPlaying(frame, dialog, onResize) {
         // GNOME would show a media card now (whether or not this card is suppressed)
         get wanted() {
             return wanted;
+        },
+        // fn() whenever `wanted` changes
+        onWantedChanged(fn) {
+            wantedListeners.push(fn);
         },
         // music mode: hide this card while it shows the player its own way
         setSuppressed(value) {
