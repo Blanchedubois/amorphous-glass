@@ -20,6 +20,12 @@ export XDG_RUNTIME_DIR=$(mktemp -d "/tmp/gdmrun.XXXX")
 chmod 700 "$XDG_RUNTIME_DIR"
 mkdir -p "$XDG_DATA_HOME/gnome-shell/extensions" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
 cp -r "$H/gdm-shot@local" "$XDG_DATA_HOME/gnome-shell/extensions/"
+# GDM_TEST_EXT_DIRS="/path/uuid ...": gdm-mode extensions from a checkout, enabled before the driver
+extra=""
+for dir in ${GDM_TEST_EXT_DIRS:-}; do
+  cp -r "$dir" "$XDG_DATA_HOME/gnome-shell/extensions/"
+  extra="$extra'$(basename "$dir")', "
+done
 # fontconfig reads ~/.local/share/fonts through XDG_DATA_HOME: absent unless asked for
 [ "$fonts" = userfonts ] && [ -d "$HOME/.local/share/fonts" ] && ln -s "$HOME/.local/share/fonts" "$XDG_DATA_HOME/fonts"
 D=$root/datadir; mkdir -p "$D"
@@ -27,7 +33,7 @@ for f in /usr/share/gnome-shell/*; do ln -s "$f" "$D/"; done
 rm "$D/gnome-shell-theme.gresource"; ln -s "$(realpath "$gres")" "$D/gnome-shell-theme.gresource"
 cat > "$XDG_CONFIG_HOME/glib-2.0/settings/keyfile" <<KF
 [org/gnome/shell]
-enabled-extensions=['gdm-shot@local']
+enabled-extensions=[${extra}'gdm-shot@local']
 disable-extension-version-validation=true
 [org/gnome/desktop/interface]
 clock-show-date=false

@@ -1,0 +1,1 @@
+{ "uuid": "widgets-test@local", "name": "widgets on the lock and login screens (test)", "description": "workshop only: tahoe-widgets weather and calendar on Liquid Glass panes, on the lock screen and the login screen", "shell-version": ["51"], "session-modes": ["unlock-dialog", "gdm"] }

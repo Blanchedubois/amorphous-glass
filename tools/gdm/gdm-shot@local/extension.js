@@ -1,6 +1,7 @@
 // Test driver for tools/gdm/run.sh: in a throwaway gnome-shell in session mode gdm (no GDM
 // daemon behind it), shows the greeter's user list, then the password prompt for the first user,
 // and screenshots each. It drives LoginDialog's own methods; nothing here talks to GDM or PAM.
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -33,6 +34,9 @@ function record(label, d) {
         clockText: Main.panel.statusArea.dateMenu?._clockDisplay?.text,
         userList: box(d._userList), prompt: box(ap), entry: box(ap._entry),
         arrow: box(ap._defaultButtonWell), logo: box(d._logoBin),
+        glassClass: d.has_style_class_name('tahoe-gdm-glass'),
+        glassPanes: (() => { let n = 0; const walk = a => { if (a.name === 'tahoe-gdm-glass') n++; a.get_children().forEach(walk); }; walk(d); return n; })(),
+        rowsOriginal: [...d._userList._items.values()].every(i => i.child?.has_style_class_name?.('tahoe-gdm-row-content') !== true && !(i.child?.layout_manager instanceof Clutter.BinLayout)),
         promptAlloc: ap.get_allocation_box() ? [ap.get_allocation_box().x1, ap.get_allocation_box().y1] : null,
         promptTx: ap.translation_x, dialog: box(d), avatar: box(ap._userWell.get_child()?.get_first_child?.()),
         listItem: box([...d._userList._items.values()][0]),
@@ -52,6 +56,12 @@ export default class {
     async _run() {
         await wait(5);
         const d = Main.screenShield._dialog;
+        // GDM_FAIL_MASK=1: the next glass masks fail (tahoe-gdm must then put everything back)
+        if (GLib.getenv('GDM_FAIL_MASK')) {
+            const ext = Main.extensionManager.lookup('tahoe-gdm@cachyos-tahoe');
+            const glass = await import(ext.dir.get_child('glass.js').get_uri());
+            glass.MATERIAL._failForTest = true;
+        }
         d._showUserList();
         await wait(2);
         record('list', d);
