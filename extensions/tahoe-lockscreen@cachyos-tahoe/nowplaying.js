@@ -118,15 +118,20 @@ export function buildNowPlaying(frame, dialog, onResize) {
     }));
 
     // ---- GNOME's own cards: hidden while ours shows; ours shows only when GNOME's would ----
+    // wanted: GNOME would show a media card; suppressed: music mode (musicmode.js) shows the
+    // player in its own card instead, so this one steps aside (GNOME's stay hidden either way)
     const known = new Set();
+    let wanted = false;
+    let suppressed = false;
     const sync = () => {
         const cards = mediaCards(list);
         const show = cards.some(gnomeWouldShow);
         for (const c of cards) {
             if (!known.has(c)) {
                 known.add(c);
+                // GNOME's card stays hidden while ours or music mode's shows the player
                 frame.connect(c, 'notify::visible', () => {
-                    if (c.visible && card.actor.visible)
+                    if (c.visible && wanted)
                         c.visible = false;
                 });
                 frame.addUndo(() => {
@@ -138,9 +143,10 @@ export function buildNowPlaying(frame, dialog, onResize) {
             if (show && c.visible)
                 c.visible = false;
         }
+        wanted = show;
         const was = card.actor.visible;
-        card.actor.visible = show;
-        if (was !== show) {
+        card.actor.visible = show && !suppressed;
+        if (was !== card.actor.visible) {
             syncTick();
             onResize?.();
         }
@@ -185,6 +191,19 @@ export function buildNowPlaying(frame, dialog, onResize) {
     });
 
     return {
+        // GNOME would show a media card now (whether or not this card is suppressed)
+        get wanted() {
+            return wanted;
+        },
+        // music mode: hide this card while it shows the player its own way
+        setSuppressed(value) {
+            if (suppressed === value)
+                return;
+            suppressed = value;
+            sync();
+        },
+        // the swirl's and the ticks' gate: not idle, not dimming (music mode uses it too)
+        gate,
         // the space Now Playing takes under the clock (0 when it is not shown)
         get height() {
             return card.actor.visible ? CARD[1] : 0;

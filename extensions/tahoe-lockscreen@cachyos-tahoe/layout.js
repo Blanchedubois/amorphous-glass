@@ -16,6 +16,9 @@ import * as Layout from 'resource:///org/gnome/shell/ui/layout.js';
 
 import { GlassClock, MATERIAL, buildMask, measure } from './glassclock.js';
 import { buildNowPlaying } from './nowplaying.js';
+import { buildMusicMode } from './musicmode.js';
+import { buildWidgetStack } from './widgetstack.js';
+import { buildPromptGlass } from './promptglass.js';
 import { buildMenuGlass } from './menuglass.js';
 
 const DIGITS_EM = 0.730;      // Space Grotesk's digit height
@@ -79,7 +82,13 @@ export function buildLayout(frame, dialog) {
         frame.set(clock[name], 'visible', false);
     let relayout = () => {};
     const nowPlaying = buildNowPlaying(frame, dialog, () => relayout());
-    relayout = placePrompt(frame, dialog, nowPlaying);
+    // the widget column on the left, music mode and the password capsule, on glass over the lock
+    // background (looked up at each layout: GNOME rebuilds it when monitors change)
+    const backdrop = () => primaryBackground(dialog);
+    buildPromptGlass(frame, dialog, backdrop);
+    const widgets = buildWidgetStack(frame, dialog, backdrop, nowPlaying.gate);
+    const music = buildMusicMode(frame, dialog, nowPlaying, backdrop, () => relayout(), () => widgets.recheck?.());
+    relayout = placePrompt(frame, dialog, nowPlaying, music, widgets);
     buildMenuGlass(frame, dialog);
 }
 
@@ -291,7 +300,7 @@ function buildGlass(frame, dialog, labels) {
 
 // ---- the prompt: GNOME's own, moved down with a translation on its stack ----
 
-function placePrompt(frame, dialog, nowPlaying = null) {
+function placePrompt(frame, dialog, nowPlaying = null, music = null, widgets = null) {
     const stack = dialog._stack;
     const mainBox = stack.get_parent();
     const notifications = dialog._notificationsBox;
@@ -306,8 +315,14 @@ function placePrompt(frame, dialog, nowPlaying = null) {
         // iPhone, when it fits above the prompt; else where GNOME put it, with the prompt above it
         const gap = Math.round(height * COLUMN_GAP);
         const underClock = Math.round(height * clockBottom()) + gap;
-        nowPlaying?.place(Main.layoutManager.primaryMonitor, underClock);
-        const columnTop = underClock + (nowPlaying?.height ? nowPlaying.height + gap : 0);
+        const monitor = Main.layoutManager.primaryMonitor;
+        nowPlaying?.place(monitor, underClock);
+        // music mode: its card in the room between the clock and the avatar, in Now Playing's place
+        let centre = nowPlaying?.height ?? 0;
+        if (music?.active)
+            centre = music.fit(monitor, underClock, avatarTop - gap);
+        widgets?.place(monitor);
+        const columnTop = underClock + (centre ? centre + gap : 0);
         let moved = false;
         if (notifications?.visible && notifications.height > 0) {
             const box = notifications.get_allocation_box();

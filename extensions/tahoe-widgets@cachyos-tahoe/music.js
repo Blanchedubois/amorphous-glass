@@ -370,8 +370,10 @@ class LyricsView {
 
 class MusicWidget {
     // options.swirl: passed to the Swirl ({lockScreen, gate}, for the lock screen's copy);
-    // options.scale: the wide widget's cover and buttons drawn that much bigger (the lock screen's
-    // larger Now Playing; its stylesheet scales the text to match). 1 on the desktop.
+    // options.scale: the wide and large widgets' cover and buttons drawn that much bigger (the lock
+    // screen's larger Now Playing and music mode; its stylesheet scales the text to match). The
+    // card's padding and corners stay as they are, so the cover stays concentric with the card.
+    // 1 on the desktop.
     constructor(options = {}) {
         this._scale = options.scale ?? 1;
         this.actor = new St.BoxLayout({
@@ -444,7 +446,7 @@ class MusicWidget {
     // the Large widget's column (also the Extra Large ones'): the cover across the width, the
     // song with the app at its right, the progress with times, the controls
     _buildPlayer(box, {spacer = true} = {}) {
-        this._art = new Art(LARGE_ART);
+        this._art = new Art(Math.round(LARGE_ART * this._scale));
         box.add_child(this._art.actor);
         if (spacer)
             box.add_child(new St.Widget({y_expand: true}));
@@ -455,13 +457,13 @@ class MusicWidget {
         song.add_child(this._title);
         song.add_child(this._artist);
         titleRow.add_child(song);
-        this._app = new AppButton(this._player, 24);
+        this._app = new AppButton(this._player, Math.round(24 * this._scale));
         this._app.actor.y_align = Clutter.ActorAlign.CENTER;
         titleRow.add_child(this._app.actor);
         box.add_child(titleRow);
         this._progress = new Progress(true);
         box.add_child(this._progress.actor);
-        this._transport = new Transport(this._player, 28);
+        this._transport = new Transport(this._player, Math.round(28 * this._scale));
         this._transport.actor.add_style_class_name('tahoe-music-transport-large');
         this._transport.actor.x_align = Clutter.ActorAlign.CENTER;
         box.add_child(this._transport.actor);

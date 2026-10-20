@@ -177,3 +177,48 @@
 .tahoe-widget.tahoe-lock-np-big .tahoe-music-track { height: 6px; border-radius: 3px; }
 .tahoe-widget.tahoe-lock-np-big .tahoe-music-fill { border-radius: 3px; }
 .tahoe-widget.tahoe-lock-np-big .tahoe-music-button { padding: 9px; }
+
+/* ---- Liquid Glass panes (widgets/paneglass.js): music mode's card and the widget column ----
+   The shader draws the glass and its rim; no CSS rim or fill over it (docs/STANDARD.md). Every
+   card is tokens/radius.json widget (24); what sits inside keeps the widgets' own concentric
+   corners (the Music widget's cover 8 at 16 px padding). */
+.tahoe-widget.tahoe-lock-pane { background-color: transparent; border-radius: 24px; }
+.tahoe-widget.tahoe-lock-pane .tahoe-widget-content {
+  border-width: 0;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+/* the password capsule on Liquid Glass (promptglass.js), as on the login screen: the glass is
+   the fill and the shader's rim the edge, so the entry's own fill and edge come off */
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-prompt-entry,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-prompt-entry:hover,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-prompt-entry:focus {
+  background-color: transparent;
+  box-shadow: none !important;
+}
+
+
+/* ---- music mode's Large card drawn bigger (musicmode.js, widgets/music.js scale) ----
+   On a big monitor the card grows with the room it has: the cover and the buttons in code, the
+   text and spacing here, in two steps (1.25x, 1.5x). The card's padding (16) and corners
+   (tokens/radius.json widget, 24) stay, so the cover's 8 px corner stays concentric with the
+   card's at every size, as on every other card. */
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-title-large { font-size: 27.5px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-artist-large { font-size: 20px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-title-row-large { padding-top: 15px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-progress { padding-top: 12.5px; spacing: 5px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-track { height: 5px; border-radius: 2.5px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-fill { border-radius: 2.5px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-time { font-size: 14px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-transport-large { spacing: 35px; padding-top: 7.5px; }
+.tahoe-widget.tahoe-lock-large-125 .tahoe-music-button { padding: 7.5px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-title-large { font-size: 33px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-artist-large { font-size: 24px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-title-row-large { padding-top: 18px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-progress { padding-top: 15px; spacing: 6px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-track { height: 6px; border-radius: 3px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-fill { border-radius: 3px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-time { font-size: 16.5px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-transport-large { spacing: 42px; padding-top: 9px; }
+.tahoe-widget.tahoe-lock-large-150 .tahoe-music-button { padding: 9px; }

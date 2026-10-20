@@ -277,3 +277,37 @@ The user asked that all of this works on other monitor sizes and ratios.
   the cover (48 = 24 + 24). Shot: `docs/gdm/music-mode-card.png`.
 - Not covered: two monitors at once (GDM shows the prompt on the primary one; the theme's picture
   spans the whole stage), and fractional or 2x scaling (worked out in logical px, untested).
+
+## Built: music mode, the widget column and glass on the lock screen (2026-10-20)
+
+In `extensions/tahoe-lockscreen@cachyos-tahoe` on this branch (not installed; main's
+lock screen is unchanged until merged and installed with scripts/tahoe-lockscreen.sh):
+- `musicmode.js`: while something plays and GNOME would show its media card, the swirl as an
+  effect on GNOME's lock background actors (cross-fade 1.2 s, 25 fps, still when idle 30 s,
+  dimming or animations off), Now Playing steps aside (`nowplaying.js setSuppressed`) and the
+  player sits in the centre on plain glass: the biggest card that fits between the clock and
+  the avatar (92 % of the room, 42 % of the width): Large 1.5x, 1.25x, 1x, wide 1.5x, wide.
+  Measured: 1366x768 and 1920x1080 wide 1.5x, 2560x1440, 2560x1600, 3440x1440 Large 1.25x,
+  3840x2160 Large 1.5x. The Music widget's own swirl is gated off; its text still takes the
+  cover's colour.
+- `widgetstack.js`: weather, today (lists today's events: privacy note in the file), month on
+  glass in a column at 4.5 % from the left, as many as fit; one gated 1 s tick.
+- `promptglass.js`: the password capsule on glass, as on the login screen.
+- Glass: `widgets/paneglass.js`, the login screen's shader shared through
+  tools/lockscreen/shared.list (with weather.js, calendar.js, clocks.js); panes look the lock
+  background up at each layout (GNOME rebuilds it on monitor changes) and re-aim when an
+  ancestor moves.
+- `widgets/music.js` (from tahoe-widgets): `scale` for the Large widget as for the wide one
+  (default 1, desktop unchanged); lockscreen.css `.tahoe-lock-large-125/150` scale its text.
+- Rounding: every card tokens/radius.json widget 24 with 16 px padding, so the cover's 8 px
+  corner is concentric at every size; capsules for the password field.
+- Tests (all through the system-bus filter, 0 gdm-password lines in the journal):
+  six monitor sizes, paused (Now Playing back, no swirl), nothing playing; the fault suite
+  (7 faults in our code, 3 outside) restores GNOME's lock screen each time with the swirl, the
+  prompt glass and the style class removed; 10 lock/unlock cycles: actors 2662 (as without
+  these changes), unlock median 680 ms (623 ms without).
+- Shots: docs/lockscreen/shots/music-mode-built-sizes.png, music-mode-built-states.png,
+  music-mode-card-125.png.
+- The harness: tools/lockscreen/run.sh now runs the shell behind tools/gdm/sysbus.sh (no real
+  GDM or PAM) and takes TAHOE_LOCK_MONITOR; lock-test's fault record also checks the background
+  effects, the prompt glass and the dialog's style classes.

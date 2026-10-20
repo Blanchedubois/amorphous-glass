@@ -5,6 +5,10 @@
 # opens the password prompt and takes screenshots.
 # TAHOE_TEST_EXT_DIRS="/path/uuid ...": extensions from a checkout, enabled too (e.g. tahoe-lockscreen).
 # TAHOE_LOCK_PICTURE=uri: another lock picture; TAHOE_LOCK_MATERIAL=json: glass material overrides.
+# TAHOE_LOCK_MONITOR=WxH@Hz: the virtual monitor (default 2560x1440@120).
+# The shell sees the system bus only through tools/gdm/sysbus.sh: its unlock prompt can never
+# reach the real GDM, so a run never starts a real PAM check for the user (on 2026-10-20 runs
+# without it counted as failed logins and pam_faillock locked the user's account).
 set -eu
 out=$1; mode=${2:-dark}
 H=$(cd "$(dirname "$0")" && pwd)
@@ -48,6 +52,8 @@ def dump(path):
 dump('/org/gnome/shell/extensions/blur-my-shell/')
 dump('/org/gnome/desktop/background/')
 dump('/org/gnome/desktop/screensaver/')
+# the weather widget's location (the lock screen's widget column)
+dump('/org/gnome/shell/weather/')
 dark = os.environ['MODE'] == 'dark'
 # TAHOE_LOCK_PICTURE=uri: a different lock picture (and wallpaper) for this run
 pic = os.environ.get('TAHOE_LOCK_PICTURE')
@@ -64,8 +70,11 @@ out += ['[org/gnome/shell]',
         '[org/gnome/desktop/lockdown]', 'disable-lock-screen=false']
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
+. "$H/../gdm/sysbus.sh"
+sysbus_start
 timeout ${TAHOE_TEST_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-lock-$$" \
-  --virtual-monitor 2560x1440@120 > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
+  --virtual-monitor ${TAHOE_LOCK_MONITOR:-2560x1440@120} > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
+sysbus_stop
 # the test session's document portal mounts a FUSE file system in its runtime dir
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
 rm -rf "$root" "$XDG_RUNTIME_DIR"
