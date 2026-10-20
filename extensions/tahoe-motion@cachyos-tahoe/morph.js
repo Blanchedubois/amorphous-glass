@@ -467,6 +467,12 @@ export class ButtonPiece {
         if (card.width < 2 || card.height < 2)
             return false;
         this.card = card;
+        // the button's content scales, its glass stays at its rest size and the blob is the glass's
+        // reveal shape: a frozen backdrop is then drawn where it was captured. A glass scaled with
+        // the button showed its backdrop stretched, misaligned until it went live (user's
+        // recording of quick settings spammed, 2026-10-19)
+        this.target._tahoe_glass_transform_free = true;
+        this.radius = Math.min(this.surface.corner_radius ?? card.height / 2, card.width / 2, card.height / 2);
         // the blob it starts as: round, a little smaller than the button's height
         const round = Math.min(card.width, card.height) * BUTTON_FROM;
         this.fromX = Math.min(1, round / card.width);
@@ -521,9 +527,27 @@ export class ButtonPiece {
 
     apply() {
         const target = this.target;
+        const sx = Math.max(0.05, this.width.value);
+        const sy = Math.max(0.05, this.height.value);
         target.set_pivot_point(0.5, 0.5);
-        target.set_scale(Math.max(0.05, this.width.value), Math.max(0.05, this.height.value));
+        target.set_scale(sx, sy);
         target.opacity = Math.round(this.saved.opacity * clamp01(this.fade.value));
+        // the glass's shape: the card scaled about the button's centre, as the button is. The glass
+        // itself only scales past 1 (an overshoot, Blur My Shell's at_rest), the reveal does the rest
+        const { card } = this;
+        const ex = sx / Math.max(1, sx);
+        const ey = sy / Math.max(1, sy);
+        const cx = target.width / 2;
+        const cy = target.height / 2;
+        const width = card.width * ex;
+        const height = card.height * ey;
+        this.surface.set_reveal({
+            x: cx + (card.x - cx) * ex,
+            y: cy + (card.y - cy) * ey,
+            width,
+            height,
+            radius: Math.min(this.radius * Math.max(ex, ey), width / 2, height / 2),
+        });
     }
 
     hide() {
@@ -558,6 +582,7 @@ export class ButtonPiece {
 
     restore() {
         this.surface.set_reveal(null);
+        delete this.target._tahoe_glass_transform_free;
         this.items.forEach(item => item.restore());
         const { opacity, pivot, scale_x, scale_y } = this.saved;
         const target = this.target;

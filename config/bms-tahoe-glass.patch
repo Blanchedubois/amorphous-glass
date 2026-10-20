@@ -417,7 +417,7 @@ index 4d16af5..eed8f3d 100644
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..8ab3e9e 100644
+index 5a891b9..9a6f722 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -461,7 +461,7 @@ index 5a891b9..8ab3e9e 100644
          this.parent.add_child(this.actor);
          if (!this.static_blur)
              this.pipeline.attach_pipeline();
-@@ -77,11 +89,93 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -77,11 +89,97 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.connect_ancestors(this.root_actor);
          if (has_style_class(this.target, 'screenshot-ui-panel'))
              this.signals.connect_actor(this.parent);
@@ -510,15 +510,19 @@ index 5a891b9..8ab3e9e 100644
 +
 +    /// tahoe glass: an animation (tahoe-motion) scales and moves the target itself while its
 +    /// glass keeps its place and is shaped by the reveal: the glass is placed from the target
-+    /// with its own scale and translation taken out for the moment.
++    /// with its own translation, and any scale below 1, taken out for the moment. A scale past 1
++    /// (a spring's overshoot) stays: the glass cannot reveal past its own box, and held at its
++    /// rest size it showed the button's outline bulging out around it.
 +    at_rest(fn) {
 +        const target = this.target;
 +        if (!target._tahoe_glass_transform_free)
 +            return fn();
 +        const { scale_x, scale_y, translation_x, translation_y } = target;
-+        if (scale_x === 1 && scale_y === 1 && translation_x === 0 && translation_y === 0)
++        const rest_x = Math.max(1, scale_x);
++        const rest_y = Math.max(1, scale_y);
++        if (rest_x === scale_x && rest_y === scale_y && translation_x === 0 && translation_y === 0)
 +            return fn();
-+        target.set_scale(1, 1);
++        target.set_scale(rest_x, rest_y);
 +        target.set_translation(0, 0, target.translation_z);
 +        try {
 +            return fn();
@@ -555,7 +559,7 @@ index 5a891b9..8ab3e9e 100644
      // Our overlay lives in `parent`, so tear it down before a destroyed
      // parent disposes of it as one of its children.
      connect_lifetime() {
-@@ -161,6 +255,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -161,6 +259,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
  
@@ -567,7 +571,7 @@ index 5a891b9..8ab3e9e 100644
      is_heavy_surface() {
          return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
      }
-@@ -174,10 +273,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -174,10 +277,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      uses_full_actor_geometry() {
@@ -592,7 +596,7 @@ index 5a891b9..8ab3e9e 100644
          if (this.is_notification_surface()) {
              this.update_live_surface();
              return;
-@@ -267,7 +379,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -267,7 +383,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
          if (this.static_blur)
              return this.static_actor.has_opacity(opacity);
          return this.actor.opacity === opacity
@@ -601,7 +605,7 @@ index 5a891b9..8ab3e9e 100644
      }
  
      update_surface_opacity(opacity) {
-@@ -276,6 +388,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -276,6 +392,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
              return;
          }
          this.actor.opacity = opacity;
@@ -612,7 +616,7 @@ index 5a891b9..8ab3e9e 100644
          this.pipeline.set_opacity_factor(this.get_pipeline_opacity(opacity) / 255);
      }
  
-@@ -286,7 +402,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -286,7 +406,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_update() {
@@ -622,7 +626,7 @@ index 5a891b9..8ab3e9e 100644
              return;
          this.update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -299,8 +416,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -299,8 +420,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_transition_update(transition_state = null) {
@@ -634,7 +638,7 @@ index 5a891b9..8ab3e9e 100644
              return;
          this.transition_update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -332,7 +451,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -332,7 +455,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      get_corner_radius() {
@@ -643,7 +647,7 @@ index 5a891b9..8ab3e9e 100644
      }
  
      is_visible() {
-@@ -372,6 +491,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -372,6 +495,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);

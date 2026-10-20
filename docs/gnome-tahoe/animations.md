@@ -558,6 +558,39 @@ size, to name it next time.
 capture and one blur of the whole quick settings rectangle per frame, each piece only refracting
 its part (the plan's old Phase 2).
 
+### Quick settings: blur misaligned while opening, then corrected (2026-10-19, after 8a59933)
+
+User: "record my screen as I spam it. You will see the gaussian live blur be misaligned and then
+corrected." Their screen was recorded for 25 s while they spammed the panel
+(`tools/record-screen.js`). In the frames of an open, the power button's glass showed the purple
+wallpaper while behind it was half a dark window: wrong for a frame or two, right once the motion
+ended.
+
+**Cause.** A quick settings button grows from a blob, and its glass scaled with it. The frozen
+backdrop is captured on the first frame, when the glass is the blob. A debug build logged every
+frozen capture against the live one at rest: round buttons 32×32 instead of 54×54, pills 52×42
+instead of 174×70. That small patch was then stretched over the growing glass, until the glass
+went live at the end.
+
+**Fix.**
+
+- tahoe-motion: the button's content still scales, but its glass stays at its rest size and the
+  blob is the glass's reveal shape (`_tahoe_glass_transform_free`, which nothing set until now).
+  The frozen backdrop is captured over the whole button and drawn where it was taken.
+- Blur My Shell `at_rest` takes out only a scale below 1. The springs overshoot to 103–108%, and
+  a glass held at rest size was clipped there while the button's outline bulged around it (seen
+  in slowed stills). Past 1 the glass scales with the button, so the frozen blur stretches by at
+  most 8%, where before it stretched by up to 5×.
+
+**After (headless).**
+
+- Every frozen capture matches the live capture at rest: 18 of 18. Before, 9 were off.
+- Slowed stills of the volume slider show the same backdrop as live blur at every step, and the
+  glass follows the button through its overshoot.
+- CPU per frame is the same as Phase 1: QS open p50 0.9 ms, submenu 2.0 ms.
+- Quick settings stress cases are all ok: spam, reversals, Wi-Fi arrow, slider scroll, instant
+  closes, 50× leak check.
+
 ## Where the code would go
 
 - Phases 1 to 3: `config/bms-tahoe-glass.patch` (popup surfaces, backdrop capture, refraction

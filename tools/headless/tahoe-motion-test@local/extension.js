@@ -356,7 +356,21 @@ export default class Driver extends Extension {
             St.Settings.get().slow_down_factor = 10;
             qs.open(true);
             for (let i = 0; i < 6; i++) {
-                await sleep(300);
+                await sleep(i ? 300 : 900);
+                const glass = globalThis.__tahoeGlass;
+                const r = a => { const [x, y] = a.get_transformed_position(); const [w, h] = a.get_transformed_size(); return `${Math.round(x)},${Math.round(y)} ${Math.round(w)}x${Math.round(h)}`; };
+                write('log.jsonl', { i, surfaces: (glass?.surfaces(qs._boxPointer) ?? []).filter(s => s.target.mapped).map(s => {
+                    let chain = []; for (let a = s.target; a && a !== qs._boxPointer && chain.length < 4; a = a.get_parent()) chain.push(a.constructor.name + (a.style_class ? '.' + a.style_class.split(' ')[0] : ''));
+                    return `${chain.join('<')} target ${r(s.target)} s${s.target.scale_x.toFixed(2)} T${s.target._tahoe_glass_transform_free ? 1 : 0}`;
+                }) });
+                const morph = Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj?._morphs?.get(qs._boxPointer);
+                const sp = morph?.pieces.find(pc => pc.target.constructor.name === 'OutputStreamSlider');
+                if (sp?.card) {
+                    const [tx, ty] = sp.target.get_transformed_position();
+                    const [tw, th] = sp.target.get_transformed_size();
+                    write('log.jsonl', { i, slider: { box: [tx, ty, tw, th].map(Math.round), alloc: [sp.target.width, sp.target.height].map(Math.round), card: sp.card, sx: sp.width.value.toFixed(3), sy: sp.height.value.toFixed(3), radius: sp.radius } });
+                    await shotRect(`slider-${i}`, [Math.round(tx - 120), Math.round(ty - 30), Math.round(tw + 240), Math.round(th + 60)]);
+                }
                 const pieces = qs._grid.get_children().filter(c => c.visible).slice(0, 4);
                 write('log.jsonl', { i, pieces: pieces.map(p => `${p.constructor.name} s${p.scale_x.toFixed(2)}/${p.scale_y.toFixed(2)} pv${p.pivot_point.x.toFixed(2)} op${p.opacity} flags${p._tahoe_glass_opacity_free ? 'O' : ''}${p._tahoe_glass_transform_free ? 'T' : ''}`) });
             }
