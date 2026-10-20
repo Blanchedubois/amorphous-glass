@@ -1,6 +1,6 @@
 // GNOME's buttons on the login screen as capsules on Liquid Glass (the user, 2026-10-20), as on the
 // lock screen (tahoe-lockscreen promptglass.js): "Not listed?", the back button beside the
-// password field, the session menu and the accessibility menu. Each gets a glass pane in our own
+// password field, the session menu, the accessibility menu and the top-right status pill. Each gets a glass pane in our own
 // layer under the login dialog (just above the backdrop), following the button's place, size,
 // scale and fade on screen; nothing of ours goes inside GNOME's buttons. While the glass is on,
 // stylesheet.css clears their own fill and rounds them.
@@ -30,8 +30,31 @@ export function buildButtons(ext, dialog, backdrop) {
         actor.get_children().forEach(find);
     };
     find(dialog);
+    // the top-right status pill (the system menu's button) as a glass capsule too
+    const pill = Main.panel?.statusArea?.quickSettings;
+    if (pill) {
+        buttons.push(pill);
+        pill.add_style_class_name('tahoe-glass-pill');
+        ext._undo.push(() => pill.remove_style_class_name('tahoe-glass-pill'));
+    }
     if (!buttons.length)
         return;
+
+    // "Not listed?" centred under the rows, its label centred in it (GNOME starts both at the left:
+    // measured 14 px left of the rows, 14 px before its text and 26 px after)
+    const notListed = dialog._notListedButton;
+    if (notListed) {
+        const label = notListed.get_child();
+        const old = [notListed.x_align, label?.x_align];
+        notListed.x_align = Clutter.ActorAlign.CENTER;
+        if (label)
+            label.x_align = Clutter.ActorAlign.CENTER;
+        ext._undo.push(() => {
+            notListed.x_align = old[0];
+            if (label)
+                label.x_align = old[1];
+        });
+    }
 
     const layer = new Clutter.Actor({name: 'tahoe-gdm-buttons', reactive: false});
     layer.add_constraint(new Clutter.BindConstraint({source: group, coordinate: Clutter.BindCoordinate.SIZE}));
@@ -50,17 +73,21 @@ export function buildButtons(ext, dialog, backdrop) {
     const follow = (button, pane) => {
         const opacity = button.mapped ? button.get_paint_opacity() : 0;
         const box = button.get_allocation_box();
-        const w = box.get_width(), h = box.get_height();
+        // the drawn shape: inside the button's (transparent) border, as GNOME draws its fill
+        const node = button.get_theme_node();
+        const [bl, br, bt, bb] = [St.Side.LEFT, St.Side.RIGHT, St.Side.TOP, St.Side.BOTTOM].map(side => node.get_border_width(side));
+        const w = box.get_width() - bl - br, h = box.get_height() - bt - bb;
         if (!opacity || !(w > 0 && h > 0)) {
             pane.hide();
             return;
         }
         const [x, y] = button.get_transformed_position();
         const [tw, th] = button.get_transformed_size();
+        const k = tw / box.get_width();
         const [gx, gy] = group.get_transformed_position();
         pane.set_size(w, h);
-        pane.set_position(Math.round(x - gx), Math.round(y - gy));
-        pane.set_scale(tw / w, th / h);
+        pane.set_position(Math.round(x + bl * k - gx), Math.round(y + bt * th / box.get_height() - gy));
+        pane.set_scale(k, th / box.get_height());
         pane.opacity = opacity;
         pane.show();
     };

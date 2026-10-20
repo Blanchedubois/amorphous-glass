@@ -141,3 +141,17 @@ The pick then goes on Super+L too (its clock is drawn by glassclock.js today).
 - The user's pick (2026-10-20): B2 clear blur on both screens. The clock's panes are one module
   now (tahoe-gdm clockpanes.js, an exact copy in the lock screen's widgets/): Super+L no longer uses
   glassclock.js. `phaseB-both-clocks.png`: Super+L and the login screen, the same.
+
+## Phase C results (2026-10-20)
+
+Measured every button on both screens (test drivers record each button's box and its content's
+gaps; text centring measured from the pixels):
+- "Not listed?": centred under the rows (centre 1279, rows 1279.5; was 14 px left of them and
+  left-aligned), 34 px tall like the back circle, text 23 / 23 px from its ends (was 14 / 26).
+- "Switch User...": 34 px tall (the lock theme adds a 6 px border: min-height 22), text 17 / 18.
+- Circles (back 9/9, next 8/8, accessibility 16/16) were already symmetric.
+- The top-right status pill: a glass capsule on both screens, inside GNOME's transparent border.
+- The next arrow in the field: the glass hairline and a light fill (no glass in glass).
+- Hover and pressed: a light fill on every button, both screens (`phaseC-buttons-hover.png`).
+Gates: fault (both screens back to GNOME's), verifying, churn 25 cycles (the only growth is
+GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).

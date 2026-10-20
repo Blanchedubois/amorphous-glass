@@ -455,7 +455,7 @@ async function runChurn() {
         await sleep(400);
         if ((i === 1 || i % 25 === 0 || i === N) || locked.frame !== 'running' && locked.extState !== null) {
             write({ label: 'cycle', i, locked, usable: u, unlocked: frameState(), mode: Main.sessionMode.currentMode,
-                actors: countActors(), rssKb: rssKb(), unlockMs,
+                actors: countActors(), census: actorCensus(), rssKb: rssKb(), unlockMs,
                 unlockMsMax: Math.max(...unlockTimes), unlockMsMedian: unlockTimes.slice().sort((a, b) => a - b)[unlockTimes.length >> 1] });
         }
     }
@@ -582,6 +582,58 @@ async function shotRect(name, [x, y, w, h]) {
     await new Promise(resolve => stream.close_async(0, null, () => resolve()));
 }
 
+// every button on screen: its box, its content's box (the label or icon), the gaps on each side
+function buttonGaps() {
+    const out = [];
+    const content = b => {
+        let best = null;
+        const walk = a => {
+            if (!a.mapped) return;
+            if (a instanceof St.Label || a instanceof St.Icon) { best ??= a; return; }
+            a.get_children().forEach(walk);
+        };
+        b.get_children().forEach(walk);
+        return best;
+    };
+    const visit = a => {
+        if (!a.mapped || a.get_paint_opacity() === 0) return;
+        const isButton = a instanceof St.Button || a.has_style_class_name?.('panel-button');
+        if (isButton) {
+            const [bx, by] = a.get_transformed_position();
+            const [bw, bh] = a.get_transformed_size();
+            const c = content(a);
+            let gaps = null;
+            if (c) {
+                // a label's text: its layout's ink width, centred as St draws it
+                const [cx, cy] = c.get_transformed_position();
+                const [cw, ch] = c.get_transformed_size();
+                let tx = cx, tw = cw;
+                if (c instanceof St.Label) {
+                    const [, logical] = c.clutter_text.get_layout().get_pixel_extents();
+                    tw = logical.width;
+                }
+                gaps = {left: Math.round(tx - bx), right: Math.round(bx + bw - (tx + tw)), top: Math.round(cy - by), bottom: Math.round(by + bh - (cy + ch))};
+            }
+            out.push({cls: a.style_class, box: [bx, by, bw, bh].map(Math.round), gaps});
+        }
+        a.get_children().forEach(visit);
+    };
+    visit(global.stage);
+    return out;
+}
+
+// actors on the stage by type and name (to find what a cycle leaves behind)
+function actorCensus() {
+    const n = {};
+    const w = a => {
+        const k = `${a.constructor.name}${a.name ? '#' + a.name : ''}`;
+        n[k] = (n[k] ?? 0) + 1;
+        a.get_children().forEach(w);
+    };
+    w(global.stage);
+    return n;
+}
+
 function box(actor) {
     if (!actor || !actor.mapped) return null;
     const [x, y] = actor.get_transformed_position();
@@ -685,6 +737,17 @@ async function run() {
     walk(global.stage, 0);
     write({ label: 'our-actors', ours });
     { const out = []; const w = a => { if (a instanceof St.Button && a.mapped) out.push(`${a.style_class}|${a.name ?? ''}|${box(a)}|${a.get_parent()?.style_class ?? ''}`); a.get_children().forEach(w); }; w(global.stage); write({ label: 'buttons', buttons: out }); }
+    write({ label: 'button-gaps', buttons: buttonGaps() });
+    if (GLib.getenv('TAHOE_LOCK_HOVER')) {
+        const btns = [];
+        const w = a => { if (a.mapped && (a instanceof St.Button || a.has_style_class_name?.('panel-button'))) btns.push(a); a.get_children().forEach(w); };
+        w(global.stage);
+        btns.forEach(b => b.add_style_pseudo_class('hover'));
+        await sleep(600);
+        await shotRect('hover', [0, 0, global.screen_width, global.screen_height]);
+        btns.forEach(b => b.remove_style_pseudo_class('hover'));
+        write({ label: 'button-gaps-after', buttons: buttonGaps() });
+    }
     write({ label: 'background', effects: [...dialog._backgroundGroup].map(b => ({ x: b.x, name: b.name,
         effects: b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`) })) });
     const nameLabel = prompt._userWell?.get_child?.()?._label ?? null;

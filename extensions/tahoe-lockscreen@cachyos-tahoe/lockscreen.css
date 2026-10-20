@@ -206,7 +206,27 @@
   background-color: transparent;
   box-shadow: none !important;
 }
-.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button { padding: 6px 16px; }
+/* text capsules as tall as the back button's circle (34), the text centred, equal ends */
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button { min-height: 22px; padding: 0 16px; }   /* 34 in all: the lock theme adds a 6 px border */
+/* the next arrow inside the field: the glass's hairline and a light fill, not glass in glass */
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.next-button {
+  background-color: rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.next-button:hover { background-color: rgba(255, 255, 255, 0.18); }
+/* the top-right status pill on glass (promptglass.js) */
+#panel .panel-button.tahoe-glass-pill,
+#panel .panel-button.tahoe-glass-pill:hover,
+#panel .panel-button.tahoe-glass-pill:active,
+#panel .panel-button.tahoe-glass-pill:checked,
+#panel .panel-button.tahoe-glass-pill:focus {
+  background-color: transparent;
+  box-shadow: none;
+  border-radius: 9999px;
+}
+#panel .panel-button.tahoe-glass-pill:hover { background-color: rgba(255, 255, 255, 0.12); }
+#panel .panel-button.tahoe-glass-pill:active,
+#panel .panel-button.tahoe-glass-pill:checked { background-color: rgba(255, 255, 255, 0.18); }
 .unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button:hover,
 .unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button:focus,
 .unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button:hover,
