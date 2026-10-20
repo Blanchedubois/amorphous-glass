@@ -1,0 +1,33 @@
+/* Tahoe Login Screen: loaded by GNOME with the extension. While the glass is there
+   (.tahoe-gdm-glass on the dialog) the theme's flat fills and edges come off the password capsule
+   and the account rows; the shader's rim is their only edge (docs/STANDARD.md: no outline). */
+
+.login-dialog.tahoe-gdm-glass .login-dialog-prompt-entry,
+.login-dialog.tahoe-gdm-glass .login-dialog-prompt-entry:hover,
+.login-dialog.tahoe-gdm-glass .login-dialog-prompt-entry:focus {
+  background-color: transparent;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* account rows: a pill, concentric with the 64 px avatar inside it (radius 32 + 9 px padding = 41,
+   half the 82 px row), so the glass pill is a capsule */
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item {
+  border-radius: 9999px;
+  padding: 0;
+  background-color: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:hover,
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus,
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:active {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.login-dialog.tahoe-gdm-glass .tahoe-gdm-row-content { padding: 9px 22px 9px 9px; }

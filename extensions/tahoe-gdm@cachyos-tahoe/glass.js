@@ -1,0 +1,259 @@
+// Liquid Glass panes for the login screen: a capsule under the password field, a pill behind each
+// account row. The shader is tahoe-lockscreen's glass clock (glassclock.js), the same material
+// over a shape instead of glyphs: the backdrop bends toward the edge of the shape, is milky and a
+// little lighter, with a rim lit from the top left. It needs no Blur My Shell (none in the greeter).
+//
+// Behind each pane is the greeter's own background picture (the image the theme puts on
+// #lockDialogGroup), drawn at monitor size and offset so its pixels line up with the real
+// background; the pane clips it to itself. The mask is drawn with cairo when the pane's size
+// changes: red = coverage, green = depth inside the shape (0 at the edge, 1 from EDGE px in),
+// blue = bend strength (1).
+
+import Cairo from 'cairo';
+import Clutter from 'gi://Clutter';
+import Cogl from 'gi://Cogl';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import St from 'gi://St';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
+// Controls are small and carry text: a little more frost than the clock, a shallower bend.
+export const MATERIAL = {
+    edge: 10,           // logical px of bevel inside the shape
+    bend: 9,            // logical px the backdrop is pushed at the very edge
+    blur: 1.5,          // logical px of softening, so text on the glass stays readable
+    contrast: 0.92,
+    saturation: 1.1,
+    brightness: 0.03,
+    milk: 0.10,
+    rim: 0.30,
+    rimBase: 0.10,
+    shade: 0.05,
+    split: 0.05,
+};
+
+const SHADER_DECLARATIONS = `
+uniform float px_x;
+uniform float px_y;
+uniform float bend_px;
+uniform float blur_px;
+uniform float contrast;
+uniform float saturation;
+uniform float brightness;
+uniform float milk;
+uniform float rim;
+uniform float rim_base;
+uniform float shade;
+uniform float split;
+
+vec3 tahoe_backdrop(vec2 uv) {
+    vec2 b = vec2(blur_px * px_x, blur_px * px_y);
+    return (texture2D(cogl_sampler0, uv).rgb * 2.0 +
+            texture2D(cogl_sampler0, uv + vec2(b.x, 0.0)).rgb +
+            texture2D(cogl_sampler0, uv - vec2(b.x, 0.0)).rgb +
+            texture2D(cogl_sampler0, uv + vec2(0.0, b.y)).rgb +
+            texture2D(cogl_sampler0, uv - vec2(0.0, b.y)).rgb) / 6.0;
+}
+`;
+
+// tahoe-lockscreen/glassclock.js SHADER without the date's extra frost
+const SHADER = `
+    vec2 uv = cogl_tex_coord0_in.st;
+    vec4 m = texture2D(cogl_sampler1, uv);
+    float cov = m.r;
+    vec2 g = vec2(texture2D(cogl_sampler1, uv + vec2(2.0 * px_x, 0.0)).g - texture2D(cogl_sampler1, uv - vec2(2.0 * px_x, 0.0)).g,
+                  texture2D(cogl_sampler1, uv + vec2(0.0, 2.0 * px_y)).g - texture2D(cogl_sampler1, uv - vec2(0.0, 2.0 * px_y)).g);
+    float gl = length(g);
+    vec2 n = gl > 0.0001 ? g / gl : vec2(0.0);
+    float x = clamp(1.0 - m.g, 0.0, 1.0);
+    float dome = 1.0 - sqrt(max(1.0 - x * x, 0.0));
+    vec2 off = -n * dome * bend_px * m.b * vec2(px_x, px_y);
+    vec3 c = vec3(tahoe_backdrop(uv + off * (1.0 + split)).r,
+                  tahoe_backdrop(uv + off).g,
+                  tahoe_backdrop(uv + off * (1.0 - split)).b);
+    c = (c - 0.5) * contrast + 0.5 + brightness;
+    float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    c = mix(vec3(luma), c, saturation);
+    c = mix(c, vec3(1.0), milk);
+    float facing = dot(-n, normalize(vec2(-1.0, -1.0)));
+    float r = smoothstep(0.55, 1.0, x) * m.b;
+    c += r * (rim_base + rim * max(facing, 0.0));
+    c *= 1.0 - shade * r * max(-facing, 0.0);
+    c = clamp(c, 0.0, 1.0);
+    cogl_color_out = vec4(c * cov, cov) * cogl_color_in.a;
+`;
+
+const GlassEffect = GObject.registerClass(
+class TahoeGdmGlassEffect extends Clutter.OffscreenEffect {
+    _init() {
+        super._init();
+        this._mask = null;
+        this._pipeline = null;
+        this._uniforms = {};
+        this._snippet = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, SHADER_DECLARATIONS, null);
+        this._snippet.set_replace(SHADER);
+    }
+
+    setMask(texture, width, height, scale) {
+        const M = MATERIAL;
+        this._mask = texture;
+        this._pipeline = null;
+        this._uniforms = {
+            px_x: 1 / width, px_y: 1 / height,
+            bend_px: M.bend * scale, blur_px: M.blur * scale,
+            contrast: M.contrast, saturation: M.saturation, brightness: M.brightness,
+            milk: M.milk, rim: M.rim, rim_base: M.rimBase, shade: M.shade, split: M.split,
+        };
+        this.queue_repaint();
+    }
+
+    vfunc_paint_target(node, paintContext) {
+        const pipeline = this.get_pipeline();
+        if (!this._mask || !pipeline)
+            return;   // no mask yet: draw nothing rather than the bare backdrop
+        if (pipeline !== this._pipeline) {
+            if (!pipeline._tahoeGdmGlass) {
+                pipeline.add_snippet(this._snippet);
+                pipeline._tahoeGdmGlass = true;
+            }
+            pipeline.set_layer_texture(1, this._mask);
+            pipeline.set_layer_filters(1, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
+            pipeline.set_layer_wrap_mode(1, Cogl.PipelineWrapMode.CLAMP_TO_EDGE);
+            for (const [name, value] of Object.entries(this._uniforms))
+                pipeline.set_uniform_1f(pipeline.get_uniform_location(name), value);
+            this._pipeline = pipeline;
+        }
+        super.vfunc_paint_target(node, paintContext);
+    }
+});
+
+function roundedRect(cr, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    cr.newPath();
+    cr.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
+    cr.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+    cr.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+    cr.arc(x + r, y + r, r, Math.PI, 1.5 * Math.PI);
+    cr.closePath();
+}
+
+// width, height: physical px; radius in physical px
+export function buildMask(width, height, radius, scale) {
+    if (MATERIAL._failForTest)   // set only by tools/gdm (GDM_FAIL_MASK)
+        throw new Error('test: mask failed');
+    const surface = new Cairo.ImageSurface(Cairo.Format.RGB24, width, height);
+    const cr = new Cairo.Context(surface);
+    cr.setSourceRGB(0, 0, 0);
+    cr.paint();
+    roundedRect(cr, 0, 0, width, height, radius);
+    cr.setSourceRGB(1, 0, 1);
+    cr.fill();
+    // green, depth: the shape eaten from the outline inwards a step at a time (as glassclock.js)
+    roundedRect(cr, 0, 0, width, height, radius);
+    cr.pushGroup();
+    cr.setOperator(Cairo.Operator.OVER);
+    cr.setSourceRGB(0, 1, 0);
+    cr.fillPreserve();
+    cr.setOperator(Cairo.Operator.DEST_OUT);
+    const steps = Math.max(2, Math.round(2 * MATERIAL.edge * scale));
+    for (let k = 1; k <= steps; k++) {
+        cr.setSourceRGBA(0, 0, 0, 1 / k);
+        cr.setLineWidth(k);
+        cr.strokePreserve();
+    }
+    cr.newPath();
+    cr.popGroupToSource();
+    cr.setOperator(Cairo.Operator.ADD);
+    cr.paint();
+    cr.$dispose();
+
+    // cairo surfaces have no byte access in GJS: through a PNG in the runtime dir, removed at once
+    const file = GLib.build_filenamev([GLib.get_user_runtime_dir(),
+        `tahoe-gdm-mask-${GLib.random_int()}.png`]);
+    try {
+        surface.writeToPNG(file);
+        surface.finish();
+        const pixbuf = GdkPixbuf.Pixbuf.new_from_file(file);
+        const ctx = global.stage.context.get_backend().get_cogl_context();
+        const format = pixbuf.get_n_channels() === 4 ? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888;
+        return Cogl.Texture2D.new_from_data(ctx, pixbuf.get_width(), pixbuf.get_height(), format,
+            pixbuf.get_rowstride(), pixbuf.read_pixel_bytes().toArray());
+    } finally {
+        GLib.unlink(file);
+    }
+}
+
+// A pane of glass that fills its parent's slot (in a BinLayout). radius: logical px, or
+// 'capsule' for half the height. backdrop: a Gio.File (the picture, drawn at monitor size) or a
+// Clutter.Actor covering the monitor (cloned, e.g. the lock screen's own background).
+export const GlassPane = GObject.registerClass({
+    Signals: {'mask-failed': {}},
+}, class TahoeGdmGlassPane extends St.Widget {
+    _init(backdrop, radius) {
+        super._init({
+            name: 'tahoe-gdm-glass',
+            reactive: false,
+            clip_to_allocation: true,
+            x_expand: true,
+            y_expand: true,
+        });
+        this._radius = radius;
+        this._backdrop = backdrop instanceof Clutter.Actor
+            ? new Clutter.Clone({source: backdrop})
+            : new St.Widget({style: `background-image: url("${backdrop.get_uri()}"); background-size: cover;`});
+        this.add_child(this._backdrop);
+        this._effect = new GlassEffect();
+        this.add_effect_with_name('tahoe-gdm-glass', this._effect);
+        this._maskSize = '';
+        this._maskId = 0;
+        this.failed = null;   // set when the mask could not be made; the owner then removes the pane
+        this.connect('destroy', () => {
+            if (this._maskId)
+                GLib.source_remove(this._maskId);
+            this._maskId = 0;
+        });
+    }
+
+    vfunc_get_preferred_width() {
+        return [0, 0];
+    }
+
+    vfunc_get_preferred_height() {
+        return [0, 0];
+    }
+
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        // the backdrop covers the monitor, placed so it lines up with the real background
+        const monitor = Main.layoutManager.primaryMonitor;
+        const [sx, sy] = this.get_transformed_position();
+        const b = new Clutter.ActorBox();
+        b.set_origin(monitor.x - sx, monitor.y - sy);
+        b.set_size(monitor.width, monitor.height);
+        this._backdrop.allocate(b);
+
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const w = Math.round(box.get_width() * scale), h = Math.round(box.get_height() * scale);
+        const key = `${w}x${h}`;
+        if (w > 0 && h > 0 && key !== this._maskSize && !this._maskId) {
+            this._maskId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                this._maskId = 0;
+                const [aw, ah] = this.get_size();
+                const pw = Math.round(aw * scale), ph = Math.round(ah * scale);
+                if (pw <= 0 || ph <= 0)
+                    return GLib.SOURCE_REMOVE;
+                try {
+                    const r = this._radius === 'capsule' ? ph / 2 : this._radius * scale;
+                    this._effect.setMask(buildMask(pw, ph, r, scale), pw, ph, scale);
+                    this._maskSize = `${pw}x${ph}`;
+                } catch (e) {
+                    this.failed = `${e}`;
+                    this.emit('mask-failed');
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+});

@@ -145,3 +145,50 @@ Files: `gdm/tahoe-gdm.css` (the greeter rules), `scripts/gdm-theme.sh build|comm
 Port of tahoe-lockscreen (frame.js safety design, shell-version pin, transactional enable,
 watchdog) with `session-modes: ["gdm"]`, installed system-wide, fonts in `/usr/share/fonts`, no
 access to the user's home. Planned after phase 1.
+
+## Workshop, 2026-10-20: Liquid Glass controls, weather and calendar (test shells only)
+
+### Liquid Glass password field and account rows (phase 2 prototype)
+
+`extensions/tahoe-gdm@cachyos-tahoe` (session mode gdm, GNOME 51 only, not installed):
+- `glass.js`: tahoe-lockscreen's glass clock shader over a shape instead of glyphs (a cairo mask
+  of a rounded rect: coverage, depth, bend), a little more frost for text on it. Backdrop: the
+  theme's background picture (read from `#lockDialogGroup`'s theme node) at monitor size, offset
+  under the pane, or a clone of a live background actor (lock screen). No Blur My Shell.
+- Password capsule: a glass pane as the first child of AuthPrompt's `_entryArea` (a BinLayout that
+  holds the entry; GNOME's password/text entry swap uses replace_child, which keeps ours).
+- Account rows: each UserListItem's content goes into a BinLayout box over a glass pill; the row's
+  padding moves onto the content, so glass and hover fill are one pill, concentric with the
+  64 px avatar (41 = 32 + 9).
+- `stylesheet.css` clears the flat fills while `.tahoe-gdm-glass` is on the dialog.
+- Safety: every change is recorded and undone on disable or on any error. Fault test
+  (`GDM_FAIL_MASK=1 tools/gdm/run.sh`): the mask fails, everything is put back (no style class,
+  0 panes, rows back to GNOME's own), the password field stays where it was with phase 1's capsule.
+- Still to do before installing: a watchdog like tahoe-lockscreen's frame.js (entry visible,
+  on screen, clickable), the lock screen's capsule in the same glass (tahoe-lockscreen), real-login check.
+- Shots: `docs/gdm/phase2-glass-controls.png`.
+
+### Weather and calendar widgets
+
+What Apple does (checked 2026-10-20):
+- **macOS Tahoe** lock screen and login window: date, the big clock (font and weight under
+  System Settings > Wallpaper > Clock Appearance, glass look), avatar and password. Apple's own
+  documentation describes no widgets there; Mac widgets live on the desktop and in Notification
+  Center (one vendor blog claims lock screen widgets on macOS 26; not confirmed by Apple or reviews).
+- **iPad / iPhone** (iPadOS 17+, iOS 16+, Liquid Glass in 26): a row of small widgets under the
+  clock and an inline line by the date (weather, next event); iOS 26 can also put them at the
+  bottom; translucent glass look; a "Glass" clock option.
+So widgets under the clock are iPad, not Mac; nothing at all on Apple's login window.
+
+Tested (`tools/gdm/widgets-test.sh OUTDIR lock|gdm KINDS`, `tools/gdm/widgets-test@local`):
+tahoe-widgets' WeatherSmall, CalendarDay and CalendarMonth on the glass panes above, under the clock.
+- Lock screen (main's tahoe-lockscreen): works. Real weather (the user's location, Cleveland),
+  today's date with the rest of today's events. Events on the lock screen are visible to anyone at
+  the machine, so that would be an opt-in.
+- Login screen: works in the test shell, with limits on the real greeter: it runs as user gdm, so
+  it has no calendars (date or month grid only) and no weather location; weather needs the
+  location set system-wide (gdm dconf `org/gnome/shell/weather`), shows the city to anyone at the
+  login screen and makes the login screen fetch weather over the network.
+- Legibility: white text on the glass is fine on the darker parts of the wallpaper, weak on the
+  bright yellow (weekend dates in the month, the calendar's red weekday on magenta).
+- Shots: `docs/gdm/widgets-workshop.png`, `docs/gdm/widgets-closeup.png`.
