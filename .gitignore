@@ -3,3 +3,6 @@
 extensions/tahoe-menu-bar@cachyos-tahoe/icons/*.svg
 *.pyc
 __pycache__/
+
+# throwaway headless shell folders (tools/headless/run.sh); gvfs may write into one after the run
+tools/headless/root.*/

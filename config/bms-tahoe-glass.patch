@@ -304,7 +304,7 @@ index 0ca7acc..2adcb7b 100644
          const listed = this.settings.applications.ENABLE_ALL
              ? !matches_any(wm_class, this.blacklist)
 diff --git a/src/components/popup/index.js b/src/components/popup/index.js
-index 4d16af5..3c42988 100644
+index 4d16af5..f315fd4 100644
 --- a/src/components/popup/index.js
 +++ b/src/components/popup/index.js
 @@ -1,5 +1,6 @@
@@ -419,7 +419,7 @@ index 4d16af5..3c42988 100644
      }
  
      track_container(container) {
-@@ -95,6 +175,60 @@ export const PopupBlur = class PopupBlur {
+@@ -95,6 +175,71 @@ export const PopupBlur = class PopupBlur {
          });
      }
  
@@ -442,8 +442,19 @@ index 4d16af5..3c42988 100644
 +        const stack = [controls];
 +        while (stack.length > 0) {
 +            const actor = stack.pop();
++            // results arrive after the text changes: the app results row is watched for new tiles
++            if (actor instanceof St.Widget && actor.has_style_class_name('grid-search-results')
++                && !this.watched_result_rows?.has(actor)) {
++                (this.watched_result_rows ??= new WeakSet()).add(actor);
++                this.connections.connect(actor, 'child-added', () => this.queue_overview_scan());
++            }
++            // the search's app results: marked, then glass like the rest
++            if (actor instanceof St.Widget && actor.has_style_class_name('overview-tile')
++                && actor.get_parent()?.has_style_class_name?.('grid-search-results'))
++                actor.add_style_class_name('tahoe-search-tile');
 +            if (actor instanceof St.Widget && (actor.has_style_class_name('app-folder')
-+                || actor.has_style_class_name('search-section-content'))) {
++                || actor.has_style_class_name('search-section-content')
++                || actor.has_style_class_name('tahoe-search-tile'))) {
 +                this.try_blur(actor);
 +                this.follow_scrolling(actor);
 +            } else {
@@ -480,7 +491,7 @@ index 4d16af5..3c42988 100644
      track_keyboard() {
          const keyboard_box = Main.layoutManager.keyboardBox;
          this.track_container(keyboard_box);
-@@ -228,6 +362,16 @@ export const PopupBlur = class PopupBlur {
+@@ -228,6 +373,16 @@ export const PopupBlur = class PopupBlur {
              return { parent, sibling };
          }
  
@@ -497,7 +508,7 @@ index 4d16af5..3c42988 100644
          const overlay_groups = [
              Main.uiGroup,
              Main.layoutManager.modalDialogGroup,
-@@ -351,6 +495,14 @@ export const PopupBlur = class PopupBlur {
+@@ -351,6 +506,14 @@ export const PopupBlur = class PopupBlur {
          }
  
          this.cancel_queued_blurs();
@@ -513,7 +524,7 @@ index 4d16af5..3c42988 100644
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..7b7c7fd 100644
+index 5a891b9..5c85fcd 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -537,7 +548,7 @@ index 5a891b9..7b7c7fd 100644
 +];
  const FULL_GEOMETRY_STYLE_CLASSES = [
 -    'popup-menu-content', 'candidate-popup-content',
-+    'popup-menu-content', 'candidate-popup-content', 'app-folder', 'search-section-content',
++    'popup-menu-content', 'candidate-popup-content', 'app-folder', 'search-section-content', 'tahoe-search-tile',
      'quick-settings', 'quick-toggle-menu', 'screenshot-ui-panel',
      'notification-banner', 'snap-assistant',
      'osd-window', 'resize-popup', 'workspace-switcher',
@@ -790,10 +801,22 @@ index 5a891b9..7b7c7fd 100644
          if (this.static_blur) {
              this.static_actor.destroy();
 diff --git a/src/components/popup/surface/fade.js b/src/components/popup/surface/fade.js
-index 3130fdd..058815e 100644
+index 3130fdd..fb3245c 100644
 --- a/src/components/popup/surface/fade.js
 +++ b/src/components/popup/surface/fade.js
-@@ -65,6 +65,10 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
+@@ -10,6 +10,11 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
+     }
+ 
+     get_opacity() {
++        // tahoe glass: an app result of the overview search has its glass only while it is
++        // hovered, focused or selected (a glass capsule in place of a flat fill)
++        if (has_style_class(this.target, 'tahoe-search-tile')
++            && !/\b(hover|focus|selected|active|checked)\b/.test(this.target.get_style_pseudo_class() ?? ''))
++            return 0;
+         let opacity = 255;
+         const visited = new WeakSet();
+ 
+@@ -65,6 +70,10 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
              : actor;
          if (!shown_actor?.visible || !shown_actor.mapped)
              return 0;
@@ -804,7 +827,7 @@ index 3130fdd..058815e 100644
  
          return Math.round(opacity * actor.opacity / 255);
      }
-@@ -81,6 +85,8 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
+@@ -81,6 +90,8 @@ export const PopupBlurSurfaceFade = class PopupBlurSurfaceFade {
          )
              return null;
  
@@ -1181,10 +1204,18 @@ index df5351e..a26590b 100644
          this.y = null;
          this.width = null;
 diff --git a/src/components/popup/surface/signals.js b/src/components/popup/surface/signals.js
-index 72d27e7..6e3a967 100644
+index 72d27e7..4aec780 100644
 --- a/src/components/popup/surface/signals.js
 +++ b/src/components/popup/surface/signals.js
-@@ -30,6 +30,15 @@ const VISIBILITY_SIGNALS = new Set([
+@@ -3,6 +3,7 @@ import Meta from 'gi://Meta';
+ import St from 'gi://St';
+ 
+ import { Connections } from '../../../conveniences/connections.js';
++import { has_style_class } from '../actors.js';
+ 
+ const ACTOR_SIGNALS = [
+     'notify::allocation',
+@@ -30,6 +31,15 @@ const VISIBILITY_SIGNALS = new Set([
      'notify::visible',
      'notify::mapped',
  ]);
@@ -1200,7 +1231,7 @@ index 72d27e7..6e3a967 100644
  const ANIMATION_SIGNALS = new Set([
      'notify::opacity',
      'notify::translation-x',
-@@ -82,7 +91,11 @@ export const PopupBlurSurfaceSignals = class PopupBlurSurfaceSignals {
+@@ -82,7 +92,14 @@ export const PopupBlurSurfaceSignals = class PopupBlurSurfaceSignals {
              return;
          }
  
@@ -1209,7 +1240,10 @@ index 72d27e7..6e3a967 100644
 +        if (this.surface.settling)
 +            return;
 +
-+        if (is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal) || SIZE_SIGNALS.has(signal)) {
++        // tahoe glass: a search result's glass comes and goes with its hover and selection
++        const state_glass = signal === 'notify::pseudo-class' && actor === this.surface.target
++            && has_style_class(actor, 'tahoe-search-tile');
++        if (state_glass || is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal) || SIZE_SIGNALS.has(signal)) {
              this.remove_idle_update();
              this.surface.queue_update();
              return;
@@ -1229,7 +1263,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..7ff3ff2 100644
+index 0dce45a..9e318e2 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1238,7 +1272,7 @@ index 0dce45a..7ff3ff2 100644
  
  import { has_any_style_class, is_internal_actor } from './actors.js';
  
-@@ -6,9 +7,31 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
+@@ -6,9 +7,33 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
  const POPUP_TARGET_STYLE_CLASSES = [
      'popup-menu-content', 'quick-settings', 'quick-toggle-menu', 'notification-banner',
      'candidate-popup-content', 'screenshot-ui-panel', 'bms-keyboard-surface',
@@ -1248,12 +1282,14 @@ index 0dce45a..7ff3ff2 100644
 +    'app-folder',
 +    // tahoe glass: the overview's search result panels (docs/gnome-tahoe/search-glass-plan.md)
 +    'search-section-content',
++    // tahoe glass: the search's app results, a glass rounded square while hovered or selected
++    'tahoe-search-tile',
  ];
 +// tahoe glass: capsules whatever their height
 +const CAPSULE_STYLE_CLASSES = ['dash-label'];
-+// tahoe glass: search result panels, concentric with their capsule rows: an 18 px row end plus
-+// the 12 px gap (tokens/radius.json 'search')
-+const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 30 };
++// tahoe glass: search result panels, concentric with the capsule in their corner: the provider's
++// 60 px capsule (30 px ends, measured) plus the 12 px gap (tokens/radius.json 'search')
++const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 42 };
  const POPUP_CHILD_STYLE_CLASSES = ['osd-window', 'resize-popup', 'switcher-list', 'workspace-switcher', 'modal-dialog', 'run-dialog', 'clipboard-dialog'];
  const POPUP_DESCENDANT_TARGET_STYLE_CLASSES = ['switcher-list'];
 +// Quick settings without a card: each toggle, slider, system button and opened
@@ -1270,17 +1306,18 @@ index 0dce45a..7ff3ff2 100644
  
  export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
  export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
-@@ -29,7 +52,8 @@ export const POPUP_CORNER_RADII = [
+@@ -29,7 +54,9 @@ export const POPUP_CORNER_RADII = [
      {
          key: 'calendar-corner-radius',
          property: 'CALENDAR_CORNER_RADIUS',
 -        style_classes: ['datemenu-popover'],
-+        // tahoe glass: app grid folder tiles share the calendar's 32 (tokens/radius.json 'folder')
-+        style_classes: ['datemenu-popover', 'app-folder'],
++        // tahoe glass: app grid folder tiles and the search's app results share the calendar's 32
++        // (tokens/radius.json 'folder'): a rounded square around the app icon's own squircle
++        style_classes: ['datemenu-popover', 'app-folder', 'tahoe-search-tile'],
      },
      {
          key: 'notification-corner-radius',
-@@ -95,6 +119,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -95,6 +122,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
  
          const box = actor._delegate?.box;
@@ -1296,7 +1333,7 @@ index 0dce45a..7ff3ff2 100644
          if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
              targets.add(box);
  
-@@ -143,6 +176,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -143,6 +179,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
                  }
              }
  
@@ -1308,7 +1345,7 @@ index 0dce45a..7ff3ff2 100644
              if (this.is_blur_target_actor(child)) {
                  targets.add(child);
                  continue;
-@@ -152,6 +190,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -152,6 +193,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
      }
  
@@ -1334,7 +1371,7 @@ index 0dce45a..7ff3ff2 100644
      push_children(stack, children) {
          for (let index = children.length - 1; index >= 0; index--)
              stack.push({ actor: children[index], fallback_count: null });
-@@ -167,6 +224,14 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -167,6 +227,14 @@ export const PopupBlurTargets = class PopupBlurTargets {
      }
  
      get_corner_radius(target, root_actor) {

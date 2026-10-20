@@ -50,8 +50,8 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
 | Volume / brightness OSD | capsule | | | `popup osd-window-corner-radius` 9999 | `.osd-window` 9999, lifted 112 px over the dock |
 | Dock app names (hover) | capsule, real glass | | | popup glass (`dash-label`, patch) | `.dash-label` 9999, no fill |
 | Overview search field, window captions | capsule, glass look in CSS (over the overview's blur, no glass surface of their own) | | | | `#overview .search-entry`, `.window-caption` |
-| Overview search result panels | **30** | 12 | rows capsule | popup glass (`search-section-content`, patch), its own pipeline `pipeline_glassbar_search`: tint dark 0.55 / light 0.30 / milky 0.22, shadow 0.32, rim 0.70, AO 0.42 | `.search-section-content` 30, no fill |
-| Search hovers: result rows, provider labels, app result tiles | capsule | | | | `.list-search-result`, `.search-provider-icon`, `.grid-search-results .overview-tile` 9999 |
+| Overview search result panels | **42** | 12 | provider label capsule **60** tall (measured: 48 content + 6 + 6), ends 30; 30 + 12 = 42, concentric in the corner; rows capsule | popup glass (`search-section-content`, patch, 42), its own pipeline `pipeline_glassbar_search`: tint dark 0.55 / light 0.30 / milky 0.22, shadow 0.32, rim 0.70, AO 0.42 | `.search-section-content` 42, no fill |
+| Search hovers | rows and provider labels capsule; app results **32** (the folder tiles' rounded square) | | | app results: real glass while hovered or selected (patch `tahoe-search-tile`, gated on the pseudo-class); rows and provider labels: a lift, the glass edge on keyboard focus (no accent ring) | `.list-search-result`, `.search-provider-icon` 9999; `.grid-search-results .overview-tile` 32, no fill |
 | Run dialog field (Alt+F2) | capsule | | | tint and edge in the patch's popup styles | `.run-dialog-entry` 9999 |
 | Tooltips | 8, not glass | | | | |
 
