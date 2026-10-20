@@ -1,0 +1,100 @@
+{
+ "widgets": [
+  {
+   "type": "clock-analog",
+   "monitor": 0,
+   "x": 40,
+   "y": 64
+  },
+  {
+   "type": "clock-analog-marks",
+   "monitor": 0,
+   "x": 224,
+   "y": 64
+  },
+  {
+   "type": "clock-analog-quarters",
+   "monitor": 0,
+   "x": 408,
+   "y": 64
+  },
+  {
+   "type": "clock-digital",
+   "monitor": 0,
+   "x": 592,
+   "y": 64
+  },
+  {
+   "type": "clock-datetime",
+   "monitor": 0,
+   "x": 776,
+   "y": 64
+  },
+  {
+   "type": "clock-glass-text",
+   "monitor": 0,
+   "x": 1160,
+   "y": 64
+  },
+  {
+   "type": "weather-small",
+   "monitor": 0,
+   "x": 40,
+   "y": 248
+  },
+  {
+   "type": "weather-medium",
+   "monitor": 0,
+   "x": 224,
+   "y": 248
+  },
+  {
+   "type": "music-small",
+   "monitor": 0,
+   "x": 592,
+   "y": 248
+  },
+  {
+   "type": "music-medium",
+   "monitor": 0,
+   "x": 776,
+   "y": 248
+  },
+  {
+   "type": "calendar-medium",
+   "monitor": 0,
+   "x": 1160,
+   "y": 248
+  },
+  {
+   "type": "weather-large",
+   "monitor": 0,
+   "x": 40,
+   "y": 432
+  },
+  {
+   "type": "music-large",
+   "monitor": 0,
+   "x": 408,
+   "y": 432
+  },
+  {
+   "type": "music-lyrics",
+   "monitor": 0,
+   "x": 776,
+   "y": 432
+  },
+  {
+   "type": "calendar-day",
+   "monitor": 0,
+   "x": 1160,
+   "y": 432
+  },
+  {
+   "type": "calendar-month",
+   "monitor": 0,
+   "x": 1344,
+   "y": 432
+  }
+ ]
+}
