@@ -120,6 +120,34 @@ export default class IcsTest extends Extension {
         check('user agent', /tahoe-widgets/.test(l[0]?.ua ?? ''), {ua: l[0]?.ua});
         check('next refresh scheduled', feed._timerId !== 0);
 
+        // the reader (ics-expand.js, its own process): basic.ics is one event a day at 15:00 UTC
+        await waitFor(() => feed.events.length > 0, 10000);
+        const today = GLib.DateTime.new_now_local();
+        const inWindow = feed.events.filter(e => e.title === 'Daily fixture event');
+        check('reader: the days around today, one occurrence each', inWindow.length === 16 &&
+            feed._window.from === today.add_days(-7).format('%Y-%m-%d') && feed._window.to === today.add_days(9).format('%Y-%m-%d'),
+        {count: feed.events.length, window: feed._window});
+        check('reader: events cache is private', perms(`${CACHE}/calendar.events.json`) === '600');
+        const helperRuns = () => feed._window;
+        const w0 = helperRuns();
+        feed.ensureWindow(today);
+        feed.ensureWindow(today.add_days(1));
+        check('reader: not run again for the same copy and day, nor the next day', feed._helper === null && feed._window === w0);
+        feed.ensureWindow(today.add_days(3));
+        check('reader: run again when the days run out', feed._helper !== null);
+        await waitFor(() => feed._helper === null, 10000);
+        feed.ensureWindow(today);
+        await waitFor(() => feed._helper === null, 10000);
+
+        // a new shell: the events come from the cache, before any fetch or reader run
+        const fresh = new feed.constructor();
+        fresh.acquire();
+        await waitFor(() => fresh.events.length > 0, 3000);
+        check('new shell: cached events shown at once, no reader run', fresh.events.length === 16 && fresh._helper === null,
+            {count: fresh.events.length});
+        fresh.release();
+        await log();
+
         await sleep(1100);
         const before = feed.updated;
         const dataBefore = data;
@@ -191,7 +219,14 @@ export default class IcsTest extends Extension {
         const took = (GLib.get_monotonic_time() - t0) / 1e6;
         check('slow server: gives up after the 20 s timeout', feed.status === Status.OFFLINE && took > 18 && took < 26, {took});
 
+        // a calendar the reader cannot read
         await serve('ok');
+        writeFile(`${CONF}/calendar-url`, `${base}/private-TESTSECRET0042/truncated.ics\n`);
+        setSource('file');
+        await waitFor(() => feed.status === Status.INVALID, 10000);
+        check('a feed the reader cannot read: invalid, no events of another calendar', feed.status === Status.INVALID && feed.events.length === 0,
+            {status: feed.status, events: feed.events.length});
+
         await log();
         writeFile(`${CONF}/calendar-url`, `${base}/private-TESTSECRET0099/basic.ics\n`);
         const statuses = [];

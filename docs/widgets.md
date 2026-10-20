@@ -1,6 +1,6 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phase 1 done (link and fetch); Phase 2 (parsing) next.** Your picks: small layout A,
+**Status: Phases 1 and 2 done (link, fetch, parsing); Phase 3 (the widgets) next.** Your picks: small layout A,
 Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
 week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
@@ -195,6 +195,39 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
   Retry-After, a dropped connection, a sign-in page with 200, 404, over 16 MB, a server that never
   answers (gives up at 20 s), a new link drops the old validators, release and re-acquire,
   keyring link, locked keyring with no prompt. It fails if the link's test marker shows in a log.
+
+## Phase 2: what was built (2026-10-20)
+
+- `vendor/ical.js`: ical.js 2.2.1 unmodified, with its MPL-2.0 licence and source (`vendor/README.md`).
+- `ics-expand.js FILE --from D --to D`: run by the feed with `Gio.Subprocess` (`TZ` set to the
+  shell's zone, 30 s limit, stopped with the feed); prints the occurrences overlapping the local
+  days [from, to) as JSON. The feed asks for today - 7 to today + 9 (any week holding today, and
+  tomorrow), runs it after each new copy, and again only when today's needs (today - 6 to today + 8)
+  leave that window or the zone changes; the answer is kept in `calendar.events.json` (0600), so
+  a new shell shows events at once. A feed the helper can't read sets `invalid` and keeps nothing.
+- Rules: lines unfolded as bytes (a fold may split a UTF-8 character); TZID through the feed's
+  VTIMEZONE, else the tz database by name, floating times local; DTEND exclusive, all-day without
+  DTEND one day, zero-length events kept; overrides (RECURRENCE-ID) shown on their own, moved,
+  retitled or cancelled, and the occurrence they replace skipped (also when moved in from outside
+  the window, or with no series in the feed); STATUS:CANCELLED dropped; colours: the event's
+  `COLOR`, else the calendar's (`COLOR`, `X-APPLE-CALENDAR-COLOR`, `X-OUTLOOK-COLOR`), hex or a CSS
+  name only.
+- **Speed.** A made-up 5 MB feed (`tools/widgets-stress/ics-bigfeed.py`: 12 290 events since 2012,
+  1 072 series) first took 18.5 s. Two causes: `new ICAL.Event(component)` looks through every
+  VEVENT of the calendar for overrides (quadratic; fixed by passing `{exceptions: []}`, as the
+  helper handles overrides itself), and long series walked from 2012. Simple series (DAILY, or
+  WEEKLY by weekday, no COUNT) now start a whole number of periods before the window, in wall-clock
+  time. **0.62 s** now (161 MB peak, in the helper only), with exactly the same 4 560 occurrences as
+  the full walk. The shell never parses.
+- Tests: `gjs -m tools/widgets-stress/ics-test.js`, 24 cases over 9 fixtures in
+  `tools/widgets-stress/ics/` (made-up events only), expected results worked out by hand in
+  `ics/expected.json`: Berlin and New York summer time ends (25 Oct and 1 Nov 2026), the same feed
+  seen from Berlin and Tokyo, a TZID with no VTIMEZONE, quoted TZID, floating and UTC, all-day and
+  multi-day, overnight, EXDATE, moved and cancelled overrides, an orphan override, RDATE, BYDAY=3TU,
+  BYSETPOS=-1, COUNT, UNTIL in UTC on the boundary, yearly, a series since 2001, the skip-ahead (interval 3
+  days since 2015 with old EXDATEs, every other week from a start day off its BYDAY days), colours,
+  and two broken files. A deliberately wrong skip-ahead fails 3 cases. `ics-feed-test.sh` now has
+  32 checks, the reader's among them (window, re-runs, private cache, a new shell, an unreadable feed).
 
 ## Phases (one commit each, on this branch)
 

@@ -24,6 +24,7 @@ Gio._promisify(Gio.OutputStream.prototype, 'close_async');
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async');
 Gio._promisify(Gio.InputStream.prototype, 'close_async');
 Gio._promisify(Soup.Session.prototype, 'send_async');
+Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async');
 
 const CONF_DIR = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass']);
 const SOURCE_FILE = GLib.build_filenamev([CONF_DIR, 'calendar-source']);   // store=keyring|file|none
@@ -31,6 +32,9 @@ const URL_FILE = GLib.build_filenamev([CONF_DIR, 'calendar-url']);
 const CACHE_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-glass']);
 export const CACHE_ICS = GLib.build_filenamev([CACHE_DIR, 'calendar.ics']);
 const CACHE_META = GLib.build_filenamev([CACHE_DIR, 'calendar.meta.json']);
+// the occurrences ics-expand.js found, so a new shell shows them without parsing again
+const CACHE_EVENTS = GLib.build_filenamev([CACHE_DIR, 'calendar.events.json']);
+const HELPER = GLib.build_filenamev([GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]), 'ics-expand.js']);
 
 const SECRET_SCHEMA = 'org.cachyos.tahoe.Calendar';
 const SECRET_ATTR = ['tahoe-glass', 'calendar-ics'];   // as tahoe-widgets.sh stores it
@@ -42,6 +46,10 @@ const MIN_GAP = 60;                 // s between attempts started by resume or t
 const TIMEOUT = 20;                 // s for the whole request
 const MAX_BYTES = 16 * 1024 * 1024;
 const CHUNK = 64 * 1024;
+const HELPER_TIMEOUT = 30;          // s for ics-expand.js
+// the days around today the helper expands: any week holding today, and tomorrow
+const WINDOW_BEFORE = 7, WINDOW_AFTER = 9;     // the helper's [from, to)
+const NEED_BEFORE = 6, NEED_AFTER = 8;         // re-run when today's need leaves it
 
 // what the widgets show:
 //   none     no link set
@@ -71,6 +79,10 @@ function fetchUrl(url) {
     if (url.startsWith('http://') && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(hostOf(url)))
         return url;
     return null;
+}
+
+function localZoneId() {
+    return GLib.TimeZone.new_local().get_identifier() || 'Local';
 }
 
 const linkId = url => GLib.compute_checksum_for_string(GLib.ChecksumType.SHA256, url, -1);
@@ -141,6 +153,10 @@ class IcsFeed extends EventEmitter {
         this._fetching = null;
         this._cancellable = null;
         this._session = null;
+        this._events = [];
+        this._window = null;         // {from, to, tz, changed} the events cover
+        this._helper = null;
+        this._expandAgain = false;
     }
 
     // what the widgets read
@@ -160,6 +176,93 @@ class IcsFeed extends EventEmitter {
 
     get cacheFile() {
         return CACHE_ICS;
+    }
+
+    // occurrences around today, sorted by start: {uid, title, allDay, start, end, startDate?,
+    // endDate?, color?}, unix seconds; empty until the first copy is read
+    get events() {
+        return this._events;
+    }
+
+    // called on the widgets' minute tick (cheap): the events follow the day and the time zone
+    ensureWindow(now) {
+        if (!this.hasCopy || !this._cancellable)
+            return;
+        const day = n => now.add_days(n).format('%Y-%m-%d');
+        const w = this._window;
+        if (w && w.tz === localZoneId() && w.changed === this._meta.changed &&
+            w.from <= day(-NEED_BEFORE) && w.to >= day(NEED_AFTER))
+            return;
+        this._expand();
+    }
+
+    // ics-expand.js over the cached copy, in its own process
+    async _expand() {
+        if (this._helper) {
+            this._expandAgain = true;
+            return;
+        }
+        const now = GLib.DateTime.new_now_local();
+        const from = now.add_days(-WINDOW_BEFORE).format('%Y-%m-%d');
+        const to = now.add_days(WINDOW_AFTER).format('%Y-%m-%d');
+        const tz = localZoneId();
+        const changed = this._meta.changed;
+        const launcher = new Gio.SubprocessLauncher({flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE});
+        if (tz !== 'Local')
+            launcher.setenv('TZ', tz, true);
+        let helper;
+        try {
+            helper = launcher.spawnv(['gjs', '-m', HELPER, CACHE_ICS, '--from', from, '--to', to]);
+        } catch (e) {
+            console.warn(`tahoe-widgets: calendar: cannot start the reader: ${e.message}`);
+            return;
+        }
+        this._helper = helper;
+        const timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, HELPER_TIMEOUT, () => {
+            helper.force_exit();
+            return GLib.SOURCE_REMOVE;
+        });
+        let out = null, err = '';
+        try {
+            [out, err] = await helper.communicate_utf8_async(null, null);
+        } catch {}
+        GLib.source_remove(timeoutId);
+        if (this._helper !== helper)   // stopped meanwhile
+            return;
+        this._helper = null;
+        if (helper.get_successful() && out) {
+            try {
+                const data = JSON.parse(out);
+                this._events = data.events;
+                this._window = {from, to, tz, changed};
+                this.emit('events-changed');
+                writePrivate(CACHE_EVENTS, new TextEncoder().encode(JSON.stringify({...this._window, events: data.events})),
+                    this._cancellable).catch(() => {});
+            } catch (e) {
+                console.warn(`tahoe-widgets: calendar: the reader's answer: ${e.message}`);
+            }
+        } else if (helper.get_if_exited() && helper.get_exit_status() === 2) {
+            this._window = {from, to, tz, changed};   // same copy: no point reading it again
+            this._setStatus(Status.INVALID, (err ?? '').trim().split('\n').pop().replace(/^ics-expand: /, ''));
+        } else {
+            console.warn('tahoe-widgets: calendar: the reader stopped or took too long');
+            this._window = {from, to, tz, changed};
+        }
+        if (this._expandAgain) {
+            this._expandAgain = false;
+            this.ensureWindow(GLib.DateTime.new_now_local());
+        }
+    }
+
+    // a new copy, or no link any more
+    _dataChanged() {
+        if (!this._url && this._status === Status.NONE && this._events.length) {
+            this._events = [];
+            this._window = null;
+            this.emit('events-changed');
+        }
+        this.ensureWindow(GLib.DateTime.new_now_local());
+        this.emit('data-changed');
     }
 
     acquire() {
@@ -218,6 +321,9 @@ class IcsFeed extends EventEmitter {
         this._session?.abort();
         this._session = null;
         this._fetching = null;
+        this._helper?.force_exit();
+        this._helper = null;
+        this._expandAgain = false;
     }
 
     async _init() {
@@ -228,6 +334,15 @@ class IcsFeed extends EventEmitter {
             } catch {
                 this._meta = null;
             }
+            // the events from the last shell, if they are of this copy (a new link clears the cache)
+            try {
+                const cached = JSON.parse(await readText(CACHE_EVENTS, cancellable) ?? 'null');
+                if (cached && this._meta?.changed && cached.changed === this._meta.changed) {
+                    this._events = cached.events;
+                    this._window = {from: cached.from, to: cached.to, tz: cached.tz, changed: cached.changed};
+                    this.emit('events-changed');
+                }
+            } catch {}
         }
         if (!this._linkRead || this._status === Status.LOCKED)
             await this._readLink();
@@ -254,15 +369,19 @@ class IcsFeed extends EventEmitter {
         }
         this._url = url;
         const other = url && this._meta?.link !== linkId(url);
-        if (other)
+        if (other) {
             this._meta = {link: linkId(url)};   // another calendar: its cache is not this one's
+            this._events = [];
+            this._window = null;
+            this.emit('events-changed');
+        }
         if (locked)
             this._setStatus(Status.LOCKED);
         else if (!url)
             this._setStatus(Status.NONE);
         else if (other || [Status.NONE, Status.LOCKED, Status.INVALID].includes(this._status))
             this._setStatus(this.hasCopy ? Status.OK : Status.LOADING);
-        this.emit('data-changed');
+        this._dataChanged();
         if (locked)
             this._retry();
     }
@@ -399,7 +518,7 @@ class IcsFeed extends EventEmitter {
             await this._saveMeta(meta, cancellable);
             this._failures = 0;
             this._setStatus(Status.OK);
-            this.emit('data-changed');
+            this._dataChanged();
         } else if (code === Soup.Status.NOT_MODIFIED && this.hasCopy) {
             await this._saveMeta({...this._meta, fetched: now()}, cancellable);
             this._failures = 0;
