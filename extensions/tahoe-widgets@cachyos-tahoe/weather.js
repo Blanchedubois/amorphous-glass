@@ -234,7 +234,7 @@ class DailyPane {
     }
 
     _placeFill(r) {
-        if (!r.span)
+        if (!r.span || !r.track.get_stage())   // placed again once allocated
             return;
         const [a, b] = r.span;
         const w = r.track.width;
