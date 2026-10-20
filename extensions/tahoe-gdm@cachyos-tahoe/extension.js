@@ -14,11 +14,13 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
-import { GlassPane } from './glass.js';
+import { GlassPane, MENU_GLASS, THIN_EDGE } from './glass.js';
 import { buildLayout } from './layout.js';
 import { buildClock } from './clock.js';
 import { buildWidgets } from './widgets.js';
 import { buildBackdrop, buildNowPlaying } from './nowplaying.js';
+import { buildButtons } from './buttons.js';
+import { buildMenus } from './menus.js';
 
 // GNOME versions this was tested on; the private parts of LoginDialog it relies on
 const TESTED_MAJORS = [51];
@@ -100,10 +102,14 @@ export default class TahoeLoginScreen extends Extension {
         buildWidgets(this, this.dir);
         // the song from the locked session behind this login screen (Switch User)
         buildNowPlaying(this, backdrop);
+        // GNOME's buttons as glass capsules
+        buildButtons(this, dialog, backdrop);
+        // GNOME's menus (the calendar, the system menu...) on frosted glass
+        buildMenus(this, backdrop, {GlassPane, MENU_GLASS});
 
         // the password capsule: glass under the entry, in the entry's own BinLayout slot (GNOME
         // swaps the password and text entries in that slot with replace_child, which keeps ours)
-        this._addPane(entryArea, 0, backdrop, 'capsule');
+        this._addPane(entryArea, 0, backdrop, 'capsule', THIN_EDGE);
 
         // the account rows: each row's content goes into a BinLayout box over a glass pill
         for (const item of userList._items.values())
@@ -154,8 +160,8 @@ export default class TahoeLoginScreen extends Extension {
         });
     }
 
-    _addPane(parent, index, background, radius) {
-        const pane = new GlassPane(background, radius);
+    _addPane(parent, index, background, radius, material = {}) {
+        const pane = new GlassPane(background, radius, material);
         parent.insert_child_at_index(pane, index);
         let gone = false;
         pane.connect('destroy', () => (gone = true));

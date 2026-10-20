@@ -13,53 +13,62 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 
-import {GlassPane} from './widgets/paneglass.js';
+import {GlassPane, THIN_EDGE} from './widgets/paneglass.js';
 
 const STYLE_CLASS = 'tahoe-lock-glass-prompt';
 
 // backdrop: () => the primary monitor's lock background actor
 export function buildPromptGlass(frame, dialog, backdrop) {
-    // the dialog's direct child that holds GNOME's stack: our layer goes just below it
-    let content = dialog._stack;
-    while (content && content.get_parent() !== dialog)
-        content = content.get_parent();
-    if (!content)
-        throw new Error('the unlock dialog has changed (no content box)');
+    // our layer: just above the lock background, so it is under all of GNOME's content (the
+    // prompt, and the buttons at the bottom)
+    const background = dialog._backgroundGroup;
+    if (!background || background.get_parent() !== dialog)
+        throw new Error('the unlock dialog has changed (no background group)');
 
     const layer = new Clutter.Actor({name: 'prompt-glass-layer', reactive: false});
     layer.add_constraint(new Clutter.BindConstraint({source: dialog, coordinate: Clutter.BindCoordinate.SIZE}));
     frame.addActor(dialog, layer);
-    dialog.set_child_below_sibling(layer, content);
-
-    const pane = new GlassPane(backdrop, 'capsule');
-    pane.set_pivot_point(0, 0);
-    layer.add_child(pane);
-    pane.hide();
-    pane.connect('mask-failed', () => frame.fail(`prompt glass: ${pane.failed}`));
+    dialog.set_child_above_sibling(layer, background);
     frame.addStyleClass(dialog, STYLE_CLASS);
 
-    // the pane over the entry, as GNOME has it on screen now
-    const sync = () => {
-        const entry = dialog._authPrompt?._entry;
-        if (!entry || !entry.mapped || entry.get_paint_opacity() === 0) {
+    // what gets glass: the password field, the back button beside it and Switch User (GNOME's
+    // buttons are capsules on glass, as on the login screen; the user, 2026-10-20)
+    const TARGETS = [
+        () => dialog._authPrompt?._entry,
+        () => dialog._authPrompt?.cancelButton,
+        () => dialog._otherUserButton,
+    ];
+    const panes = TARGETS.map(() => {
+        const pane = new GlassPane(backdrop, 'capsule', THIN_EDGE);
+        pane.set_pivot_point(0, 0);
+        layer.add_child(pane);
+        pane.hide();
+        pane.connect('mask-failed', () => frame.fail(`prompt glass: ${pane.failed}`));
+        return pane;
+    });
+
+    // each pane over its actor, as GNOME has it on screen now
+    const follow = (actor, pane) => {
+        if (!actor || !actor.mapped || actor.get_paint_opacity() === 0) {
             pane.hide();
             return;
         }
-        const box = entry.get_allocation_box();
+        const box = actor.get_allocation_box();
         const w = box.get_width(), h = box.get_height();
         if (!(w > 0 && h > 0)) {
             pane.hide();
             return;
         }
-        const [x, y] = entry.get_transformed_position();
-        const [tw, th] = entry.get_transformed_size();
+        const [x, y] = actor.get_transformed_position();
+        const [tw, th] = actor.get_transformed_size();
         const [dx, dy] = dialog.get_transformed_position();
         pane.set_size(w, h);
         pane.set_position(Math.round(x - dx), Math.round(y - dy));
         pane.set_scale(tw / w, th / h);
-        pane.opacity = entry.get_paint_opacity();
+        pane.opacity = actor.get_paint_opacity();
         pane.show();
     };
+    const sync = () => TARGETS.forEach((target, i) => follow(target(), panes[i]));
 
     // not from inside a layout pass (moving the pane then makes Clutter warn): once, just before
     // the next frame
@@ -85,20 +94,48 @@ export function buildPromptGlass(frame, dialog, backdrop) {
         frame.connect(box, `notify::${prop}`, schedule);
     for (const prop of ['translation-y', 'allocation'])
         frame.connect(dialog._stack, `notify::${prop}`, schedule);
-    const watched = new WeakSet();   // the prompts already followed (nothing is set on GNOME's)
+    if (dialog._adjustment)   // GNOME's clock-to-prompt transition
+        frame.connect(dialog._adjustment, 'notify::value', schedule);
+    const watched = new WeakSet();   // the actors already followed (nothing is set on GNOME's)
+    // the pane takes the entry's paint opacity, so it follows a fade on any actor between the
+    // entry and the dialog (GNOME fades the prompt in through more than the prompt box: the pane
+    // stayed at its first faint frame, 8 of 255, and the field looked like GNOME's flat pill)
+    const watchFades = actor => {
+        for (let a = actor; a && a !== dialog; a = a.get_parent()) {
+            if (watched.has(a))
+                continue;
+            watched.add(a);
+            frame.connect(a, 'notify::opacity', schedule);
+        }
+    };
     const watchPrompt = prompt => {
         if (!prompt || watched.has(prompt))
             return;
-        watched.add(prompt);
+        watchFades(prompt._entry ?? prompt);
+        watchFades(prompt.cancelButton);
         frame.connect(prompt, 'notify::allocation', schedule);
         const area = prompt._entryArea;
         if (area) {
             frame.connect(area, 'notify::allocation', schedule);
             frame.connect(area, 'notify::translation-x', schedule);   // GNOME's wrong-password wiggle
-            frame.connect(area, 'child-added', schedule);   // the password/text entry swap
+            frame.connect(area, 'child-added', () => {   // the password/text entry swap
+                watchFades(prompt._entry);
+                schedule();
+            });
         }
     };
     watchPrompt(dialog._authPrompt);
+    // the buttons outside the prompt (Switch User): their fades and moves
+    for (const target of TARGETS.slice(1)) {
+        const actor = target();
+        if (!actor)
+            continue;
+        watchFades(actor);
+        for (let a = actor; a && a !== dialog; a = a.get_parent()) {
+            frame.connect(a, 'notify::allocation', schedule);
+            frame.connect(a, 'notify::visible', schedule);
+        }
+    }
     frame.connect(box, 'child-added', () => {
         watchPrompt(dialog._authPrompt);
         schedule();

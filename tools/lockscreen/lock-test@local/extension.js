@@ -684,6 +684,7 @@ async function run() {
     };
     walk(global.stage, 0);
     write({ label: 'our-actors', ours });
+    { const out = []; const w = a => { if (a instanceof St.Button && a.mapped) out.push(`${a.style_class}|${a.name ?? ''}|${box(a)}|${a.get_parent()?.style_class ?? ''}`); a.get_children().forEach(w); }; w(global.stage); write({ label: 'buttons', buttons: out }); }
     write({ label: 'background', effects: [...dialog._backgroundGroup].map(b => ({ x: b.x, name: b.name,
         effects: b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`) })) });
     const nameLabel = prompt._userWell?.get_child?.()?._label ?? null;

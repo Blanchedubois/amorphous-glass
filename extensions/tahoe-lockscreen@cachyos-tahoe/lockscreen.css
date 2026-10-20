@@ -198,6 +198,26 @@
   box-shadow: none !important;
 }
 
+/* the back button and Switch User: capsules on glass (promptglass.js), a light fill on hover as
+   the login screen's (tahoe-gdm stylesheet.css) */
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button {
+  border-radius: 9999px;
+  background-color: transparent;
+  box-shadow: none !important;
+}
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button { padding: 6px 16px; }
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button:hover,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button:focus,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button:hover,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button:focus {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.cancel-button:active,
+.unlock-dialog.tahoe-lock-glass-prompt .login-dialog-button.switch-user-button:active {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
 
 /* ---- music mode's Large card drawn bigger (musicmode.js, widgets/music.js scale) ----
    On a big monitor the card grows with the room it has: the cover and the buttons in code, the
@@ -222,3 +242,65 @@
 .tahoe-widget.tahoe-lock-large-150 .tahoe-music-time { font-size: 16.5px; }
 .tahoe-widget.tahoe-lock-large-150 .tahoe-music-transport-large { spacing: 42px; padding-top: 9px; }
 .tahoe-widget.tahoe-lock-large-150 .tahoe-music-button { padding: 9px; }
+
+/* ---- GNOME's menus while locked on frosted glass (widgets/glassmenus.js, the login screen's
+   menus.js): the same rules as the login screen's stylesheet ---- */
+/* GNOME's menus on frosted glass (menus.js): no fill, border or shadow of their own */
+.tahoe-gdm-glass-menus .popup-menu-content,
+.tahoe-gdm-glass-menus .candidate-popup-content {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* inside a glass menu, GNOME's dark grey fills read as holes in the glass: clear for the calendar's
+   days, headings and month label, a light translucent fill for buttons and off toggles; today and
+   the on toggles keep the accent colour */
+.tahoe-gdm-glass-menus .calendar .calendar-day,
+.tahoe-gdm-glass-menus .calendar .calendar-day-heading,
+.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label {
+  background-color: transparent;
+}
+.tahoe-gdm-glass-menus .calendar .calendar-day:hover,
+.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label:hover,
+.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button,
+.tahoe-gdm-glass-menus .quick-settings .icon-button,
+.tahoe-gdm-glass-menus .quick-toggle,
+.tahoe-gdm-glass-menus .quick-toggle-menu .header .icon {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.tahoe-gdm-glass-menus .quick-toggle:hover,
+.tahoe-gdm-glass-menus .quick-settings .icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today {
+  background-color: -st-accent-color;
+}
+.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today:hover {
+  background-color: st-lighten(-st-accent-color, 6%);
+}
+/* an on toggle: the accent colour, white text (dark mode on both screens; the desktop's shell
+   theme draws it white on the lock screen, overridden there too) */
+.tahoe-gdm-glass-menus .quick-toggle:checked {
+  background-color: -st-accent-color;
+  color: #ffffff;
+}
+.tahoe-gdm-glass-menus .quick-toggle:checked:hover {
+  background-color: st-lighten(-st-accent-color, 6%);
+}
+
+/* while locked only: the desktop's shell theme (MacTahoe) draws on toggles white with !important;
+   on the dark glass they take the accent colour, as on the login screen (the user, 2026-10-20:
+   all dark). The desktop's own menu keeps its theme: this class is on the UI group only while
+   locked. */
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .quick-toggle:checked {
+  background-color: -st-accent-color !important;
+  color: #ffffff !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .quick-toggle:checked:hover,
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .quick-toggle:checked:active {
+  background-color: st-lighten(-st-accent-color, 6%) !important;
+  color: #ffffff !important;
+}

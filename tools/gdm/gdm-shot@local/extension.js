@@ -41,6 +41,7 @@ function record(label, d) {
         promptAlloc: ap.get_allocation_box() ? [ap.get_allocation_box().x1, ap.get_allocation_box().y1] : null,
         promptTx: ap.translation_x, dialog: box(d), avatar: box(ap._userWell.get_child()?.get_first_child?.()),
         listItem: box([...d._userList._items.values()][0]),
+        buttons: (() => { const out = []; const w = a => { if (a instanceof St.Button && a.mapped) out.push(`${a.style_class}|${a.name ?? ''}|${box(a)}|${a.get_parent()?.style_class ?? ''}`); a.get_children().forEach(w); }; w(global.stage); return out; })(),
         rowBox: box([...d._userList._items.values()][0]?.child),
         rowPane: box([...d._userList._items.values()][0]?.child?.get_first_child?.()),
         rowContent: box([...d._userList._items.values()][0]?.child?.get_last_child?.()),
@@ -89,6 +90,23 @@ export default class {
         await wait(1);
         record('typed', d);
         await shot('typed');
+
+        // GDM_SHOT_MENUS=1: the calendar, the system menu and the accessibility menu, open
+        if (GLib.getenv('GDM_SHOT_MENUS')) {
+            const menus = [['calendar', Main.panel.statusArea.dateMenu?.menu],
+                ['system', Main.panel.statusArea.quickSettings?.menu],
+                ['a11y', d._a11yMenuButton?._menu]];
+            for (const [name, menu] of menus) {
+                if (!menu)
+                    continue;
+                menu.open(true);
+                await wait(1.2);
+                record(name, d);
+                await shot(name);
+                menu.close(false);
+                await wait(0.5);
+            }
+        }
     }
 
     disable() {}

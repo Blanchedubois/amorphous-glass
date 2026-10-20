@@ -19,7 +19,8 @@ import { buildNowPlaying } from './nowplaying.js';
 import { buildMusicMode } from './musicmode.js';
 import { buildWidgetStack } from './widgetstack.js';
 import { buildPromptGlass } from './promptglass.js';
-import { darkScheme } from './widgets/paneglass.js';
+import { darkScheme, GlassPane, MENU_GLASS } from './widgets/paneglass.js';
+import { buildMenus } from './widgets/glassmenus.js';
 import { buildMenuGlass } from './menuglass.js';
 
 const DIGITS_EM = 0.730;      // Space Grotesk's digit height
@@ -87,6 +88,9 @@ export function buildLayout(frame, dialog) {
     // background (looked up at each layout: GNOME rebuilds it when monitors change)
     const backdrop = () => primaryBackground(dialog);
     buildPromptGlass(frame, dialog, backdrop);
+    // GNOME's menus while locked (the system menu) on frosted glass, as on the login screen
+    buildMenus({_undo: {push: fn => frame.addUndo(fn)}, _fail: reason => frame.fail(reason)},
+        backdrop, {GlassPane, MENU_GLASS});
     const widgets = buildWidgetStack(frame, dialog, backdrop, nowPlaying.gate);
     const music = buildMusicMode(frame, dialog, nowPlaying, backdrop, () => relayout(), () => widgets.recheck?.());
     relayout = placePrompt(frame, dialog, nowPlaying, music, widgets);
@@ -261,7 +265,7 @@ function buildGlass(frame, dialog, labels) {
             glass.actor.set_position(x, y);
             glass.actor.set_size(boxWidth, boxHeight);
             glass.setBackdrop(backgroundOf(), x, y);
-            // the clock's glass as every glass surface (paneglass.js GLASS_LOOK: light on both screens)
+            // the clock's glass as every glass surface (paneglass.js GLASS_LOOK: dark on both screens)
             const dark = darkScheme();
             glass.setMask(buildMask(boxWidth * scale, boxHeight * scale, spec, scale),
                 boxWidth * scale, boxHeight * scale, scale, dark, spec.timeSize / (MATERIAL.refSize * scale));
