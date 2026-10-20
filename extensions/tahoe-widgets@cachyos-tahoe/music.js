@@ -5,13 +5,16 @@
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
 import {Swirl} from './swirl.js';
 
-const LYRIC_LINES = 7;
+const DIM = 92;          // opacity of the lines not being sung (of 255)
+const SCROLL_MS = 520;   // the lyrics column gliding to the next line
+const FADE_MS = 360;     // a line brightening or dimming
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
 
 function clock(seconds) {
@@ -132,22 +135,38 @@ class Transport {
     }
 }
 
-// the current line in full, the ones around it dimmed; moves on at each line's own time
+// Every line of the song in one column that scrolls: at each line's own time the column glides
+// up so the new line sits second from the top, the new line brightens and the last one dims,
+// as Apple Music's lyrics. All lines share one size (a size change would reflow and jump); only
+// opacity and the column's position move, eased on the compositor (no work between lines).
+// With GNOME animations off the eases end at once.
+// a viewport that asks for no height of its own: it takes what the card has left (y_expand),
+// however long the song's column inside it is
+const LyricsViewport = GObject.registerClass(
+class LyricsViewport extends St.Widget {
+    vfunc_get_preferred_height(_forWidth) {
+        return [0, 0];
+    }
+});
+
 class LyricsView {
     constructor() {
-        this.actor = new St.BoxLayout({
+        this.actor = new LyricsViewport({
             style_class: 'tahoe-music-lyrics',
-            orientation: Clutter.Orientation.VERTICAL,
+            layout_manager: new Clutter.FixedLayout(),
             x_expand: true, y_expand: true,
             clip_to_allocation: true,
         });
+        this._column = new St.BoxLayout({
+            style_class: 'tahoe-music-lyrics-column',
+            orientation: Clutter.Orientation.VERTICAL,
+        });
+        this.actor.add_child(this._column);
+        // the column is as wide as the view; its height follows the wrapped lines
+        this.actor.connect('notify::width', () => (this._column.width = this.actor.width));
+        // once laid out (or reflowed), the current line is placed again without animation
+        this._column.connect('notify::height', () => this._place(false));
         this._labels = [];
-        for (let i = 0; i < LYRIC_LINES; i++) {
-            const l = new St.Label({style_class: 'tahoe-music-lyric'});
-            l.clutter_text.line_wrap = true;
-            this.actor.add_child(l);
-            this._labels.push(l);
-        }
         this._lines = null;
         this._shown = -2;
     }
@@ -155,8 +174,16 @@ class LyricsView {
     setLines(lines, message) {
         this._lines = lines;
         this._shown = -2;
-        if (!lines)
-            this._show([message], 0);
+        this._column.remove_all_transitions();
+        this._column.destroy_all_children();
+        this._column.translation_y = 0;
+        const texts = lines ? lines.map(l => l[1] || '♪') : [message];
+        this._labels = texts.map(text => {
+            const l = new St.Label({style_class: 'tahoe-music-lyric', text, opacity: lines ? DIM : 255});
+            l.clutter_text.line_wrap = true;
+            this._column.add_child(l);
+            return l;
+        });
     }
 
     // the index of the line being sung at this position
@@ -172,23 +199,29 @@ class LyricsView {
             return null;
         const index = this._index(position);
         if (index !== this._shown) {
+            const last = this._labels[this._shown];
             this._shown = index;
-            const start = Math.max(0, index - 1);
-            this._show(this._lines.slice(start, start + LYRIC_LINES).map(l => l[1] || '♪'), index - start);
+            last?.ease({opacity: DIM, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            this._labels[index]?.ease({opacity: 255, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            this._place(true);
         }
         // seconds until the next line
         const next = this._lines[index + 1];
         return next ? next[0] - position : null;
     }
 
-    _show(texts, current) {
-        this._labels.forEach((l, i) => {
-            l.text = texts[i] ?? '';
-            if (i === current)
-                l.add_style_class_name('tahoe-music-lyric-current');
-            else
-                l.remove_style_class_name('tahoe-music-lyric-current');
-        });
+    // the line before the current one at the top, so the sung line is second
+    _place(animate) {
+        if (!this._lines || !this._column.has_allocation())
+            return;
+        const top = this._labels[Math.max(0, this._shown - 1)];
+        const y = this._shown > 0 && top ? -top.y : 0;
+        if (!animate) {
+            this._column.remove_all_transitions();
+            this._column.translation_y = y;
+        } else if (this._column.translation_y !== y) {
+            this._column.ease({translation_y: y, duration: SCROLL_MS, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+        }
     }
 }
 
@@ -320,13 +353,14 @@ export const LARGE_ART = 324;   // 356 less 16 px each side
 
 export class MusicLarge extends MusicWidget {
     static size = 'large';
-    static height = 496;
+    static height = 504;
 
     _build() {
         this._art = new Art(LARGE_ART);
         this.actor.add_child(this._art.actor);
         this.actor.add_child(new St.Widget({y_expand: true}));
         this._title.add_style_class_name('tahoe-music-title-large');
+        this._artist.add_style_class_name('tahoe-music-artist-large');
         this.actor.add_child(this._title);
         this.actor.add_child(this._artist);
         this._progress = new Progress(true);
