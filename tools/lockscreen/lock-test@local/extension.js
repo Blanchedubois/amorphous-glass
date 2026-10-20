@@ -288,6 +288,41 @@ async function runMusicIdle() {
         frame: frameState().frame, stillLocked: Main.sessionMode.isLocked, dialog: !!dialog });
 }
 
+// TAHOE_LOCK_GATE=demo: frames for a short video (tools/lockscreen/demo.sh): music mode playing,
+// then paused (the picture and Now Playing come back), then playing again
+async function runDemo() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    // no GDM conversation in the throwaway shell (the PAM guard): show the entry the way a password
+    // question does, as run() does, and type a few dots into it
+    const prompt = dialog._authPrompt;
+    if (!prompt._entryArea.visible)
+        prompt.setQuestion('Enter Password');
+    await typeKeys('demo');
+    await sleep(2500);
+    const fps = Number(GLib.getenv('TAHOE_DEMO_FPS') ?? 8);
+    let n = 0;
+    const record = async seconds => {
+        const end = GLib.get_monotonic_time() + seconds * 1e6;
+        while (GLib.get_monotonic_time() < end) {
+            const t = GLib.get_monotonic_time();
+            await shotRect(`demo-${String(n++).padStart(4, '0')}`, [0, 0, global.screen_width, global.screen_height]);
+            const wait = 1000 / fps - (GLib.get_monotonic_time() - t) / 1000;
+            if (wait > 0)
+                await sleep(Math.round(wait));
+        }
+    };
+    const start = GLib.get_monotonic_time();
+    await record(6);
+    setFakeStatus('Paused');
+    await record(4);
+    setFakeStatus('Playing');
+    await record(6);
+    // the rate the frames really came at (a screenshot can take longer than 1/fps)
+    const real = n / ((GLib.get_monotonic_time() - start) / 1e6);
+    write({ label: 'demo', frames: n, fps: Math.round(real * 100) / 100, frame: frameState().frame });
+}
+
 // G2 for our own code: a broken later phase, injected through the frame's own API
 async function runOurs(kind) {
     await sleep(3000);
@@ -437,6 +472,17 @@ const MPRIS_XML = `<node>
   <property name="CanGoPrevious" type="b" access="read"/>
   <property name="CanPlay" type="b" access="read"/>
 </interface></node>`;
+// the fake player's properties, and a way to change its playback status (the demo gate)
+let fakeProps = null;
+function setFakeStatus(status) {
+    if (!fakeProps)
+        return;
+    const v = new GLib.Variant('s', status);
+    fakeProps.PlaybackStatus = v;
+    Gio.DBus.session.emit_signal(null, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties',
+        'PropertiesChanged', new GLib.Variant('(sa{sv}as)', ['org.mpris.MediaPlayer2.Player', {PlaybackStatus: v}, []]));
+}
+
 function fakePlayer() {
     const given = GLib.getenv('TAHOE_LOCK_ART');
     const art = given && given !== 'none' ? given : `${OUT}/art.png`;
@@ -470,6 +516,7 @@ function fakePlayer() {
         CanGoPrevious: new GLib.Variant('b', true),
         CanPlay: new GLib.Variant('b', true),
     };
+    fakeProps = props;
     for (const iface of info.interfaces) {
         Gio.DBus.session.register_object('/org/mpris/MediaPlayer2', iface,
             (c, sender, path, ifaceName, method, params, invocation) => invocation.return_value(null),
@@ -677,7 +724,7 @@ export default class Driver extends Extension {
         isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
