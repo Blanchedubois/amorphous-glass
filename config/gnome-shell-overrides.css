@@ -267,4 +267,25 @@
   margin-bottom: 112px !important;
 }
 .osd-window .level { -barlevel-height: 6px; -barlevel-active-background-color: white; border-radius: {{capsule.radius}}px !important; }
+/* A3: folder tiles in the app grid, the same glass as the folder popup they open into: a glass
+   look in CSS over the overview's blur, at the popup's {{folder.radius}} px. The grid always sits on
+   the blurred wallpaper, so one recipe for every mode: lit from the top (a white gradient), a
+   bright rim, a crisp top highlight and a soft lift. Real glass per tile is left out: 20 and more
+   on screen. */
+.app-folder {
+  background-gradient-direction: vertical !important;
+  background-gradient-start: rgba(255, 255, 255, 0.20) !important;
+  background-gradient-end: rgba(255, 255, 255, 0.07) !important;
+  border-radius: {{folder.radius}}px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 4px 12px 0 rgba(0, 0, 0, 0.20) !important;
+}
+.app-folder:hover, .app-folder:focus {
+  background-gradient-start: rgba(255, 255, 255, 0.28) !important;
+  background-gradient-end: rgba(255, 255, 255, 0.12) !important;
+}
+.app-folder:active, .app-folder:highlighted, .app-folder:selected, .app-folder:checked {
+  background-gradient-start: rgba(255, 255, 255, 0.34) !important;
+  background-gradient-end: rgba(255, 255, 255, 0.18) !important;
+}
+.app-folder:insensitive { background-gradient-direction: none !important; background-color: transparent !important; box-shadow: none !important; }
 /* end tahoe-overrides */

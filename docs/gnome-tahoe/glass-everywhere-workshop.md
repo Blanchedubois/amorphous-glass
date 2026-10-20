@@ -126,6 +126,7 @@ done, and its effort and risk. The mechanisms are:
 | C3 | Alt-Tab, workspace switcher | glass and CSS both 28 (the glass was 28 under a 24 shape), items 20, selected a glass lift instead of the accent | `shots/phase1-alt-tab.jpg` |
 | C5 | Run dialog field | a large glass capsule, no accent ring (the ring came from Blur My Shell's own popup styles, which outrank the theme; fixed in the patch's styles for this field only, so password fields keep their focus ring) | `shots/phase1-run.jpg` |
 | C7 | Screenshot toolbar | mode and pointer buttons as glass chips; the photo/video switch keeps Blur My Shell's segmented look | `shots/phase1-screenshot.jpg` |
+| A3 | Folder tiles in the app grid (user asked, 2026-10-20) | glass look in CSS at the folder popup's 32 px: lit from the top (white gradient 0.20 → 0.07), rim, top highlight, soft lift; one recipe for every mode, since the grid always sits on the blurred wallpaper | `shots/phase1-folder-tiles.jpg` |
 | C1 | Volume / brightness OSD | a glass capsule (glass 9999, it was 48 under a 24 shape), lifted clear of the dock, white level bar; kept at the bottom (top right under the bar is a later choice) | `shots/phase1-osd.jpg` |
 
 Tokens: `switcher`, `osd`, `folder` radii and their Blur My Shell keys in `tokens/radius.json`, `chip` and `chip_text` in `tokens/glass.json`; `docs/STANDARD.md` lists the new surfaces.
