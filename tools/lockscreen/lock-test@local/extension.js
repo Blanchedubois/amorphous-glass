@@ -174,16 +174,44 @@ async function runQs() {
     await sleep(1200);
     const menu = qs.menu;
     const chain = []; for (let a = menu.actor; a; a = a.get_parent()) chain.push(`${a.constructor.name}${a.name ? '#' + a.name : ''}${a.style_class ? '.' + a.style_class.split(' ').join('.') : ''}`);
-    const box = menu.box ?? menu.actor;
-    write({ label: 'qs', open: menu.isOpen, actor: box ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
+    const mbox = menu.box ?? menu.actor;
+    write({ label: 'qs', open: menu.isOpen, actor: mbox ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
         boxStyle: menu.box?.style_class, chain, frame: frameState().frame,
         glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-lock:menu-glass' || a.name === 'menu-glass') n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
     const [x, y] = menu.box.get_transformed_position(); const [w, h] = menu.box.get_transformed_size();
+    const pieceDump = []; const wg = (a, d) => { if (a.name === 'menu-glass' && a.visible) pieceDump.push({ glass: box(a) }); for (const c of a.get_children()) wg(c, d + 1); }; wg(global.stage, 0);
+    const toggles = []; const w2 = a => { if (a.has_style_class_name?.('quick-toggle') && a.mapped) toggles.push({ toggle: box(a), radius: a.get_theme_node().get_border_radius(0), margin: a.get_theme_node().get_margin?.(St.Side.RIGHT) ?? null }); for (const c of a.get_children()) w2(c); }; w2(menu.box);
+    write({ label: 'qs-pieces', glass: pieceDump, toggles, pointer: menu._boxPointer ? { tx: menu._boxPointer.translation_x, ty: menu._boxPointer.translation_y, o: menu._boxPointer.opacity } : null });
     write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
     await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);
     qs.menu.close(false);
     await sleep(500);
     write({ label: 'qs-closed', frame: frameState().frame, stillLocked: Main.sessionMode.isLocked });
+}
+
+// the top-right menu's submenus (Wi-Fi, Power Mode arrows) while locked
+async function runQsSub() {
+    await sleep(3000);
+    await lockAndPrompt();
+    await sleep(1000);
+    const qs = Main.panel.statusArea.quickSettings;
+    qs.menu.open(false);
+    await sleep(1200);
+    const toggles = []; const wt = a => { if (a.has_style_class_name?.('quick-toggle-has-menu') && a.mapped) toggles.push(a); for (const c of a.get_children()) wt(c); }; wt(qs.menu.box);
+    for (const [i, t] of toggles.entries()) {
+        t.menu?.open(true);
+        await sleep(1500);
+        const [x, y] = qs.menu.box.get_transformed_position(); const [w, h] = qs.menu.box.get_transformed_size();
+        const glass = []; const wg = a => { if (a.name === 'menu-glass' && a.visible) glass.push(box(a)); for (const c of a.get_children()) wg(c); }; wg(global.stage);
+        const subs = []; const ws = a => { if (a.has_style_class_name?.('quick-toggle-menu') && a.mapped) subs.push(box(a)); for (const c of a.get_children()) ws(c); }; ws(qs.menu.actor);
+        write({ label: 'qs-sub', i, open: t.menu?.isOpen ?? null, glass, submenus: subs, frame: frameState().frame });
+        await shotRect(`qssub-${i}`, [Math.max(0, Math.round(x) - 30), Math.max(0, Math.round(y) - 10), Math.round(w) + 60, Math.round(h) + 40]);
+        t.menu?.close(true);
+        await sleep(800);
+    }
+    qs.menu.close(false);
+    await sleep(500);
+    write({ label: 'qs-sub-closed', frame: frameState().frame, stillLocked: Main.sessionMode.isLocked });
 }
 
 // Phase 6: our actors ease in when the screen wakes, and settle at full opacity and size
@@ -212,15 +240,15 @@ async function runNpIdle() {
     await sleep(3000);
     const dialog = await lockAndPrompt();
     await sleep(1500);
-    const glass = () => { let g = null; const w = a => { if (a.name === 'now-playing-glass') g = a; for (const c of a.get_children()) w(c); }; w(global.stage); return g; };
-    const paintsOver = async ms => { const e = glass()?.get_effect('tahoe-lock-swirl'); const a = e?.paints ?? 0; await sleep(ms); return (e?.paints ?? 0) - a; };
-    const active = await paintsOver(2000);
+    const swirl = await import(`${lockExt().dir.get_uri()}/widgets/swirl.js`);
+    const running = () => swirl.swirlFramesRunning();
+    const active = running();
     await sleep(35000);                       // no input
-    const idle = await paintsOver(2000);
+    const idle = running();
     await typeKeys('x');                      // input again
-    await sleep(300);
-    const again = await paintsOver(2000);
-    write({ label: 'np-idle', paintsIn2sActive: active, paintsIn2sAfter35sIdle: idle, paintsIn2sAfterInput: again,
+    await sleep(500);
+    const again = running();
+    write({ label: 'np-idle', swirlsRunningActive: active, swirlsRunningAfter35sIdle: idle, swirlsRunningAfterInput: again,
         frame: frameState().frame, stillLocked: Main.sessionMode.isLocked, dialog: !!dialog });
 }
 
@@ -578,7 +606,7 @@ export default class Driver extends Extension {
         this._started = true;
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
