@@ -18,21 +18,25 @@ import { GlassClock, MATERIAL, buildMask, measure } from './glassclock.js';
 import { buildNowPlaying } from './nowplaying.js';
 import { buildMenuGlass } from './menuglass.js';
 
+const DIGITS_EM = 0.730;      // Space Grotesk's digit height
 const DATE_TOP = 0.108;       // top of the date's letters
-// 1.5x Apple's size, as the user asked: digits 15 % of the height (Space Grotesk's digits are
-// 0.730 em), the date and the gap in the same proportion
-const DATE_SIZE = 0.0375;     // date type size (54 px at 1440)
-const TIME_SIZE = 0.2055;     // time type size (296 px at 1440: digits 216 px, 15 %)
-const TIME_GAP = 0.017;       // from the bottom of the date's letters to the top of the digits
+// The clock's size: the digits' height as a share of the screen height (Apple's is about 10 %).
+// The date and the gap follow in proportion (measured on the press image). Space Grotesk's digits
+// are 0.730 em, so the type size is digits / 0.730.
+export const CLOCK = {digits: 0.12};
+const DATE_RATIO = 0.1825;    // date type size / time type size
+const GAP_RATIO = 0.0827;     // gap under the date's letters / time type size
+const timeSizeOf = () => CLOCK.digits / DIGITS_EM;
+const DATE_SIZE_OF = () => timeSizeOf() * DATE_RATIO;
+const TIME_GAP_OF = () => timeSizeOf() * GAP_RATIO;
 
 // where the letters sit inside an St.Label line, as fractions of the type size, measured with
 // Pango on Space Grotesk SemiBold: the cap/digit top below the line top, and the cap height
 // (these place the plain fallback labels; the glass places its letters from Pango's ink itself)
 const INK_TOP = {date: 0.278, time: 0.270};
 const CAP_HEIGHT = 0.741;
-const DIGITS_EM = 0.730;      // Space Grotesk's digit height
 // the bottom of the clock's digits, as a fraction of the height
-const CLOCK_BOTTOM = DATE_TOP + DATE_SIZE * CAP_HEIGHT + TIME_GAP + TIME_SIZE * DIGITS_EM;
+const clockBottom = () => DATE_TOP + DATE_SIZE_OF() * CAP_HEIGHT + TIME_GAP_OF() + CLOCK.digits;
 const AVATAR_CENTRE = 0.825;  // centre of the avatar
 const AVATAR_SIZE = 64;       // logical px, matches lockscreen.css
 const BOTTOM_MARGIN = 0.04;   // the prompt never comes closer to the bottom edge than this
@@ -150,13 +154,13 @@ function buildClock(frame, dialog) {
         if (!(height > 0))
             return;
         const px = f => Math.round(f * height);
-        const dateSize = px(DATE_SIZE), timeSize = px(TIME_SIZE);
+        const dateSize = px(DATE_SIZE_OF()), timeSize = px(timeSizeOf());
         date.style = `font-size: ${dateSize}px;`;
         time.style = `font-size: ${timeSize}px;`;
         // place by the letters, not the line boxes (a 190 px line has a lot of air above the digits)
         const dateLineTop = px(DATE_TOP) - Math.round(dateSize * INK_TOP.date);
         box.style = `margin-top: ${Math.max(0, dateLineTop)}px;`;
-        const digitsTop = px(DATE_TOP) + Math.round(dateSize * CAP_HEIGHT) + px(TIME_GAP);
+        const digitsTop = px(DATE_TOP) + Math.round(dateSize * CAP_HEIGHT) + px(TIME_GAP_OF());
         const [, dateLineHeight] = date.get_preferred_height(-1);
         time.translation_y = digitsTop - Math.round(timeSize * INK_TOP.time) - (dateLineTop + dateLineHeight);
     };
@@ -236,8 +240,8 @@ function buildGlass(frame, dialog, labels) {
             const px = f => Math.round(f * height);
             const spec = {
                 date: dateString, time: timeString,
-                dateSize: px(DATE_SIZE) * scale, timeSize: px(TIME_SIZE) * scale,
-                dateTop: GLASS_PAD * scale, gap: px(TIME_GAP) * scale,
+                dateSize: px(DATE_SIZE_OF()) * scale, timeSize: px(timeSizeOf()) * scale,
+                dateTop: GLASS_PAD * scale, gap: px(TIME_GAP_OF()) * scale,
             };
             const ink = measure(spec);
             const boxWidth = Math.ceil(ink.width / scale) + 2 * GLASS_PAD;
@@ -301,7 +305,7 @@ function placePrompt(frame, dialog, nowPlaying = null) {
         // Now Playing under the clock, then GNOME's notifications column under it, as on the
         // iPhone, when it fits above the prompt; else where GNOME put it, with the prompt above it
         const gap = Math.round(height * COLUMN_GAP);
-        const underClock = Math.round(height * CLOCK_BOTTOM) + gap;
+        const underClock = Math.round(height * clockBottom()) + gap;
         nowPlaying?.place(Main.layoutManager.primaryMonitor, underClock);
         const columnTop = underClock + (nowPlaying?.height ? nowPlaying.height + gap : 0);
         let moved = false;

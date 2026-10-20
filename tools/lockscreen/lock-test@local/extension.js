@@ -469,7 +469,14 @@ function state(label) {
 async function applyMaterial() {
     const json = GLib.getenv('TAHOE_LOCK_MATERIAL');
     const ext = lockExt();
-    // TAHOE_LOCK_NP_STYLE=wide|wide-big|large|wide-scaled: Now Playing's style for this run
+    // TAHOE_LOCK_CLOCK=0.12: the clock's digits as a share of the screen height for this run
+    const clockSize = GLib.getenv('TAHOE_LOCK_CLOCK');
+    if (clockSize && ext) {
+        const layout = await import(`${ext.dir.get_uri()}/layout.js`);
+        layout.CLOCK.digits = Number(clockSize);
+        write({ label: 'clock-size', digits: layout.CLOCK.digits });
+    }
+    // TAHOE_LOCK_NP_STYLE=wide|wide-big|large: Now Playing's style for this run
     const npStyle = GLib.getenv('TAHOE_LOCK_NP_STYLE');
     if (npStyle && ext) {
         const np = await import(`${ext.dir.get_uri()}/nowplaying.js`);
