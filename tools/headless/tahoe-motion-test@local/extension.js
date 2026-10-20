@@ -483,6 +483,35 @@ export default class Driver extends Extension {
             write('log.jsonl', { done: true });
             return;
         }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'subprobe') {
+            // a quick settings submenu opening, frame by frame: the container's height (what the
+            // morph sets), its natural height now, and the box (the glass's target)
+            const want = GLib.getenv('TAHOE_TEST_TOGGLE') ?? 'PowerProfilesToggle';
+            const toggle = qs._grid.get_children().find(c => c.menu && c.visible && c.constructor.name === want);
+            qs.open(false);
+            await sleep(800);
+            for (let run = 0; run < 2; run++) {
+                const menu = toggle.menu;
+                const rows = [];
+                const id = global.stage.connect('after-update', () => {
+                    const c = menu.actor;
+                    const [, nat] = c.get_preferred_height(c.width || -1);
+                    const glass = globalThis.__tahoeGlass?.surfaces(qs._boxPointer)?.find(g => g.target === menu.box);
+                    const g = glass?.glass_rect?.();
+                    const piece = Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj?._morphs?.get(menu.box)?.pieces?.[0];
+                    rows.push(`${Math.round(c.height)}|${Math.round(menu.box.x)},${Math.round(menu.box.y)}+${Math.round(menu.box.width)}x${Math.round(menu.box.height)}|g${g ? Math.round(g.height) : '-'}|r${piece?.lastRect ? Math.round(piece.lastRect.y + piece.lastRect.height) : '-'}`);
+                });
+                menu.open({ animate: true });
+                await sleep(900);
+                await new Promise(r => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => { r(); return GLib.SOURCE_REMOVE; }));
+                global.stage.disconnect(id);
+                write('log.jsonl', { run, toggle: want, frames: rows.join(' ') });
+                menu.close({ animate: false });
+                await sleep(600);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'strip') {
             // stills of the open and close animations, slowed down
             const settings = St.Settings.get();
