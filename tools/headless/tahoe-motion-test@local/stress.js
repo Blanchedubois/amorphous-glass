@@ -65,6 +65,10 @@ export async function runStress(write) {
         }
     };
     const escape = async () => {
+        // GNOME sometimes opens the overview at startup: over the desktop it took the desktop's
+        // right-clicks (the "covered desktop" of earlier runs)
+        if (Main.overview.visible)
+            Main.overview.hide();
         Main.panel.menuManager.activeMenu?.close({ animate: false });
         desktopMenu()?.close({ animate: false });
         dockMenu()?.close({ animate: false });
@@ -349,6 +353,58 @@ export async function runStress(write) {
         await sleep(700);
         Main.overview.toggle();
         await sleep(700);
+    });
+    // Liquid Glass everywhere, phase 1: the new glass surfaces, many times
+    await runCase('dock label hover x30 (glass capsule)', 30, async i => {
+        const icon = dockIcon();
+        if (!icon)
+            throw new Error('no dock icon');
+        const [x, y] = centre(icon);
+        move(x, y);
+        await sleep(i % 3 ? 120 : 700);
+        move(x, y - 300);
+        await sleep(80);
+    });
+    await runCase('volume OSD x30 (glass HUD)', 30, async () => {
+        Main.osdWindowManager.showAll(Gio.ThemedIcon.new('audio-volume-medium-symbolic'), 'Volume', Math.random());
+        await sleep(90);
+    });
+    await runCase('app folder open/close x20 (glass)', 20, async () => {
+        Main.overview.show();
+        await sleep(300);
+        const display = Main.overview._overview?.controls?._appDisplay;
+        const folder = display?._folderIcons?.[0];
+        if (!folder)
+            throw new Error('no folder');
+        folder.open();
+        await sleep(250);
+        folder._dialog?.popdown?.() ?? folder.view?._dialog?.popdown?.();
+        await sleep(150);
+        Main.overview.hide();
+        await sleep(300);
+    });
+    // overview search in Liquid Glass (docs/gnome-tahoe/search-glass-plan.md): typing fast, panels
+    // made, shown and hidden as results change, the results scrolled while they change
+    await runCase('search typing fast x5 (glass panels)', 5, async () => {
+        Main.overview.show();
+        await sleep(500);
+        const entry = Main.overview.searchEntry;
+        const text = 'wifi password panel';
+        for (let i = 1; i <= text.length; i++) {
+            entry.set_text(text.slice(0, i));
+            await sleep(40);
+        }
+        const find = (root, test) => { const st = [root]; while (st.length) { const a = st.pop(); if (test(a)) return a; st.push(...a.get_children()); } return null; };
+        const view = find(Main.overview._overview, a => a.constructor.name === 'St_ScrollView' && a.mapped && a.has_style_class_name?.('search-display'));
+        for (let i = 0; i < 10; i++) {
+            view?.vadjustment?.set_value((i % 2) * (view.vadjustment.upper ?? 0));
+            entry.set_text(i % 2 ? 'pa' : 'w');
+            await sleep(60);
+        }
+        entry.set_text('');
+        await sleep(200);
+        Main.overview.hide();
+        await sleep(400);
     });
     await runCase('leak check: calendar open/close x50', 50, async () => {
         date.menu.open(true);

@@ -5,12 +5,16 @@
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
+import {Swirl} from './swirl.js';
 
-const LYRIC_LINES = 7;
+const DIM = 92;          // opacity of the lines not being sung (of 255)
+const SCROLL_MS = 520;   // the lyrics column gliding to the next line
+const FADE_MS = 360;     // a line brightening or dimming
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
 
 function clock(seconds) {
@@ -131,22 +135,38 @@ class Transport {
     }
 }
 
-// the current line in full, the ones around it dimmed; moves on at each line's own time
+// Every line of the song in one column that scrolls: at each line's own time the column glides
+// up so the new line sits second from the top, the new line brightens and the last one dims,
+// as Apple Music's lyrics. All lines share one size (a size change would reflow and jump); only
+// opacity and the column's position move, eased on the compositor (no work between lines).
+// With GNOME animations off the eases end at once.
+// a viewport that asks for no height of its own: it takes what the card has left (y_expand),
+// however long the song's column inside it is
+const LyricsViewport = GObject.registerClass(
+class LyricsViewport extends St.Widget {
+    vfunc_get_preferred_height(_forWidth) {
+        return [0, 0];
+    }
+});
+
 class LyricsView {
     constructor() {
-        this.actor = new St.BoxLayout({
+        this.actor = new LyricsViewport({
             style_class: 'tahoe-music-lyrics',
-            orientation: Clutter.Orientation.VERTICAL,
+            layout_manager: new Clutter.FixedLayout(),
             x_expand: true, y_expand: true,
             clip_to_allocation: true,
         });
+        this._column = new St.BoxLayout({
+            style_class: 'tahoe-music-lyrics-column',
+            orientation: Clutter.Orientation.VERTICAL,
+        });
+        this.actor.add_child(this._column);
+        // the column is as wide as the view; its height follows the wrapped lines
+        this.actor.connect('notify::width', () => (this._column.width = this.actor.width));
+        // once laid out (or reflowed), the current line is placed again without animation
+        this._column.connect('notify::height', () => this._place(false));
         this._labels = [];
-        for (let i = 0; i < LYRIC_LINES; i++) {
-            const l = new St.Label({style_class: 'tahoe-music-lyric'});
-            l.clutter_text.line_wrap = true;
-            this.actor.add_child(l);
-            this._labels.push(l);
-        }
         this._lines = null;
         this._shown = -2;
     }
@@ -154,8 +174,16 @@ class LyricsView {
     setLines(lines, message) {
         this._lines = lines;
         this._shown = -2;
-        if (!lines)
-            this._show([message], 0);
+        this._column.remove_all_transitions();
+        this._column.destroy_all_children();
+        this._column.translation_y = 0;
+        const texts = lines ? lines.map(l => l[1] || '♪') : [message];
+        this._labels = texts.map(text => {
+            const l = new St.Label({style_class: 'tahoe-music-lyric', text, opacity: lines ? DIM : 255});
+            l.clutter_text.line_wrap = true;
+            this._column.add_child(l);
+            return l;
+        });
     }
 
     // the index of the line being sung at this position
@@ -171,23 +199,29 @@ class LyricsView {
             return null;
         const index = this._index(position);
         if (index !== this._shown) {
+            const last = this._labels[this._shown];
             this._shown = index;
-            const start = Math.max(0, index - 1);
-            this._show(this._lines.slice(start, start + LYRIC_LINES).map(l => l[1] || '♪'), index - start);
+            last?.ease({opacity: DIM, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            this._labels[index]?.ease({opacity: 255, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            this._place(true);
         }
         // seconds until the next line
         const next = this._lines[index + 1];
         return next ? next[0] - position : null;
     }
 
-    _show(texts, current) {
-        this._labels.forEach((l, i) => {
-            l.text = texts[i] ?? '';
-            if (i === current)
-                l.add_style_class_name('tahoe-music-lyric-current');
-            else
-                l.remove_style_class_name('tahoe-music-lyric-current');
-        });
+    // the line before the current one at the top, so the sung line is second
+    _place(animate) {
+        if (!this._lines || !this._column.has_allocation())
+            return;
+        const top = this._labels[Math.max(0, this._shown - 1)];
+        const y = this._shown > 0 && top ? -top.y : 0;
+        if (!animate) {
+            this._column.remove_all_transitions();
+            this._column.translation_y = y;
+        } else if (this._column.translation_y !== y) {
+            this._column.ease({translation_y: y, duration: SCROLL_MS, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+        }
     }
 }
 
@@ -199,6 +233,14 @@ class MusicWidget {
             x_expand: true, y_expand: true,
         });
         this._player = acquirePlayer();
+        this._swirl = new Swirl();
+        // the text follows the swirl's colours (light covers: dark text), not the glass mode
+        this._swirl.onInk = dark => {
+            this.actor.remove_style_class_name('tahoe-music-ink-dark');
+            this.actor.remove_style_class_name('tahoe-music-ink-white');
+            if (dark !== null)
+                this.actor.add_style_class_name(dark ? 'tahoe-music-ink-dark' : 'tahoe-music-ink-white');
+        };
         this._title = ellipsized('tahoe-music-title');
         this._artist = ellipsized('tahoe-widget-secondary tahoe-music-artist');
         this._build();
@@ -208,7 +250,14 @@ class MusicWidget {
         this._refresh();
     }
 
-    setMode() {}
+    // the album-colour swirl lives in the card's glass
+    attachCard(card) {
+        this._swirl.attachCard(card);
+    }
+
+    setMode(mode) {
+        this._swirl.setMode(mode);
+    }
 
     // the progress moves each second while playing
     get wantsSeconds() {
@@ -216,6 +265,7 @@ class MusicWidget {
     }
 
     tick() {
+        this._swirl.check();   // a window may have moved over the card, or away
         if (this._state?.playing)
             this._progress?.update(this._player.position(), this._state.length);
     }
@@ -227,7 +277,12 @@ class MusicWidget {
         const state = this._state = this._player.state;
         this._title.text = state?.title || 'Not Playing';
         this._artist.text = state ? state.artist : '';
-        this._art?.set(state ? this._player.art(state.artUrl) : null);
+        const art = state ? this._player.art(state.artUrl) : null;
+        this._art?.set(art);
+        // a web cover still downloading keeps the last colours until it is here
+        if (art || !/^https?:/.test(state?.artUrl ?? ''))
+            this._swirl.setCover(art);
+        this._swirl.setPlaying(Boolean(state?.playing));
         this._transport?.update(state);
         this._progress?.update(state ? this._player.position() : 0, state?.length ?? 0);
         this._refreshLyrics(state);
@@ -241,6 +296,7 @@ class MusicWidget {
         if (this._lyricTimer)
             GLib.source_remove(this._lyricTimer);
         this._lyricTimer = 0;
+        this._swirl.destroy();
         this._player.unlisten(this._onChange);
         this._player = null;
         releasePlayer();
@@ -267,39 +323,44 @@ export class MusicSmall extends MusicWidget {
     }
 }
 
-// art at the left; the song and the controls beside it; the progress across the bottom
+// the cover inset 16 px from the top, left and bottom (as tall as the card less two gaps); the
+// song at its top right; the controls right-aligned (their hover circles end on the column's
+// edge, as the progress does), over the progress, which ends level with the cover's bottom edge
 export class MusicMedium extends MusicWidget {
     static size = 'medium';
 
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row', y_expand: true});
-        this._art = new Art(96);
+        this._art = new Art(138);   // 170 less 16 px top and bottom
         top.add_child(this._art.actor);
         const info = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
         info.add_child(this._title);
         info.add_child(this._artist);
         info.add_child(new St.Widget({y_expand: true}));
         this._transport = new Transport(this._player, 20);
-        this._transport.actor.x_align = Clutter.ActorAlign.START;
+        this._transport.actor.x_align = Clutter.ActorAlign.END;
         info.add_child(this._transport.actor);
+        this._progress = new Progress(false);
+        info.add_child(this._progress.actor);
         top.add_child(info);
         this.actor.add_child(top);
-        this._progress = new Progress(false);
-        this.actor.add_child(this._progress.actor);
     }
 }
 
-// big art with the song beside it, the progress with times, the controls centred
+// the cover across the full width (inside the padding, concentric with the card), the song,
+// the progress with times and the controls under it; taller than a large widget to fit
+export const LARGE_ART = 324;   // 356 less 16 px each side
+
 export class MusicLarge extends MusicWidget {
     static size = 'large';
+    static height = 504;
 
     _build() {
-        const top = new St.BoxLayout({style_class: 'tahoe-music-row'});
-        this._art = new Art(150);
-        top.add_child(this._art.actor);
-        this.actor.add_child(top);
+        this._art = new Art(LARGE_ART);
+        this.actor.add_child(this._art.actor);
         this.actor.add_child(new St.Widget({y_expand: true}));
         this._title.add_style_class_name('tahoe-music-title-large');
+        this._artist.add_style_class_name('tahoe-music-artist-large');
         this.actor.add_child(this._title);
         this.actor.add_child(this._artist);
         this._progress = new Progress(true);

@@ -366,9 +366,12 @@ PY
     fi
     if [[ "$GLASS_MODE" == light ]]; then bsg .popup style-popup 1; else bsg .popup style-popup 3; fi
     if [[ "$(gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell.popup pipeline)" != "'pipeline_glassbar_menus'" ]] \
-       || ! gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell pipelines | grep -q pipeline_glassbar_menus; then
+       || ! gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell pipelines | grep -q pipeline_glassbar_menus \
+       || ! gsettings --schemadir "$BS" get org.gnome.shell.extensions.blur-my-shell pipelines | grep -q pipeline_glassbar_search; then
       log "glass menus drifted: re-applying"; bash "$ROOT/scripts/glass-bar.sh" menus on >/dev/null
     fi
+    # the app folder popup in the same Liquid Glass (docs/gnome-tahoe/glass-everywhere-workshop.md)
+    bsg .appfolder pipeline "'pipeline_glassbar_menus'"
     # the glass at the CSS shape's radius (tokens/radius.json, docs/STANDARD.md)
     while read -r sec key want; do
       if [[ "$(gsettings --schemadir "$BS" get "org.gnome.shell.extensions.blur-my-shell.$sec" "$key")" != "$want" ]]; then

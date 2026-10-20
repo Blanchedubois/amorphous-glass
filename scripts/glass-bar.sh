@@ -117,19 +117,26 @@ glass_mode() {
 
 # One Liquid Glass recipe for every glass surface (bar, menus, dock, apps); only the blur
 # radius differs per surface, and the tint per mode.
-glass_params() { # BLUR_RADIUS
-  local tint tint_color
+glass_params() { # BLUR_RADIUS [search]
+  local tint tint_color shadow=0.2 rim=0.55 ao=0.3
   case "$(glass_mode)" in
     light) tint=0.18; tint_color='[1.0, 1.0, 1.0, 1.0]' ;;        # Tahoe light: clear, milky glass
     dark)  tint=0.42; tint_color='[0.133, 0.133, 0.149, 1.0]' ;;  # Tahoe dark: smoky grey glass
     *)     tint=0.12; tint_color='[1.0, 1.0, 1.0, 1.0]' ;;        # milky: the look tuned before modes
   esac
+  # 'search': the overview's search result panels, raised glass with more prominent shading
+  # (user, 2026-10-20; docs/gnome-tahoe/search-glass-plan.md): a denser tint, a stronger drop
+  # shadow, inner edge shadow and rim light
+  if [ "${2:-}" = search ]; then
+    case "$(glass_mode)" in light) tint=0.30 ;; dark) tint=0.55 ;; *) tint=0.22 ;; esac
+    shadow=0.32; rim=0.70; ao=0.42
+  fi
   echo "{
   'strength': <0.8>, 'blur_radius': <$1>, 'edge_size': <12.0>, 'falloff': <2.4>,
   'refraction_style': <0.0>, 'rim_width': <3.0>, 'rgb_fringing': <0.06>,
   'gloss': <0.8>, 'fresnel_angle': <45.0>, 'fresnel_width': <1.0>, 'specular_strength': <0.0>,
-  'tint': <$tint>, 'tint_color': <$tint_color>, 'backdrop_zoom': <1.0>, 'shadow': <0.2>,
-  'rim_light': <0.55>, 'rim_light_width': <0.45>, 'ao': <0.3>, 'ao_width': <0.2>
+  'tint': <$tint>, 'tint_color': <$tint_color>, 'backdrop_zoom': <1.0>, 'shadow': <$shadow>,
+  'rim_light': <$rim>, 'rim_light_width': <0.45>, 'ao': <$ao>, 'ao_width': <0.2>
 }"
 }
 
@@ -172,9 +179,9 @@ PY
 
 # glass_pipeline ID NAME BLUR: a Blur My Shell pipeline with the top bar's Liquid Glass recipe
 # (tint, rim, gloss) and its own blur radius, so every glass surface shares one look
-glass_pipeline() {
+glass_pipeline() { # ID NAME BLUR [profile]
   local id=$1 name=$2 blur=$3
-  python3 - "$EXT/$BMS_UUID/schemas" "$id" "$name" "$(glass_params "$blur")" <<'PY'
+  python3 - "$EXT/$BMS_UUID/schemas" "$id" "$name" "$(glass_params "$blur" "${4:-}")" <<'PY'
 import sys
 from gi.repository import Gio, GLib
 schemas, pid, name, params = sys.argv[1:5]
@@ -572,8 +579,18 @@ PY
     # the top bar's Liquid Glass recipe, its blur a step stronger at 18; a pipeline of its own
     # so the shared default (windows) stays as it is
     glass_pipeline pipeline_glassbar_menus 'Glass menus' 18.0
+    # the overview's search result panels: the same glass, shaded more (the patched Blur My Shell
+    # uses it for them when it exists)
+    glass_pipeline pipeline_glassbar_search 'Glass search' 18.0 search
     gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.popup pipeline pipeline_glassbar_menus
+    # the app folder popup in the overview: the same Liquid Glass (its radius comes from the CSS)
+    gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.appfolder pipeline pipeline_glassbar_menus
     bms_radii
+  else
+    # the app folder's pipeline from before 'apply'
+    local folder_pipe
+    folder_pipe=$(sed -n '/^\[blur-my-shell\/appfolder\]/,/^\[/{s/^pipeline=//p}' "$b/extensions.dconf" | head -1)
+    gsettings --schemadir "$EXT/$BMS_UUID/schemas" set org.gnome.shell.extensions.blur-my-shell.appfolder pipeline "${folder_pipe:-'pipeline_default'}"
   fi
   echo "  menus: $mode"
 }
