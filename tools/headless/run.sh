@@ -53,6 +53,10 @@ out += ['[org/gnome/shell]',
         'welcome-dialog-last-shown-version=\'999\'',
         '[org/gnome/shell/extensions/user-theme]', "name='MacTahoe-Dark'",
         '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", 'enable-animations=true']
+# TAHOE_TEST_KEYS="path:key=value ...": settings changed for this run (after the user's)
+for item in os.environ.get('TAHOE_TEST_KEYS', '').split():
+    path, kv = item.split(':', 1)
+    out += [f'[{path}]', kv]
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 timeout ${TAHOE_TEST_TIMEOUT:-90} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \

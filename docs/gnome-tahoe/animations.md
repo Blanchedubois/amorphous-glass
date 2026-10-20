@@ -467,6 +467,37 @@ That is worth checking on the real desktop, where the GPU does the blur. A first
 `menu.close(false)` to GNOME 51 and missed the bug: `close()` takes `{animate}`, and `false`
 animates.
 
+### Live blur while popups move (2026-10-19, user's notes after round 4)
+
+The user saw three things on the desktop:
+
+- Quick settings' blur lagged while it opened, then went live at the end.
+- A desktop right-click followed by one elsewhere showed the first place's blur until the menu
+  settled.
+- The desktop menu's glass did not keep up with "Add Widget" expanding inside it (screenshot).
+
+The first two were the freeze. A popup that freezes while still visible (the first menu fading
+out) keeps the texture it already has, captured at its old place. The headless run shows it as
+the glass region differing from live by 3–7% RMSE mid-animation, identical at rest. The third was
+Blur My Shell measuring a resized menu from the previous frame. The glass update is triggered by
+the size signal, which fires during layout, after that frame's updates have run.
+
+- `motion-freeze` is now off by default, and `tahoe-repair.sh` keeps it off: the glass blurs
+  what is behind it every frame of the motion. Cost, measured (5 runs, user's glass): quick
+  settings open p95 9.5 → 9.4 ms, submenu open 10.4 → 10.0, calendar 8.8 → 8.7, desktop menu
+  9.0 → 9.0. The motion groups, not the freeze, were what made Phase 1 smooth.
+- Size changes queue the glass's update for the next frame, not for when the shell is idle. Its
+  geometry is read after laying the stage out (`get_allocation_box()`), so it is this frame's
+  size. "Add Widget" expanding, menu/glass height per frame: before
+  `170/158 310/170 389/310 444/389`, after `170/158 320/320 396/396 450/450`. Only the first
+  frame of the expand is one frame behind.
+- Stress suite again, with live blur: every case ok (all popups opened, nothing stuck, idle 0,
+  handlers flat). Frame p95 the same as frozen within 1 ms, except scrolling the volume slider
+  while quick settings opens: 16 ms against 10. Shell RSS rose 34 MB over 50 quick-settings
+  cycles in two live runs (2 MB frozen) and fell 8 MB in the next case. Watch it on the desktop.
+- Test: `TAHOE_TEST_ONLY=widgetmenu` (tools/headless; desktop menu with tahoe-widgets, expand and
+  collapse, right-click then far away), with `TAHOE_TEST_KEYS` for settings changed per run.
+
 ## Where the code would go
 
 - Phases 1 to 3: `config/bms-tahoe-glass.patch` (popup surfaces, backdrop capture, refraction
