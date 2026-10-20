@@ -14,6 +14,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {GlassCard, STATE_FILE, bmsUuid, glassMode, loadBms, scaleFactor} from './glass.js';
 import {AnalogClock, AnalogMarksClock, AnalogQuartersClock, DateTimeClock, DigitalClock} from './clocks.js';
+import {GlassTextClock} from './glasstext.js';
 import {CalendarDay, CalendarMedium, CalendarMonth} from './calendar.js';
 import {MusicLarge, MusicLyrics, MusicMedium, MusicSmall} from './music.js';
 import {WeatherLarge, WeatherMedium, WeatherSmall} from './weather.js';
@@ -30,6 +31,7 @@ const TYPES = {
     'clock-analog-quarters': {name: 'Analog Clock: Quarters', cls: AnalogQuartersClock},
     'clock-digital': {name: 'Digital Clock', cls: DigitalClock},
     'clock-datetime': {name: 'Date & Time', cls: DateTimeClock},
+    'clock-glass-text': {name: 'Glass Text Clock', cls: GlassTextClock},
     'calendar-day': {name: 'Calendar: Today', cls: CalendarDay},
     'calendar-month': {name: 'Calendar: Month', cls: CalendarMonth},
     'calendar-medium': {name: 'Calendar: Today and Month', cls: CalendarMedium},
@@ -107,12 +109,13 @@ export default class TahoeWidgets extends Extension {
         const def = TYPES[spec.type];
         const monitorIndex = Main.layoutManager.monitors[spec.monitor ?? -1]
             ? spec.monitor : Main.layoutManager.primaryIndex;
-        const card = new GlassCard(monitorIndex);
+        const card = new GlassCard(monitorIndex, {bare: Boolean(def.cls.bare)});
         card.actor.add_style_class_name(`tahoe-widget-${spec.type}`);
         card.setMode(this._mode);
         const widget = new def.cls();
         widget.setMode(this._mode);
         card.content.add_child(widget.actor);
+        widget.attachCard?.(card);
         const entry = {spec: {...spec, monitor: monitorIndex}, card, widget};
         this._entries.push(entry);
 
