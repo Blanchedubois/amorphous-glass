@@ -25,11 +25,11 @@ import {coverPalette, swirlPalette, wantsDarkInk} from './palette.js';
 
 // `chroma`: how far the glass takes the swirl's hue and saturation (keeping its own light and
 // dark, so the rim light and edge shadow stay); `pull`: how far it moves on to the swirl's own
-// colour. The same in every mode; both fade out across the edge band.
-const CHROMA = 0.85;
-const PULL = 0.55;
+// colour. The same in every mode, low enough that the wallpaper still shows through.
+const CHROMA = 0.70;
+const PULL = 0.38;
 const NEUTRAL = 0.5;      // a missing cover tints at half strength
-const EDGE_BAND = 14;     // logical px at the edge where the tint fades out (the rim light's band)
+const EDGE_BAND = 14;     // logical px at the edge where only the glass's highlights are kept
 const SPEED = 1.0;        // the swirl's clock against real time
 const FPS = 25;           // slow motion: 25 frames a second is plenty, at any refresh rate
 const FADE = 1.2;         // s, the cross-fade to a new track's colours
@@ -82,16 +82,28 @@ const SHADER = `
     // a dither against banding in the slow gradients
     field += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
 
-    // full strength inside, fading out across the edge band (rounded rectangle distance)
-    vec2 px = uv * vec2(sw_w, sw_h);
-    vec2 q = abs(px - 0.5 * vec2(sw_w, sw_h)) - (0.5 * vec2(sw_w, sw_h) - sw_radius);
+    // At the edge Blur My Shell's glass has a lit rim, an inner shadow and a refraction band.
+    // Only the light is kept (user, 2026-10-20: highlights, no 3D emboss): across the band the
+    // glass is read from just inside it, and whatever is brighter at the edge is added back.
+    vec2 size = vec2(sw_w, sw_h);
+    vec2 px = uv * size;
+    vec2 q = abs(px - 0.5 * size) - (0.5 * size - sw_radius);
     float inside = sw_radius - length(max(q, 0.0)) - min(max(q.x, q.y), 0.0);
-    float fade = smoothstep(0.0, sw_band, inside);
+    vec3 base = g;
+    if (inside < sw_band) {
+        // inwards, away from the nearest edge
+        vec2 out_ = q.x > 0.0 && q.y > 0.0 ? normalize(q) : (q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
+        vec2 inward = -out_ * sign(px - 0.5 * size);
+        vec4 deep = texture2D(cogl_sampler0, uv + inward * (sw_band - inside + 2.0) / size);
+        base = mix(deep.a > 0.004 ? deep.rgb / deep.a : g, g, smoothstep(0.0, sw_band, inside));
+    }
+    float light = max(sw_luma(g) - sw_luma(base), 0.0);
 
-    // the swirl's colour at the glass's own lightness, then a pull towards the swirl's lightness
-    vec3 hue = clamp(field + (sw_luma(g) - sw_luma(field)), 0.0, 1.0);
-    vec3 c = mix(g, hue, sw_chroma * mix(0.35, 1.0, fade));
-    c = mix(c, field, sw_pull * fade);
+    // the swirl's colour at the glass's own lightness, then a pull towards the swirl's own colour
+    vec3 hue = clamp(field + (sw_luma(base) - sw_luma(field)), 0.0, 1.0);
+    vec3 c = mix(base, hue, sw_chroma);
+    c = mix(c, field, sw_pull);
+    c = min(c + light, vec3(1.0));
     cogl_color_out = vec4(c * glass.a, glass.a) * cogl_color_in.a;
 `;
 
