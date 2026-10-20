@@ -7,7 +7,9 @@ R=$(cd "$(dirname "$0")/../.." && pwd)
 bad=0
 while read -r src dest; do
   case "$src" in ''|'#'*) continue ;; esac
-  if ! cmp -s "$R/extensions/tahoe-widgets@cachyos-tahoe/$src" "$R/extensions/tahoe-lockscreen@cachyos-tahoe/widgets/$dest"; then
+  from="$R/extensions/tahoe-widgets@cachyos-tahoe/$src"; to="$R/extensions/tahoe-lockscreen@cachyos-tahoe/widgets/$dest"
+  if [ -d "$from" ]; then same() { diff -rq "$from" "$to" >/dev/null 2>&1; }; else same() { cmp -s "$from" "$to"; }; fi
+  if ! same; then
     echo "widgets/$dest differs from tahoe-widgets/$src" >&2
     bad=1
   fi
