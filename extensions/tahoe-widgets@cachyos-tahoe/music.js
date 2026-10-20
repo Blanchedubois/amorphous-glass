@@ -9,6 +9,7 @@ import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
+import {Swirl} from './swirl.js';
 
 const LYRIC_LINES = 7;
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
@@ -199,6 +200,7 @@ class MusicWidget {
             x_expand: true, y_expand: true,
         });
         this._player = acquirePlayer();
+        this._swirl = new Swirl();
         this._title = ellipsized('tahoe-music-title');
         this._artist = ellipsized('tahoe-widget-secondary tahoe-music-artist');
         this._build();
@@ -208,7 +210,14 @@ class MusicWidget {
         this._refresh();
     }
 
-    setMode() {}
+    // the album-colour swirl lives in the card's glass
+    attachCard(card) {
+        this._swirl.attachCard(card);
+    }
+
+    setMode(mode) {
+        this._swirl.setMode(mode);
+    }
 
     // the progress moves each second while playing
     get wantsSeconds() {
@@ -216,6 +225,7 @@ class MusicWidget {
     }
 
     tick() {
+        this._swirl.check();   // a window may have moved over the card, or away
         if (this._state?.playing)
             this._progress?.update(this._player.position(), this._state.length);
     }
@@ -227,7 +237,12 @@ class MusicWidget {
         const state = this._state = this._player.state;
         this._title.text = state?.title || 'Not Playing';
         this._artist.text = state ? state.artist : '';
-        this._art?.set(state ? this._player.art(state.artUrl) : null);
+        const art = state ? this._player.art(state.artUrl) : null;
+        this._art?.set(art);
+        // a web cover still downloading keeps the last colours until it is here
+        if (art || !/^https?:/.test(state?.artUrl ?? ''))
+            this._swirl.setCover(art);
+        this._swirl.setPlaying(Boolean(state?.playing));
         this._transport?.update(state);
         this._progress?.update(state ? this._player.position() : 0, state?.length ?? 0);
         this._refreshLyrics(state);
@@ -241,6 +256,7 @@ class MusicWidget {
         if (this._lyricTimer)
             GLib.source_remove(this._lyricTimer);
         this._lyricTimer = 0;
+        this._swirl.destroy();
         this._player.unlisten(this._onChange);
         this._player = null;
         releasePlayer();
