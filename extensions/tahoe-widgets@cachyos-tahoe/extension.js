@@ -97,6 +97,8 @@ export default class TahoeWidgets extends Extension {
                 this._rebuildGlass();
         }, this);
 
+        global.display.connectObject('in-fullscreen-changed', () => this._tick(), this);
+
         this._bgMenuItems = [];
         this._hookBackgroundMenus();
         this._rebuildGlass();
@@ -116,6 +118,8 @@ export default class TahoeWidgets extends Extension {
         widget.setMode(this._mode);
         card.content.add_child(widget.actor);
         widget.attachCard?.(card);
+        // a widget that starts or stops showing seconds (music playing) asks for the next tick now
+        widget.requestTick = () => this._tickSoon();
         const entry = {spec: {...spec, monitor: monitorIndex}, card, widget};
         this._entries.push(entry);
 
@@ -150,6 +154,7 @@ export default class TahoeWidgets extends Extension {
         const pan = new Clutter.PanGesture({required_button: Clutter.BUTTON_PRIMARY});
         let start = null;
         pan.connect('recognize', () => {
+            actor.remove_all_transitions();   // still snapping from the last drop
             start = [actor.x, actor.y];
             actor.get_parent().set_child_above_sibling(actor, null);
             actor.add_style_class_name('tahoe-widget-dragging');
@@ -166,8 +171,9 @@ export default class TahoeWidgets extends Extension {
             this._drop(entry);
         });
         pan.connect('cancel', () => {
+            // back to its saved grid spot (where the drag started may be mid-snap)
             if (start)
-                actor.set_position(...start);
+                this._place(entry);
             start = null;
             actor.remove_style_class_name('tahoe-widget-dragging');
         });
@@ -197,7 +203,9 @@ export default class TahoeWidgets extends Extension {
         const scale = scaleFactor();
         const [w, h] = SIZES[entry.widget.constructor.size];
         const minX = (area.x - monitor.x) / scale, minY = (area.y - monitor.y) / scale;
-        const maxX = minX + area.width / scale - w, maxY = minY + area.height / scale - h;
+        // the far edges round down to the grid too, so a widget pushed against them stays on it
+        const maxX = Math.floor((minX + area.width / scale - w) / GRID) * GRID;
+        const maxY = Math.floor((minY + area.height / scale - h) / GRID) * GRID;
         const x = Math.min(Math.max(snap((actor.x - monitor.x) / scale), Math.ceil(minX / GRID) * GRID), maxX);
         const y = Math.min(Math.max(snap((actor.y - monitor.y) / scale), Math.ceil(minY / GRID) * GRID), maxY);
         entry.spec = {...entry.spec, x, y, monitor: index};
@@ -247,6 +255,7 @@ export default class TahoeWidgets extends Extension {
         }
         this._create({type, monitor: monitorIndex, x: spot[0], y: spot[1]});
         this._save();
+        this._tickSoon();   // a new second hand starts at once
     }
 
     _save() {
@@ -335,13 +344,20 @@ export default class TahoeWidgets extends Extension {
         this._entries.forEach(e => e.card.setGlass(lib));
     }
 
-    // once a second, on the second
+    // Once a second, on the second, while a widget shows seconds (an analog face, music
+    // playing); else once a minute, on the minute. Stopped while fullscreen windows cover every
+    // monitor that has widgets: 'in-fullscreen-changed' starts it again.
     _tick() {
         if (this._tickId)
             GLib.source_remove(this._tickId);
+        this._tickId = 0;
+        if (!this._entries || this._covered())
+            return;
         const now = GLib.DateTime.new_now_local();
         this._entries.forEach(e => e.widget.tick(now));
-        const wait = 1000 - Math.floor(now.get_microsecond() / 1000) + 5;
+        const seconds = this._entries.some(e => e.widget.wantsSeconds);
+        const ms = Math.floor(now.get_microsecond() / 1000);
+        const wait = seconds ? 1000 - ms + 5 : (60 - now.get_second()) * 1000 - ms + 5;
         this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, wait, () => {
             this._tickId = 0;
             this._tick();
@@ -349,13 +365,32 @@ export default class TahoeWidgets extends Extension {
         });
     }
 
+    // many requests in a row (a spammed play button) make one tick
+    _tickSoon() {
+        this._tickSoonId ||= GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._tickSoonId = 0;
+            this._tick();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _covered() {
+        const monitors = new Set(this._entries.map(e => e.card.monitorIndex));
+        return monitors.size > 0 &&
+            [...monitors].every(i => Main.layoutManager.monitors[i]?.inFullscreen);
+    }
+
     disable() {
         this._serial = (this._serial ?? 0) + 1;
         if (this._tickId)
             GLib.source_remove(this._tickId);
         this._tickId = 0;
+        if (this._tickSoonId)
+            GLib.source_remove(this._tickSoonId);
+        this._tickSoonId = 0;
         Main.layoutManager.disconnectObject(this);
         Main.extensionManager.disconnectObject(this);
+        global.display.disconnectObject(this);
         this._interface.disconnectObject(this);
         this._interface = null;
         this._stateMonitor.cancel();

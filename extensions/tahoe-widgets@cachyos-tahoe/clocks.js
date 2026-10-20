@@ -273,6 +273,7 @@ class AnalogFace {
 
 export class AnalogClock {
     static size = 'small';
+    wantsSeconds = true;   // the second hand
     static faceStyle = 'numbers';
     static faceSize = 150;
 
@@ -344,6 +345,7 @@ export class DigitalClock {
 // medium: the digital time and date beside an analog face
 export class DateTimeClock {
     static size = 'medium';
+    wantsSeconds = true;   // the face's second hand
 
     constructor() {
         this.actor = new St.BoxLayout({style_class: 'tahoe-clock-datetime', x_expand: true, y_expand: true});

@@ -11,6 +11,7 @@ import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
 
 const LYRIC_LINES = 7;
+const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
 
 function clock(seconds) {
     const s = Math.max(0, Math.floor(seconds));
@@ -209,19 +210,29 @@ class MusicWidget {
 
     setMode() {}
 
+    // the progress moves each second while playing
+    get wantsSeconds() {
+        return Boolean(this._progress && this._state?.playing);
+    }
+
     tick() {
         if (this._state?.playing)
             this._progress?.update(this._player.position(), this._state.length);
     }
 
     _refresh() {
+        if (!this._player)   // a late answer after destroy
+            return;
+        const wanted = this.wantsSeconds;
         const state = this._state = this._player.state;
         this._title.text = state?.title || 'Not Playing';
         this._artist.text = state ? state.artist : '';
-        this._art?.set(state ? this._player.art(state.artUrl, () => this._refresh()) : null);
+        this._art?.set(state ? this._player.art(state.artUrl) : null);
         this._transport?.update(state);
         this._progress?.update(state ? this._player.position() : 0, state?.length ?? 0);
         this._refreshLyrics(state);
+        if (this.wantsSeconds !== wanted)
+            this.requestTick?.();
     }
 
     _refreshLyrics() {}
@@ -326,22 +337,53 @@ export class MusicLyrics extends MusicWidget {
         this.actor.add_child(this._progress.actor);
     }
 
+    // a new track is looked up once it has stayed for LOOKUP_DELAY ms, so skipping through
+    // songs asks lrclib.net nothing; the answer is cached per track
     _refreshLyrics(state) {
         if (!state) {
+            this._cancelLookup();
             this._lyricsKey = null;
             this._lyrics.setLines(null, '');
         } else if (state.key !== this._lyricsKey) {
+            this._cancelLookup();
             this._lyricsKey = state.key;
-            const key = state.key;
-            const lines = this._player.lyrics(state, found => {
-                if (this._player && this._lyricsKey === key) {
-                    this._lyrics.setLines(found, 'No synced lyrics for this song');
-                    this._followLyrics();
-                }
-            });
-            this._lyrics.setLines(lines ?? null, lines === undefined ? 'Looking for lyrics…' : 'No synced lyrics for this song');
+            const known = this._player.knownLyrics(state.key);
+            if (known !== undefined) {
+                this._lyrics.setLines(known, 'No synced lyrics for this song');
+            } else {
+                this._lyrics.setLines(null, 'Looking for lyrics…');
+                this._lookupId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LOOKUP_DELAY, () => {
+                    this._lookupId = 0;
+                    this._lookup(state);
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
         }
         this._followLyrics();
+    }
+
+    _lookup(state) {
+        const key = state.key;
+        const show = found => {
+            if (this._player && this._lyricsKey === key) {
+                this._lyrics.setLines(found, 'No synced lyrics for this song');
+                this._followLyrics();
+            }
+        };
+        const lines = this._player.lyrics(state, show);
+        if (lines !== undefined)
+            show(lines);
+    }
+
+    _cancelLookup() {
+        if (this._lookupId)
+            GLib.source_remove(this._lookupId);
+        this._lookupId = 0;
+    }
+
+    destroy() {
+        this._cancelLookup();
+        super.destroy();
     }
 
     // one timer, to the next line only, and only while playing

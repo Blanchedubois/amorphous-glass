@@ -13,22 +13,15 @@ import {use24h} from './clocks.js';
 
 const MAX_EVENTS = {small: 2, medium: 3};
 
-// one event source for every calendar widget, closed with the last of them
+// One event source for every calendar widget, made once per shell session and kept across
+// disable/enable (every screen lock): the shell's DBusEventSource cannot cancel its start-up,
+// so destroying it while it starts (a quick lock and unlock) leaves it using a disposed proxy.
+// The shell's own calendar keeps its source for good too; the widgets only disconnect.
 let eventSource = null;
-let eventSourceUsers = 0;
 
 function acquireEvents() {
-    if (!eventSource)
-        eventSource = new Calendar.DBusEventSource();
-    eventSourceUsers++;
+    eventSource ??= new Calendar.DBusEventSource();
     return eventSource;
-}
-
-function releaseEvents() {
-    if (--eventSourceUsers === 0) {
-        eventSource.destroy();
-        eventSource = null;
-    }
 }
 
 // the first day of the week: GNOME's setting, else the locale's
@@ -188,7 +181,6 @@ class CalendarWidget {
 
     destroy() {
         this._source.disconnectObject(this);
-        releaseEvents();
         this.actor.destroy();
     }
 }
