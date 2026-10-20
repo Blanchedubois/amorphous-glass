@@ -17,9 +17,9 @@ import {Swirl} from './swirl.js';
 // lyrics motion
 const DIM = 125;          // opacity of the lines not being sung (of 255)
 const LINE_SCALE = 0.84;  // size of the lines not being sung
-const DRIFT_MS = 480;     // a line drifting up to its new place
-const GROW_MS = 340;      // a line growing (the new one) or shrinking (the old one)
-const STAGGER_MS = 28;    // each line below starts this much after the one above it
+const DRIFT_MS = 380;     // a line drifting up to its new place
+const GROW_MS = 270;      // a line growing (the new one) or shrinking (the old one)
+const STAGGER_MS = 22;    // each line below starts this much after the one above it
 const STAGGER_LINES = 6;
 const NEAR = 10;          // lines further than this from the sung one are not drawn
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
