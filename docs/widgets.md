@@ -44,7 +44,7 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   rim light) is added back: no inner shadow or refraction bevel, no "3D emboss". The 1 px edge is
   CSS over everything, unchanged. Without Blur My Shell (fallback card) there is no swirl.
 - **Large**: the cover 324 x 324 (356 less 16 px each side), radius 8 (24 - 16); title, artist,
-  progress with times and controls under it; the card is 356 x 496 (a widget class can set a
+  progress with times and controls under it; the card is 356 x 504 (a widget class can set a
   `static height`, `extension.js` `dims()`).
 - **Wide**: 16 px padding on every side and between cover and column; the cover 138 x 138 (170 less
   two gaps); title and artist at its top right. **Controls**: right-aligned in the column to the
@@ -52,6 +52,14 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   The hover circle of the last button (not its icon) ends on the column's edge, as the bar does.
 - **Lyrics** and **small** share the same swirl (all music cards are `MusicWidget`s); every music
   card now has 16 px padding.
+- **Lyrics glide** (user, 2026-10-20 follow-up): every line of the song sits in one column that
+  scrolls. At each line's time the column eases up (520 ms, ease-out cubic) so the sung line is
+  second from the top, and the new line fades to full while the last one dims (360 ms, to 36 %).
+  All lines share one size (SF Pro Display 20 bold), so nothing reflows mid-glide. The eases run on
+  the compositor between lines only, and end at once with GNOME animations off.
+- **Fonts** (same follow-up): Apple's SF throughout, Text under 20 px and Display from 20 px. Song
+  titles are bigger: small 15, wide 17, lyrics 16, large 22 (SF Pro Display); artists 13 to 16. The
+  large card grew to 356 x 504 to fit.
 - **Public API unchanged**: `MusicSmall`, `MusicMedium`, `MusicLarge`, `MusicLyrics` keep their
   constructors, `size`, `setMode`, `tick`, `wantsSeconds`, `requestTick`, `destroy`; added
   `attachCard(card)` (optional: without it no swirl) and `MusicLarge.height`.
