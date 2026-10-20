@@ -1263,7 +1263,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..9360da5 100644
+index 0dce45a..9e318e2 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1288,8 +1288,8 @@ index 0dce45a..9360da5 100644
 +// tahoe glass: capsules whatever their height
 +const CAPSULE_STYLE_CLASSES = ['dash-label'];
 +// tahoe glass: search result panels, concentric with the capsule in their corner: the provider's
-+// 48 px capsule (24 px ends) plus the 12 px gap (tokens/radius.json 'search')
-+const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 36 };
++// 60 px capsule (30 px ends, measured) plus the 12 px gap (tokens/radius.json 'search')
++const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 42 };
  const POPUP_CHILD_STYLE_CLASSES = ['osd-window', 'resize-popup', 'switcher-list', 'workspace-switcher', 'modal-dialog', 'run-dialog', 'clipboard-dialog'];
  const POPUP_DESCENDANT_TARGET_STYLE_CLASSES = ['switcher-list'];
 +// Quick settings without a card: each toggle, slider, system button and opened

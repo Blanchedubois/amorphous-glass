@@ -305,7 +305,13 @@
 /* the provider's label (icon, name, "13 more") sits in the panel's corner: {{search.provider}} px tall,
    {{search.gap}} px from the top and the side, so its capsule is concentric with the corner */
 .list-search-result { border-radius: {{capsule.radius}}px !important; padding: 8px 14px !important; }
-.search-provider-icon { border-radius: {{capsule.radius}}px !important; padding: 6px 14px !important; min-height: {{search.provider}}px !important; }
+/* St's min-height sizes the content box: {{search.provider_content}} + 2 × {{search.provider_padding}} = {{search.provider}} px */
+.search-provider-icon {
+  border-radius: {{capsule.radius}}px !important;
+  padding: {{search.provider_padding}}px 14px !important;
+  min-height: {{search.provider_content}}px !important;
+  max-height: {{search.provider_content}}px !important;
+}
 .list-search-result:hover, .list-search-result:focus, .list-search-result:selected,
 .search-provider-icon:hover, .search-provider-icon:focus, .search-provider-icon:selected { background-color: {{mode.hover}} !important; }
 .list-search-result:active, .list-search-result:checked,
