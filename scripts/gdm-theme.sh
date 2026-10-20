@@ -3,8 +3,14 @@
 #   build     make build/gdm/gnome-shell-theme.gresource (no root): the base theme's files plus
 #             gdm/tahoe-gdm.css appended to every stylesheet and the lock picture as a sharp
 #             background (tahoe-gdm-background.jpg)
-#   commands  print the root commands that install it, set the greeter's clock to time only, and
-#             undo both. This script never runs sudo itself. GDM_CLOCK_FORMAT=24h also sets a 24 h
+#   install   install it (asks for the sudo password): the user's choices by default, a 24 h
+#             clock, Space Grotesk and the login screen extension (GDM_CLOCK_FORMAT, GDM_FONTS,
+#             GDM_EXTENSION override). Shows at the next logout or boot.
+#   undo      put the previous login screen back (asks for the sudo password); it shows at the
+#             next logout or boot. If the login screen is broken: from a text console
+#             (Ctrl+Alt+F3), `bash scripts/gdm-theme.sh undo`, then `sudo systemctl restart gdm`.
+#   commands  print the root commands of install and undo (for reading; install and undo run them
+#             without the copy-paste mistakes of running both). GDM_CLOCK_FORMAT=24h also sets a 24 h
 #             clock on the login screen only; GDM_FONTS=1 adds installing Space Grotesk (OFL)
 #             system-wide, from ~/.local/share/fonts/SpaceGrotesk, so the greeter (user gdm) has it.
 #             GDM_EXTENSION=1 adds the login screen extension (extensions/tahoe-gdm@cachyos-tahoe:
@@ -118,8 +124,31 @@ sudo systemctl restart gdm    # only from the text console: it ends any graphica
 EOF
 }
 
+# run the install or the undo half of the commands (the same text `commands` prints)
+run_part() {
+  export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-24h} GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1}
+  local text part
+  text=$(commands)
+  case $1 in
+    install) part=${text%%"# undo ("*} ;;
+    # a restart of gdm ends the graphical session: never from here (see the usage above)
+    undo) part=$(printf '%s\n' "${text#*"# undo ("}" | tail -n +2 | grep -v 'systemctl restart gdm') ;;
+  esac
+  local script; script=$(mktemp)
+  printf 'set -euo pipefail\n%s\n' "$part" > "$script"
+  bash "$script"
+  rm -f "$script"
+}
+
 case ${1:-} in
   build) build ;;
   commands) commands ;;
-  *) echo "usage: $0 build|commands" >&2; exit 2 ;;
+  install)
+    [ -f "$OUT/gnome-shell-theme.gresource" ] || build
+    run_part install
+    echo "Installed. The new login screen shows at the next logout or boot." ;;
+  undo)
+    run_part undo
+    echo "Undone. The previous login screen shows at the next logout or boot." ;;
+  *) echo "usage: $0 build|install|undo|commands" >&2; exit 2 ;;
 esac
