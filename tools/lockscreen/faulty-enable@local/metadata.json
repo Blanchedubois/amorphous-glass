@@ -1,0 +1,1 @@
+{ "uuid": "faulty-enable@local", "name": "faulty lock extension", "description": "test only: an unlock-dialog extension whose enable() throws", "shell-version": ["51"], "session-modes": ["unlock-dialog"] }

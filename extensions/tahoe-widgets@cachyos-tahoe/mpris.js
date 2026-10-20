@@ -7,6 +7,8 @@ import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Soup from 'gi://Soup?version=3.0';
 
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
 const PREFIX = 'org.mpris.MediaPlayer2.';
 const PATH = '/org/mpris/MediaPlayer2';
 const IFACE = 'org.mpris.MediaPlayer2.Player';
@@ -20,7 +22,11 @@ function soup() {
     return session;
 }
 
+// the only network call (web covers, lyrics); never while the screen is locked (the lock screen's
+// Music widget shows local covers only and asks nothing of the web)
 async function fetchBytes(url) {
+    if (Main.sessionMode.isLocked)
+        throw new Error('no network while the screen is locked');
     const message = Soup.Message.new('GET', url);
     const bytes = await new Promise((resolve, reject) => soup().send_and_read_async(
         message, GLib.PRIORITY_LOW, null, (s, res) => {

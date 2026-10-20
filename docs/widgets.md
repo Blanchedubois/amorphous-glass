@@ -253,3 +253,18 @@ DRIVER=widget-stress@local bash tools/widgets-stress/run.sh /tmp/widgets-stress 
 `STRESS_ONLY=drags`, `idle` or `control` runs one part; `DRIVER=widget-shot@local` (with
 `SHOT_FAKE_PLAYER=1`) takes the light/dark/milky screenshots. The fake players have no artist, so
 the test never asks lrclib.net.
+
+## Shared with the lock screen (2026-10-20)
+
+The lock screen extension (`extensions/tahoe-lockscreen@cachyos-tahoe`, docs/LOCKSCREEN_PLAN.md)
+shows the wide Music widget under its clock. It carries exact copies of `glass.js`, `mpris.js`,
+`swirl.js`, `music.js`, `palette.js` and `stylesheet.css` in its `widgets/` folder
+(`tools/lockscreen/shared.list`). After changing any of them, run `tools/lockscreen/sync-shared.sh`;
+`tools/lockscreen/check-shared.sh` fails when they have drifted.
+
+Two opt-in changes made for it, which do nothing on the desktop:
+- `mpris.js`: `fetchBytes`, the only network call (web covers, lyrics), refuses while the screen is
+  locked. The desktop widgets are off while locked anyway.
+- `swirl.js`: `new Swirl({lockScreen, gate})`, passed through `new MusicMedium({swirl: {...}})`. With
+  `lockScreen` the swirl may run while locked (no window checks there) and `gate()` decides; by
+  default it still holds still while locked.

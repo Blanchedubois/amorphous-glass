@@ -1,0 +1,146 @@
+/* Tahoe Widgets: the glass itself comes from Blur My Shell; this draws the rim and the text.
+   Text is dark on light glass (as the top bar in light mode) and white on dark and milky glass. */
+
+.tahoe-widget { border-radius: 24px; }
+
+/* the rim sits on the content, which is drawn over the glass */
+.tahoe-widget-content {
+  padding: 16px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-family: "SF Pro Text", sans-serif;
+}
+.tahoe-widget-light .tahoe-widget-content { border-color: rgba(255, 255, 255, 0.25); color: #1c1c1e; }
+.tahoe-widget-milky .tahoe-widget-content { border-color: rgba(255, 255, 255, 0.12); }
+
+/* no Blur My Shell: a plain translucent card */
+.tahoe-widget-fallback { background-color: rgba(34, 34, 38, 0.55); }
+.tahoe-widget-fallback.tahoe-widget-light { background-color: rgba(255, 255, 255, 0.35); }
+
+/* lifted while dragged */
+.tahoe-widget-dragging { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* shared text roles */
+.tahoe-widget-accent { font-size: 13px; font-weight: 700; color: #ff453a; }
+.tahoe-widget-light .tahoe-widget-accent { color: #e0352b; }
+.tahoe-widget-secondary { font-size: 13px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+.tahoe-widget-light .tahoe-widget-secondary { color: rgba(28, 28, 30, 0.6); }
+
+/* clocks */
+.tahoe-widget-clock-analog .tahoe-widget-content,
+.tahoe-widget-clock-analog-marks .tahoe-widget-content { padding: 9px; }
+.tahoe-widget-clock-analog-quarters .tahoe-widget-content { padding: 0; }
+.tahoe-clock-time { font-family: "SF Pro Display", sans-serif; font-size: 48px; font-weight: 300; }
+.tahoe-clock-time-large { font-size: 56px; }
+.tahoe-clock-ampm { font-size: 15px; font-weight: 600; padding: 0 0 10px 3px; }
+.tahoe-clock-datetime { spacing: 12px; }
+
+/* calendar */
+.tahoe-cal-daynum { font-family: "SF Pro Display", sans-serif; font-size: 52px; font-weight: 400; }
+.tahoe-cal-events { spacing: 6px; }
+.tahoe-cal-event { spacing: 6px; }
+.tahoe-cal-event-bar { width: 3px; border-radius: 2px; background-color: #ff453a; }
+.tahoe-cal-event-title { font-size: 12px; font-weight: 600; }
+.tahoe-cal-event-time { font-size: 11px; }
+.tahoe-widget-calendar-month .tahoe-widget-content { padding: 14px 12px 12px 12px; }
+.tahoe-cal-month { spacing: 4px; }
+.tahoe-cal-month .tahoe-widget-accent { padding-left: 4px; }
+.tahoe-cal-weekday { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.tahoe-widget-light .tahoe-cal-weekday { color: rgba(28, 28, 30, 0.55); }
+.tahoe-cal-date { font-size: 11px; font-weight: 600; min-width: 18px; min-height: 18px; text-align: center; }
+.tahoe-cal-weekend { color: rgba(255, 255, 255, 0.6); }
+.tahoe-widget-light .tahoe-cal-weekend { color: rgba(28, 28, 30, 0.55); }
+.tahoe-cal-today { background-color: #ff453a; color: #ffffff; border-radius: 9px; }
+.tahoe-widget-light .tahoe-cal-today { color: #ffffff; }
+.tahoe-cal-medium { spacing: 16px; }
+.tahoe-cal-medium .tahoe-cal-day { width: 130px; }
+
+/* weather */
+.tahoe-weather-place { font-size: 15px; font-weight: 700; }
+.tahoe-weather-temp { font-family: "SF Pro Display", sans-serif; font-size: 44px; font-weight: 300; }
+.tahoe-weather-condition { font-size: 13px; font-weight: 600; }
+.tahoe-weather-icon { color: inherit; padding-bottom: 2px; }
+.tahoe-weather-small { font-size: 11px; font-weight: 600; }
+.tahoe-weather-hourly { padding-top: 4px; }
+.tahoe-weather-hour { spacing: 4px; }
+.tahoe-weather-hour-temp { font-size: 13px; font-weight: 600; }
+.tahoe-weather-separator { height: 1px; margin: 10px 0 4px 0; background-color: rgba(255, 255, 255, 0.10); }
+.tahoe-widget-light .tahoe-weather-separator { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-weather-day { spacing: 10px; }
+.tahoe-weather-day-name { font-size: 13px; font-weight: 600; width: 52px; }
+.tahoe-weather-day-temp { font-size: 13px; font-weight: 600; width: 34px; text-align: right; }
+.tahoe-weather-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.16); }
+.tahoe-widget-light .tahoe-weather-track { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-weather-fill {
+  border-radius: 2px;
+  background-gradient-direction: horizontal;
+  background-gradient-start: #64d2ff;
+  background-gradient-end: #ffd60a;
+}
+
+/* music: 16 px on every side, art rounded concentric with the card (24 - 16) */
+.tahoe-widget-music-small .tahoe-widget-content,
+.tahoe-widget-music-medium .tahoe-widget-content,
+.tahoe-widget-music-large .tahoe-widget-content,
+.tahoe-widget-music-lyrics .tahoe-widget-content { padding: 16px; }
+.tahoe-music-row { spacing: 16px; }
+.tahoe-music-art { border-radius: 8px; background-color: rgba(255, 255, 255, 0.12); }
+.tahoe-widget-light .tahoe-music-art { background-color: rgba(0, 0, 0, 0.06); }
+.tahoe-music-art-image { background-color: transparent; background-size: cover; }
+.tahoe-widget-light .tahoe-music-art-image { background-color: transparent; }
+/* Apple's SF: Text under 20 px, Display from 20 px (titles and lyrics) */
+.tahoe-music { font-family: "SF Pro Text", sans-serif; }
+.tahoe-music-title { font-family: "SF Pro Text", sans-serif; font-size: 16px; font-weight: 700; }
+.tahoe-widget-music-small .tahoe-music-title { font-size: 15px; }
+.tahoe-widget-music-medium .tahoe-music-title { font-size: 17px; }
+.tahoe-music-title-large { font-family: "SF Pro Display", sans-serif; font-size: 22px; padding-top: 12px; }
+.tahoe-music-artist { font-family: "SF Pro Text", sans-serif; font-size: 14px; font-weight: 500; }
+.tahoe-widget-music-small .tahoe-music-artist { font-size: 13px; }
+.tahoe-music-artist-large { font-size: 16px; }
+.tahoe-music-progress { spacing: 4px; padding-top: 10px; }
+.tahoe-music-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.20); }
+.tahoe-widget-light .tahoe-music-track { background-color: rgba(0, 0, 0, 0.12); }
+.tahoe-music-fill { border-radius: 2px; background-color: rgba(255, 255, 255, 0.85); }
+.tahoe-widget-light .tahoe-music-fill { background-color: rgba(28, 28, 30, 0.75); }
+.tahoe-music-time { font-size: 11px; font-weight: 600; }
+.tahoe-music-transport { spacing: 4px; }
+.tahoe-music-transport-large { spacing: 28px; padding-top: 6px; }
+.tahoe-music-button { border-radius: 999px; padding: 6px; color: inherit; }
+.tahoe-music-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+.tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.18); }
+.tahoe-widget-light .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.06); }
+.tahoe-widget-light .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.10); }
+/* lyrics: one size for every line in the layout; the lines not being sung are scaled to 0.84
+   and dimmed (music.js), so the column never reflows while it drifts. */
+.tahoe-music-lyrics { margin-top: 14px; }   /* margin: a fixed layout ignores padding */
+.tahoe-music-lyrics-column { spacing: 6px; }
+.tahoe-music-lyric { font-family: "SF Pro Display", sans-serif; font-size: 23px; font-weight: 700; color: #ffffff; }
+.tahoe-widget-light .tahoe-music-lyric { color: #1c1c1e; }
+
+/* the music text over the album swirl: its ink follows the cover's colours, not the glass mode
+   (the swirl is the same in every mode); without a cover it follows the mode as above */
+.tahoe-music-ink-white { color: #ffffff; }
+.tahoe-music-ink-white .tahoe-widget-secondary { color: rgba(255, 255, 255, 0.72); }
+.tahoe-music-ink-white .tahoe-music-track { background-color: rgba(255, 255, 255, 0.22); }
+.tahoe-music-ink-white .tahoe-music-fill { background-color: rgba(255, 255, 255, 0.88); }
+.tahoe-music-ink-white .tahoe-music-button:hover { background-color: rgba(255, 255, 255, 0.14); }
+.tahoe-music-ink-white .tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.20); }
+.tahoe-music-ink-white .tahoe-music-lyric { color: #ffffff; }
+.tahoe-music-ink-dark { color: #1c1c1e; }
+.tahoe-music-ink-dark .tahoe-widget-secondary { color: rgba(28, 28, 30, 0.66); }
+.tahoe-music-ink-dark .tahoe-music-track { background-color: rgba(0, 0, 0, 0.14); }
+.tahoe-music-ink-dark .tahoe-music-fill { background-color: rgba(28, 28, 30, 0.80); }
+.tahoe-music-ink-dark .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.07); }
+.tahoe-music-ink-dark .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.11); }
+.tahoe-music-ink-dark .tahoe-music-lyric { color: #1c1c1e; }
+
+/* glass text clock: a bare card, the glass is cut to the glyphs by a shader (glasstext.js);
+   the labels show only without Blur My Shell */
+.tahoe-widget-bare .tahoe-widget-content { border-width: 0; }
+.tahoe-widget-bare.tahoe-widget-fallback { background-color: transparent; }
+.tahoe-glasstext-fallback { color: transparent; spacing: 4px; }
+.tahoe-widget-fallback .tahoe-glasstext-fallback { color: rgba(255, 255, 255, 0.55); }
+.tahoe-widget-fallback.tahoe-widget-light .tahoe-glasstext-fallback { color: rgba(28, 28, 30, 0.45); }
+.tahoe-glasstext-day { font-family: "SF Pro Rounded", sans-serif; font-size: 26px; font-weight: 600; }
+.tahoe-glasstext-time { font-family: "SF Pro Rounded", sans-serif; font-size: 100px; font-weight: 700; }
