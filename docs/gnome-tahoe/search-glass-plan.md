@@ -84,3 +84,20 @@ hidden and shown, and their rows are rebuilt as the user types.
 | search typing fast ×5 (19 keystrokes 40 ms apart, results scrolled while they change) | p95 28.7 ms, 85 slow frames (search itself) | p95 27.8 ms, 88 |
 | app folder open/close ×20 | p95 11.2 ms | 12.5 ms |
 | full suite (28 cases) | — | nothing stuck, no JS errors, handlers and actors flat |
+
+## Round 2 (user, after logging in): "this is just circles instead of liquid glass", "this doesnt follow the right consistent inset spacing"
+
+- **App results**: the hover and selection fill was a flat white circle. Now a real Liquid Glass
+  capsule. Each app result tile is a glass target (`tahoe-search-tile`, marked by the patch's
+  overview scan). Its glass shows only while the tile is hovered, focused or selected: the
+  fade gives 0 otherwise, and a pseudo-class change updates it at once. Results arrive after the
+  text changes, so the app results row is watched for new tiles. Square tiles make the capsule
+  round.
+- **Inset spacing**: the provider label (icon, name, "15 more") is two lines, about 50 px. Its
+  25 px ends plus the 12 px gap missed the panel's 30 px corner. The label is now a fixed 48 px
+  (24 px ends) 12 px from the top and side, and the panel 36 px, so they are concentric. Rows
+  stay 36 px capsules.
+- Stress, same machine load, previous build → this one: search typing p95 28.0 → 24.8 ms, quick
+  settings ×50 13.5 → 13.4 ms (both slower than earlier runs: two test shells ran at once).
+
+![app result selected: a glass capsule](shots/search-glass-tile.jpg)
