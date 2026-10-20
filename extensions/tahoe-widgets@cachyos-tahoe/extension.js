@@ -13,7 +13,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {GlassCard, STATE_FILE, bmsUuid, glassMode, loadBms, scaleFactor} from './glass.js';
-import {AnalogClock, DateTimeClock, DigitalClock} from './clocks.js';
+import {AnalogClock, AnalogMarksClock, AnalogQuartersClock, DateTimeClock, DigitalClock} from './clocks.js';
 import {CalendarDay, CalendarMedium, CalendarMonth} from './calendar.js';
 
 const LAYOUT_FILE = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass', 'widgets.json']);
@@ -24,6 +24,8 @@ const SIZES = {small: [170, 170], medium: [356, 170], large: [356, 356]};
 
 const TYPES = {
     'clock-analog': {name: 'Analog Clock', cls: AnalogClock},
+    'clock-analog-marks': {name: 'Analog Clock: Marks', cls: AnalogMarksClock},
+    'clock-analog-quarters': {name: 'Analog Clock: Quarters', cls: AnalogQuartersClock},
     'clock-digital': {name: 'Digital Clock', cls: DigitalClock},
     'clock-datetime': {name: 'Date & Time', cls: DateTimeClock},
     'calendar-day': {name: 'Calendar: Today', cls: CalendarDay},

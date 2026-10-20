@@ -28,7 +28,9 @@
 .tahoe-widget-light .tahoe-widget-secondary { color: rgba(28, 28, 30, 0.6); }
 
 /* clocks */
-.tahoe-widget-clock-analog .tahoe-widget-content { padding: 9px; }
+.tahoe-widget-clock-analog .tahoe-widget-content,
+.tahoe-widget-clock-analog-marks .tahoe-widget-content { padding: 9px; }
+.tahoe-widget-clock-analog-quarters .tahoe-widget-content { padding: 0; }
 .tahoe-clock-time { font-family: "SF Pro Display", sans-serif; font-size: 48px; font-weight: 300; }
 .tahoe-clock-time-large { font-size: 56px; }
 .tahoe-clock-ampm { font-size: 15px; font-weight: 600; padding: 0 0 10px 3px; }
