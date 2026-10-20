@@ -99,6 +99,9 @@ submenus 8.9 / 8.6; calendar 8.6 / 8.5; desktop menu 8.5 / 8.5; menu switching 9
 opacity 68, overshoots to 1.04 and settles, about 300 ms in real time. Icons that change on their
 own get a small push at most every 400 ms. No effects while the panel itself is animating.
 
+Workshop (2026-10-19): Wi-Fi's icon draws its slash in and out instead of Replace (`iconmorph.js`).
+See `animated-icons-workshop.md`.
+
 ## Phase E (needs the user's go-ahead): Material Symbols Rounded
 
 - Needs `MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf` from google/material-design-icons
