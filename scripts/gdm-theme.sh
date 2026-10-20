@@ -2,7 +2,7 @@
 # gdm-theme.sh: the Tahoe login screen (GDM greeter) as a shell theme gresource. docs/GDM_PLAN.md.
 #   build     make build/gdm/gnome-shell-theme.gresource (no root): the base theme's files plus
 #             gdm/tahoe-gdm.css appended to every stylesheet and the lock picture as a sharp
-#             background (tahoe-gdm-background.jpg)
+#             background (tahoe-gdm-background.png: lossless, dithered down from the 16-bit picture)
 #   install   install it (asks for the sudo password): the user's choices by default, a 24 h
 #             clock, Space Grotesk and the login screen extension (GDM_CLOCK_FORMAT, GDM_FONTS,
 #             GDM_EXTENSION override). Shows at the next logout or boot.
@@ -34,11 +34,14 @@ build() {
 import sys, gi
 from gi.repository import Gio
 r = Gio.Resource.load(sys.argv[1])
-try:
-    r.lookup_data('/org/gnome/shell/theme/tahoe-gdm-background.jpg', 0)
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
+# an earlier build had a JPEG background, the current one a PNG: either means "ours"
+for name in ('tahoe-gdm-background.png', 'tahoe-gdm-background.jpg'):
+    try:
+        r.lookup_data('/org/gnome/shell/theme/' + name, 0)
+        sys.exit(0)
+    except Exception:
+        pass
+sys.exit(1)
 PY
   then echo "base $base is already a Tahoe build and there is no $BACKUP; cannot build" >&2; exit 1; fi
 
@@ -64,7 +67,7 @@ for f in walk(P):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     open(dst, 'wb').write(data)
     files.append(rel)
-files.append('tahoe-gdm-background.jpg')
+files.append('tahoe-gdm-background.png')
 with open(os.path.join(src, 'theme.gresource.xml'), 'w') as x:
     x.write('<?xml version="1.0" encoding="UTF-8"?>\n<gresources>\n  <gresource prefix="/org/gnome/shell/theme">\n')
     for rel in sorted(files):
@@ -77,7 +80,10 @@ PY
   case $pic in
     *.jxl) djxl "$pic" "$work/pic.png" >/dev/null 2>&1; pic=$work/pic.png ;;
   esac
-  magick "$pic" -resize 2560x1440^ -gravity center -extent 2560x1440 -strip -quality 92 "$work/src/tahoe-gdm-background.jpg"
+  # lossless and dithered: a JPEG halves the colour resolution (soft colour edges) and a plain
+  # 16 to 8 bit step bands the wallpaper's smooth gradients; both read as "low res" (user, 2026-10-20)
+  magick "$pic" -filter Lanczos -resize 2560x1440^ -gravity center -extent 2560x1440 -strip \
+    -ordered-dither o8x8,256 -depth 8 -define png:compression-level=9 "$work/src/tahoe-gdm-background.png"
   mkdir -p "$OUT"
   glib-compile-resources --sourcedir="$work/src" --target="$OUT/gnome-shell-theme.gresource.new" "$work/src/theme.gresource.xml"
   mv "$OUT/gnome-shell-theme.gresource.new" "$OUT/gnome-shell-theme.gresource"
@@ -144,7 +150,7 @@ case ${1:-} in
   build) build ;;
   commands) commands ;;
   install)
-    [ -f "$OUT/gnome-shell-theme.gresource" ] || build
+    build   # always from the current checkout: never an older build left in build/gdm
     run_part install
     echo "Installed. The new login screen shows at the next logout or boot." ;;
   undo)

@@ -24,7 +24,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 export const MATERIAL = {
     edge: 10,           // logical px of bevel inside the shape
     bend: 9,            // logical px the backdrop is pushed at the very edge
-    blur: 1.5,          // logical px of softening, so text on the glass stays readable
+    blur: 0.5,          // logical px of softening: just enough to calm the bend's edge (1.5 read as soft, user 2026-10-20)
     contrast: 0.92,
     saturation: 1.1,
     brightness: 0.03,
