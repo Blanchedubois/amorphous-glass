@@ -79,6 +79,9 @@ WANT="['user-theme@gnome-shell-extensions.gcampax.github.com','dash-to-dock@micx
 [[ -d "$EXT_DIR/tahoe-widgets@cachyos-tahoe" && "$(glass_state widgets)" == on ]] && WANT="${WANT%]},'tahoe-widgets@cachyos-tahoe']"
 # Control Center (scripts/tahoe-control-center.sh): kept on while installed and switched on
 [[ -d "$EXT_DIR/tahoe-control-center@cachyos-tahoe" && "$(glass_state controlcenter)" == on ]] && WANT="${WANT%]},'tahoe-control-center@cachyos-tahoe']"
+# Tahoe lock screen (scripts/tahoe-lockscreen.sh): kept on while installed and switched on; it runs
+# only while the screen is locked and falls back to GNOME's own lock screen on any fault
+[[ -d "$EXT_DIR/tahoe-lockscreen@cachyos-tahoe" && "$(glass_state lockscreen)" == on ]] && WANT="${WANT%]},'tahoe-lockscreen@cachyos-tahoe']"
 # open and close animations (scripts/tahoe-motion.sh): kept on while installed and switched on
 [[ -d "$EXT_DIR/tahoe-motion@cachyos-tahoe" && "$(glass_state motion)" == on ]] && WANT="${WANT%]},'tahoe-motion@cachyos-tahoe']"
 # the frame probe (tools/tahoe-probe@cachyos-tahoe, measuring only): kept on while it is on

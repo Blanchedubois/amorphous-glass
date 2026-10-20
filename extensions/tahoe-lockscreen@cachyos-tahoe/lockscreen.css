@@ -116,3 +116,89 @@
 .unlock-dialog .login-dialog-button.switch-user-button:hover,
 .unlock-dialog .login-dialog-button.switch-user-button:focus { background-color: rgba(255, 255, 255, 0.24); }
 .unlock-dialog .login-dialog-button.switch-user-button:active { background-color: rgba(255, 255, 255, 0.32); }
+
+/* ---- Phase 5: Now Playing ----
+   GNOME's own media card, restyled; the glass and the album-colour swirl under it are ours
+   (nowplaying.js), so the card itself is clear. Radius: tokens/radius.json widget (24). */
+.unlock-dialog-notifications-container .message.media-message,
+.unlock-dialog-notifications-container .message.media-message:hover,
+.unlock-dialog-notifications-container .message.media-message:focus,
+.unlock-dialog-notifications-container .message.media-message:active {
+  background-color: transparent;
+  border-radius: 24px;
+  box-shadow: none !important;
+  padding: 8px;
+  color: #ffffff;
+}
+
+.unlock-dialog-notifications-container .media-message .message-header { color: rgba(255, 255, 255, 0.72); }
+
+.unlock-dialog-notifications-container .media-message .message-box .message-icon {
+  icon-size: 64px;
+  border-radius: 12px !important;
+}
+
+.unlock-dialog-notifications-container .media-message .message-title {
+  font-family: "SF Pro Text", sans-serif;
+  font-weight: 700;
+}
+
+.unlock-dialog-notifications-container .media-message .message-body { color: rgba(255, 255, 255, 0.78); }
+
+.unlock-dialog-notifications-container .media-message .message-media-control {
+  border-radius: 9999px;
+  padding: 8px;
+  color: #ffffff;
+  background-color: transparent;
+}
+
+.unlock-dialog-notifications-container .media-message .message-media-control:hover { background-color: rgba(255, 255, 255, 0.12); }
+.unlock-dialog-notifications-container .media-message .message-media-control:active { background-color: rgba(255, 255, 255, 0.18); }
+.unlock-dialog-notifications-container .media-message .message-media-control StIcon { icon-size: 20px; }
+
+/* a light cover: dark text, as the Music widgets (each part named, so these win over the rules
+   above and the theme's own colours) */
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-title,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-media-control,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-media-control StIcon { color: rgba(0, 0, 0, 0.85); }
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-header,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-source-title,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-source-icon,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-body { color: rgba(0, 0, 0, 0.62); }
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-media-control:hover { background-color: rgba(0, 0, 0, 0.08); }
+
+/* ---- The top-right menu (quick settings) while locked ----
+   Each piece has glass of its own under it (menuglass.js), so the pieces' own fill is all but
+   cleared; a checked toggle keeps the theme's fill. Submenus: tokens/radius.json submenu (32). */
+.quick-settings .quick-toggle,
+.quick-settings .quick-slider,
+.quick-settings .quick-settings-system-item .icon-button {
+  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+
+.quick-settings .quick-toggle:hover,
+.quick-settings .quick-settings-system-item .icon-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+
+.quick-settings .quick-toggle:active,
+.quick-settings .quick-settings-system-item .icon-button:active { background-color: rgba(255, 255, 255, 0.18); }
+
+.quick-settings .quick-toggle-menu {
+  background-color: transparent;
+  border-radius: 32px;
+  box-shadow: none;
+}
+
+/* a checked toggle keeps the theme's own fill (the rules above would otherwise win over it) */
+.quick-settings .quick-toggle:checked {
+  color: -st-accent-fg-color;
+  background-color: -st-accent-color;
+}
+
+/* Blur My Shell's stylesheet (loaded while locked too) colours these with long selectors on the
+   UI group's .bms-popup-background-* class; the same chains here, one class longer, keep a light
+   cover's dark text */
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-box .message-content .message-title { color: rgba(0, 0, 0, 0.85); }
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-header .message-header-content .message-source-title,
+.unlock-dialog-notifications-container .message.media-message.tahoe-lock-ink-dark .message-header .message-source-icon { color: rgba(0, 0, 0, 0.62); }

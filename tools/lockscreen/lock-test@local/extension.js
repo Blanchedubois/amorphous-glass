@@ -164,6 +164,66 @@ async function runPerf() {
         intervalP95: pct(intervals.filter(x => x < 50), 0.95), frame: frameState().frame });
 }
 
+// the top-right menu (quick settings) while locked
+async function runQs() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    await sleep(1000);
+    const qs = Main.panel.statusArea.quickSettings;
+    qs.menu.open(false);
+    await sleep(1200);
+    const menu = qs.menu;
+    const chain = []; for (let a = menu.actor; a; a = a.get_parent()) chain.push(`${a.constructor.name}${a.name ? '#' + a.name : ''}${a.style_class ? '.' + a.style_class.split(' ').join('.') : ''}`);
+    const box = menu.box ?? menu.actor;
+    write({ label: 'qs', open: menu.isOpen, actor: box ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
+        boxStyle: menu.box?.style_class, chain, frame: frameState().frame,
+        glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-lock:menu-glass' || a.name === 'menu-glass') n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
+    const [x, y] = menu.box.get_transformed_position(); const [w, h] = menu.box.get_transformed_size();
+    write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
+    await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);
+    qs.menu.close(false);
+    await sleep(500);
+    write({ label: 'qs-closed', frame: frameState().frame, stillLocked: Main.sessionMode.isLocked });
+}
+
+// Phase 6: our actors ease in when the screen wakes, and settle at full opacity and size
+async function runMotion() {
+    await sleep(3000);
+    Main.screenShield.lock(false);
+    await sleep(2500);
+    const dialog = Main.screenShield._dialog;
+    const ours = () => dialog.get_children().filter(c => c.name?.startsWith('tahoe-lock:'));
+    const sample = () => ours().map(a => `${a.name.slice(11)} o=${a.opacity} s=${a.scale_x.toFixed(3)}`).join(' | ');
+    const t0 = GLib.get_monotonic_time();
+    Main.screenShield._wakeUpScreen();
+    const samples = [];
+    for (const at of [30, 80, 150, 250, 400, 700, 1200]) {
+        while ((GLib.get_monotonic_time() - t0) / 1000 < at)
+            await sleep(5);
+        samples.push(`${at} ms: ${sample()}`);
+        if (at === 150)
+            await shotRect('motion-150', [0, 0, global.screen_width, global.screen_height]);
+    }
+    write({ label: 'motion', samples, frame: frameState().frame });
+}
+
+// Now Playing's swirl must hold still after 30 s without input and move again on input
+async function runNpIdle() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    await sleep(1500);
+    const glass = () => { let g = null; const w = a => { if (a.name === 'now-playing-glass') g = a; for (const c of a.get_children()) w(c); }; w(global.stage); return g; };
+    const paintsOver = async ms => { const e = glass()?.get_effect('tahoe-lock-swirl'); const a = e?.paints ?? 0; await sleep(ms); return (e?.paints ?? 0) - a; };
+    const active = await paintsOver(2000);
+    await sleep(35000);                       // no input
+    const idle = await paintsOver(2000);
+    await typeKeys('x');                      // input again
+    await sleep(300);
+    const again = await paintsOver(2000);
+    write({ label: 'np-idle', paintsIn2sActive: active, paintsIn2sAfter35sIdle: idle, paintsIn2sAfterInput: again,
+        frame: frameState().frame, stillLocked: Main.sessionMode.isLocked, dialog: !!dialog });
+}
+
 // G2 for our own code: a broken later phase, injected through the frame's own API
 async function runOurs(kind) {
     await sleep(3000);
@@ -296,6 +356,59 @@ function write(obj) {
     s.close(null);
 }
 
+// TAHOE_LOCK_PLAYER=1: a fake MPRIS player (made-up song, generated cover) for Now Playing;
+// TAHOE_LOCK_ART=path|none: another cover; TAHOE_LOCK_STATUS=Playing|Paused
+const MPRIS_XML = `<node>
+<interface name="org.mpris.MediaPlayer2"><property name="Identity" type="s" access="read"/><property name="DesktopEntry" type="s" access="read"/></interface>
+<interface name="org.mpris.MediaPlayer2.Player">
+  <method name="PlayPause"/><method name="Next"/><method name="Previous"/>
+  <property name="PlaybackStatus" type="s" access="read"/>
+  <property name="Metadata" type="a{sv}" access="read"/>
+  <property name="CanGoNext" type="b" access="read"/>
+  <property name="CanGoPrevious" type="b" access="read"/>
+  <property name="CanPlay" type="b" access="read"/>
+</interface></node>`;
+function fakePlayer() {
+    const given = GLib.getenv('TAHOE_LOCK_ART');
+    const art = given && given !== 'none' ? given : `${OUT}/art.png`;
+    if (!given) {
+        const surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, 300, 300);
+        const cr = new Cairo.Context(surface);
+        const g = new Cairo.LinearGradient(0, 0, 300, 300);
+        g.addColorStopRGB(0, 0.98, 0.45, 0.25);
+        g.addColorStopRGB(0.5, 0.95, 0.20, 0.55);
+        g.addColorStopRGB(1, 0.20, 0.30, 0.90);
+        cr.setSource(g);
+        cr.paint();
+        cr.setSourceRGBA(1, 0.9, 0.3, 0.9);
+        cr.arc(110, 120, 60, 0, 2 * Math.PI);
+        cr.fill();
+        surface.writeToPNG(art);
+        cr.$dispose();
+    }
+    const info = Gio.DBusNodeInfo.new_for_xml(MPRIS_XML);
+    const props = {
+        Identity: new GLib.Variant('s', 'Fake Player'),
+        DesktopEntry: new GLib.Variant('s', 'org.gnome.Settings'),
+        PlaybackStatus: new GLib.Variant('s', GLib.getenv('TAHOE_LOCK_STATUS') ?? 'Playing'),
+        Metadata: new GLib.Variant('a{sv}', {
+            'mpris:trackid': new GLib.Variant('o', '/fake/track/1'),
+            'xesam:title': new GLib.Variant('s', 'Made-Up Song Title'),
+            'xesam:artist': new GLib.Variant('as', ['Test Artist']),
+            ...given === 'none' ? {} : {'mpris:artUrl': new GLib.Variant('s', `file://${art}`)},
+        }),
+        CanGoNext: new GLib.Variant('b', true),
+        CanGoPrevious: new GLib.Variant('b', true),
+        CanPlay: new GLib.Variant('b', true),
+    };
+    for (const iface of info.interfaces) {
+        Gio.DBus.session.register_object('/org/mpris/MediaPlayer2', iface,
+            (c, sender, path, ifaceName, method, params, invocation) => invocation.return_value(null),
+            (c, sender, path, ifaceName, name) => props[name] ?? null, null);
+    }
+    Gio.DBus.session.own_name('org.mpris.MediaPlayer2.fake', Gio.BusNameOwnerFlags.NONE, null, null);
+}
+
 async function shotRect(name, [x, y, w, h]) {
     const file = Gio.File.new_for_path(`${OUT}/${TAG}-${name}.png`);
     const stream = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
@@ -426,6 +539,29 @@ async function run() {
             }
         })() });
     await shotRect('full', [0, 0, sw, sh]);
+    // Now Playing: GNOME's card, our glass under it, and whether the swirl moves (two shots)
+    const find = pred => { let r = []; const w = a => { if (pred(a)) r.push(a); for (const c of a.get_children()) w(c); }; w(global.stage); return r; };
+    const cards = find(a => a.has_style_class_name?.('media-message'));
+    const glasses = find(a => a.name === 'now-playing-glass');
+    const fg = a => { try { const c = a.get_theme_node().get_foreground_color(); return `${c.red},${c.green},${c.blue},${c.alpha}`; } catch (e) { return `? ${e}`; } };
+    write({ label: 'nowplaying', cards: cards.map(c => ({ box: box(c), visible: c.visible, classes: c.style_class, pseudo: c.get_style_pseudo_class?.() ?? null,
+        cardFg: fg(c), titleFg: c.titleLabel ? fg(c.titleLabel) : null, titleClass: c.titleLabel?.style_class ?? null, titleStyle: c.titleLabel?.style ?? null })),
+        glasses: glasses.map(g => ({ box: box(g), visible: g.visible, mapped: g.mapped, x: g.x, y: g.y, w: g.width, h: g.height,
+            parentMapped: g.get_parent()?.mapped, parentVisible: g.get_parent()?.visible, parentName: g.get_parent()?.name,
+            paints: g.get_effect('tahoe-lock-swirl')?.paints ?? null })),
+        notificationsTranslation: dialog._notificationsBox?.translation_y ?? null, stackTranslation: dialog._stack.translation_y });
+    if (glasses[0]?.mapped) {
+        const b = box(glasses[0]);
+        const r = [b[0] - 30, b[1] - 30, b[2] + 60, b[3] + 60];
+        await shotRect('np-a', r);
+        await sleep(2000);
+        await shotRect('np-b', r);
+        const sh = Main.screenShield;
+        write({ label: 'nowplaying-later', paints: glasses[0].get_effect('tahoe-lock-swirl')?.paints ?? null,
+            shortLightbox: sh._shortLightbox?.active, longLightbox: sh._longLightbox?.active,
+            powerSave: global.backend.get_monitor_manager().get_power_save_mode?.() ?? 'no getter', animations: St.Settings.get().enable_animations,
+            playerStatus: cards[0]?._player?.status ?? null, cover: cards[0]?._player?.trackCoverUrl ?? null });
+    }
     const a = box(prompt._entryArea);
     if (a) await shotRect('entry', [a[0] - 40, a[1] - 40, a[2] + 80, a[3] + 80]);
     const c = box(dialog._clock);
@@ -440,7 +576,9 @@ export default class Driver extends Extension {
     enable() {
         if (this._started) return;
         this._started = true;
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        if (GLib.getenv('TAHOE_LOCK_PLAYER'))
+            fakePlayer();
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
