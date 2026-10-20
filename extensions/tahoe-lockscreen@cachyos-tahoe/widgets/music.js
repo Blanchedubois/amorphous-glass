@@ -226,8 +226,11 @@ class LyricsView {
 }
 
 class MusicWidget {
-    // options.swirl: passed to the Swirl ({lockScreen, gate}, for the lock screen's copy)
+    // options.swirl: passed to the Swirl ({lockScreen, gate}, for the lock screen's copy);
+    // options.scale: the wide widget's cover and buttons drawn that much bigger (the lock screen's
+    // larger Now Playing; its stylesheet scales the text to match). 1 on the desktop.
     constructor(options = {}) {
+        this._scale = options.scale ?? 1;
         this.actor = new St.BoxLayout({
             style_class: 'tahoe-music',
             orientation: Clutter.Orientation.VERTICAL,
@@ -332,13 +335,13 @@ export class MusicMedium extends MusicWidget {
 
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row', y_expand: true});
-        this._art = new Art(138);   // 170 less 16 px top and bottom
+        this._art = new Art(Math.round(138 * this._scale));   // 170 less 16 px top and bottom
         top.add_child(this._art.actor);
         const info = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
         info.add_child(this._title);
         info.add_child(this._artist);
         info.add_child(new St.Widget({y_expand: true}));
-        this._transport = new Transport(this._player, 20);
+        this._transport = new Transport(this._player, Math.round(20 * this._scale));
         this._transport.actor.x_align = Clutter.ActorAlign.END;
         info.add_child(this._transport.actor);
         this._progress = new Progress(false);

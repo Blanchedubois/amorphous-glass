@@ -469,6 +469,13 @@ function state(label) {
 async function applyMaterial() {
     const json = GLib.getenv('TAHOE_LOCK_MATERIAL');
     const ext = lockExt();
+    // TAHOE_LOCK_NP_STYLE=wide|wide-big|large|wide-scaled: Now Playing's style for this run
+    const npStyle = GLib.getenv('TAHOE_LOCK_NP_STYLE');
+    if (npStyle && ext) {
+        const np = await import(`${ext.dir.get_uri()}/nowplaying.js`);
+        np.NOW_PLAYING.style = npStyle;
+        write({ label: 'np-style', style: npStyle });
+    }
     if (!json || !ext)
         return;
     const mod = await import(`${ext.dir.get_uri()}/glassclock.js`);

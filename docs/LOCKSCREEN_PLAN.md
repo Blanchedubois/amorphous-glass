@@ -556,6 +556,17 @@ Rules while locked:
 - **Placement:** the remaining notifications move under Now Playing when they fit above the
   prompt.
 
+**Size, the user's choice:** the wide widget drawn 1.5×, 534 × 239. It was picked from
+[np-size-options.png](lockscreen/shots/np-size-options.png), which also showed the desktop size and
+the Large widget.
+- `music.js` takes an opt-in `scale` for the cover and button icons (1 on the desktop).
+- `lockscreen.css` scales the text to match: title 26 px SF Pro Display, artist 21 px, and the track
+  and button padding.
+- The card's padding stays 16, so the cover's 8 px corner stays concentric with the card's 24.
+- A plain 1.5× scale of the actor was ruled out: softer text, and the Liquid Glass behind it would
+  show a magnified wallpaper that no longer lines up.
+- `nowplaying.js` keeps `wide` and `large` as other styles (`NOW_PLAYING.style`).
+
 **Top-right menu (quick settings)**, which the user asked for (`menuglass.js`). Blur My Shell's
 popup glass is off in the lock screen's session mode, so each piece gets that same glass here:
 - **What it is:** a wallpaper copy through the desktop dropdowns' own pipeline (`popup/pipeline`,
