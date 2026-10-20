@@ -1,0 +1,54 @@
+/* Tahoe Lock Screen. Loaded only while the screen is locked (session mode unlock-dialog). The user
+   theme is switched off on the lock screen, so these rules sit on the system shell theme
+   (/usr/share/gnome-shell/gnome-shell-theme.gresource, currently MacTahoe's GDM build).
+
+   Password capsule. GNOME overlays the unlock arrow (.login-dialog-default-button-well) on the
+   right end of the entry and reserves room for it with padding-right: 2.5em on the entry; the
+   MacTahoe build drops that rule, so the peek (eye) icon, which St draws at the entry's right
+   edge, ended up under the arrow. Here the capsule is 48 px tall (radius 24), the arrow is a
+   32 px circle (radius 16) 8 px in from the end, so the two curves are concentric
+   (24 = 16 + 8, docs/STANDARD.md), and the entry's text stops 4 px before the arrow, which puts
+   the eye just left of it. */
+.unlock-dialog .login-dialog-prompt-entry {
+  height: 48px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-radius: 9999px;
+}
+
+.unlock-dialog .login-dialog-prompt-entry:ltr {
+  padding-left: 18px !important;
+  padding-right: 44px !important;
+}
+
+.unlock-dialog .login-dialog-prompt-entry:rtl {
+  padding-right: 18px !important;
+  padding-left: 44px !important;
+}
+
+.unlock-dialog .login-dialog-default-button-well:ltr { margin-right: 8px; }
+.unlock-dialog .login-dialog-default-button-well:rtl { margin-left: 8px; }
+
+.unlock-dialog .login-dialog-button.next-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff;
+  box-shadow: none !important;
+}
+
+.unlock-dialog .login-dialog-button.next-button:hover { background-color: rgba(255, 255, 255, 0.28) !important; }
+.unlock-dialog .login-dialog-button.next-button:active { background-color: rgba(255, 255, 255, 0.36) !important; }
+.unlock-dialog .login-dialog-button.next-button:insensitive { background-color: rgba(255, 255, 255, 0.08) !important; color: rgba(255, 255, 255, 0.45); }
+
+.unlock-dialog .login-dialog-button.next-button StIcon { icon-size: 16px; }
+
+.unlock-dialog .login-dialog-prompt-entry StIcon.peek-password {
+  icon-size: 16px;
+  padding: 0 4px !important;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.unlock-dialog .login-dialog-prompt-entry StIcon.peek-password:hover { color: #ffffff; }
