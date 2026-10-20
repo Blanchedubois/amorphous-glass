@@ -84,3 +84,47 @@ hidden and shown, and their rows are rebuilt as the user types.
 | search typing fast ×5 (19 keystrokes 40 ms apart, results scrolled while they change) | p95 28.7 ms, 85 slow frames (search itself) | p95 27.8 ms, 88 |
 | app folder open/close ×20 | p95 11.2 ms | 12.5 ms |
 | full suite (28 cases) | — | nothing stuck, no JS errors, handlers and actors flat |
+
+## Round 2 (user, after logging in): "this is just circles instead of liquid glass", "this doesnt follow the right consistent inset spacing"
+
+- **App results**: the hover and selection fill was a flat white circle. Now a real Liquid Glass
+  capsule. Each app result tile is a glass target (`tahoe-search-tile`, marked by the patch's
+  overview scan). Its glass shows only while the tile is hovered, focused or selected: the
+  fade gives 0 otherwise, and a pseudo-class change updates it at once. Results arrive after the
+  text changes, so the app results row is watched for new tiles. Square tiles make the capsule
+  round.
+- **Inset spacing**: the provider label (icon, name, "15 more") is two lines, about 50 px. Its
+  25 px ends plus the 12 px gap missed the panel's 30 px corner. The label is now a fixed 48 px
+  (24 px ends) 12 px from the top and side, and the panel 36 px, so they are concentric. Rows
+  stay 36 px capsules.
+- Stress, same machine load, previous build → this one: search typing p95 28.0 → 24.8 ms, quick
+  settings ×50 13.5 → 13.4 ms (both slower than earlier runs: two test shells ran at once).
+
+![app result selected: a glass capsule](shots/search-glass-tile.jpg)
+
+## Round 3 (user): "It should be a rounded rectangle a squircle"
+
+- App results: the glass is the folder tiles' rounded square, 32 px, around the app icon's own
+  squircle, not a circle. The shader's corners are circular arcs, so it is a rounded rectangle
+  with large corners rather than a true superellipse.
+- Keyboard focus on rows and provider labels showed GNOME's accent ring: now the glass's 1 px
+  edge. The provider label in its panel's corner (round 2), close up:
+
+![provider label in the corner: 12 px inset, concentric](shots/search-glass-provider-corner.jpg)
+
+## Round 4 (user): "the rounding isnt right for the selected label, measure it and confirm"
+
+Measured in the headless shell (the survey's `provider-geometry` record):
+
+| | Before | After |
+|---|---|---|
+| Provider label | 188 × 60 px (ends 30) | 188 × 60 px (ends 30) |
+| Inset from the panel's top and side | 12, 12 | 12, 12 |
+| Panel corner (CSS and glass) | 36 | **42** |
+| Concentric corner (ends + inset) | 42: off by 6 | 42: exact |
+
+The label was meant to be 48 px. St's `min-height` sizes the content box, and its padding (6 + 6)
+comes on top, so it was 60. The label's content (icon and two lines) is 48 px on its own, so
+rather than squeeze it, the label stays 60 (content fixed at 48) and the panel's corner is
+30 + 12 = 42, in the CSS and in the patch's glass. The glass's corner, traced from the
+screenshot's pixels, follows a 42 px circle within about 1 px near the top edge.

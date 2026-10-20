@@ -120,6 +120,30 @@ export async function runSurvey(write) {
         mouse.notify_absolute_motion(t(), 100, 700);
         await step('search-pa', () => Main.overview.searchEntry.set_text('pa'), 2500);
         await step('search-keys', async () => { Main.overview.searchEntry.grab_key_focus(); await key(Clutter.KEY_Down); await key(Clutter.KEY_Down); }, 600);
+        // the provider labels against their panels: size, insets and corner radii, in px
+        {
+            const out = [];
+            const st = [Main.overview._overview];
+            while (st.length) {
+                const a = st.pop();
+                if (a.mapped && a.has_style_class_name?.('search-provider-icon')) {
+                    let panel = a.get_parent();
+                    while (panel && !panel.has_style_class_name?.('search-section-content')) panel = panel.get_parent();
+                    const r = x => { const [px, py] = x.get_transformed_position(); const [w, h] = x.get_transformed_size(); return { x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10, w: Math.round(w * 10) / 10, h: Math.round(h * 10) / 10 }; };
+                    const L = r(a), Pn = panel ? r(panel) : null;
+                    const glassApi = globalThis.__tahoeGlass;
+                    let glass = null;
+                    for (let r = panel; r && !glass; r = r.get_parent())
+                        glass = glassApi?.surfaces?.(r)?.find(g => g.target === panel) ?? null;
+                    out.push({ glass_radius: glass?.corner_radius ?? null, label: L, label_radius: a.get_theme_node().get_border_radius(0), pseudo: a.get_style_pseudo_class(),
+                        panel: Pn, panel_radius: panel?.get_theme_node().get_border_radius(0),
+                        inset_left: Pn && L.x - Pn.x, inset_top: Pn && L.y - Pn.y, capsule_end: L.h / 2,
+                        wanted_panel_radius: Pn && (L.h / 2 + (L.x - Pn.x)) });
+                }
+                st.push(...a.get_children());
+            }
+            write({ survey: 'provider-geometry', out });
+        }
         const view = find(Main.overview._overview, a => a.constructor.name === 'St_ScrollView' && a.mapped && find(a, b => b.has_style_class_name?.('search-section-content')));
         await step('search-scrolled', () => { view?.vadjustment?.set_value(view.vadjustment.upper); return view ? null : 'no scroll view'; }, 800);
         await step('search-scrolled-back', () => { view?.vadjustment?.set_value(0); }, 800);
