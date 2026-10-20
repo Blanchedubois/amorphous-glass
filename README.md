@@ -29,13 +29,14 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `docs/gnome-tahoe/` | Refraction shader study, menu bar and Control Center port, animation plan |
 | `docs/GLASS_MENUS_PLAN.md` | Plan for glass menus in GTK apps |
 | `docs/HANDOVER.md` | Where things stand and what to standardise next |
-| `tools/` | Frame probe extension and A/B script used to measure menu smoothness |
+| `tools/` | Frame probe extension and A/B script used to measure menu smoothness; `tools/widgets-stress/` headless widget screenshots and stress test |
 
 ## Widgets
 
 Right-click the desktop for Add Widget; drag to move, it snaps to an 8 px grid. Sizes are Tahoe's:
 small 170, medium 356 x 170, large 356 x 356 (logical px), all on the 24 px glass card of
 `docs/STANDARD.md`, in light, dark and milky. Sheet: `docs/shots/widgets-light.png`, `widgets-dark.png`.
+Stress and idle-cost results (spam clicks, fast drags, lock cycles, leaks): `docs/widgets.md`.
 
 | Widget | Sizes | Module | Data |
 |---|---|---|---|

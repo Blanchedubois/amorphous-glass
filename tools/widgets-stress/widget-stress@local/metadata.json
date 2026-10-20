@@ -1,0 +1,1 @@
+{ "uuid": "widget-stress@local", "name": "widget stress", "description": "headless widget stress test", "shell-version": ["51"], "session-modes": ["user", "unlock-dialog"] }

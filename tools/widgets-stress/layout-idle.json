@@ -1,0 +1,1 @@
+{"widgets": [{"type": "clock-digital", "monitor": 0, "x": 592, "y": 64}, {"type": "clock-glass-text", "monitor": 0, "x": 1160, "y": 64}, {"type": "weather-small", "monitor": 0, "x": 40, "y": 248}, {"type": "calendar-medium", "monitor": 0, "x": 1160, "y": 248}, {"type": "weather-large", "monitor": 0, "x": 40, "y": 432}, {"type": "calendar-day", "monitor": 0, "x": 1160, "y": 432}]}
