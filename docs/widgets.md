@@ -1,4 +1,15 @@
-# Plan: app button and Extra Large music widgets (2026-10-20, to workshop)
+# App button and Extra Large music widgets (2026-10-20)
+
+**Status: done.** Your picks: the app button on the Music widgets only; Extra Large Wide with the
+cover and player on the left and lyrics on the right; Extra Large Tall with the player on top and
+lyrics under it. The lyrics are also a bit faster (380 ms drift). Sheets:
+`docs/shots/music-all-{light,dark}.png`. Tests: `STRESS_ONLY=app` (a fake player in its own
+process and window is focused from behind another window, from minimised and from another
+workspace) and `tools/widgets-stress/layout-xl.json` for the big cards. Not checked: whether
+Firefox and Chromium switch to the playing tab on Raise. That needs a real browser playing audio,
+which the headless test shell can't do; the button calls Raise in any case.
+
+The plan as agreed:
 
 ## Part A: the app button ("open where the audio comes from")
 
@@ -27,7 +38,7 @@ process that owns the player's name (`GetConnectionUnixProcessID`).
 | Wide | top-right corner of the card, level with the title (title ellipsizes before it) | 20 px |
 | Large | right of the title and artist, level with the title | 24 px |
 | Lyrics | badge on the small cover's corner (the play button keeps the top right) | 18 px |
-| Extra Large (B) | as Large, on the player column | 24 px |
+| Extra Large Wide / Tall | as Large, on the player column | 24 px |
 
 Phases:
 - **A1** `mpris.js`: per player `desktopEntry`, `identity`, `canRaise`, owner `pid` (read once
