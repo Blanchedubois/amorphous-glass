@@ -9,7 +9,8 @@
 # Settings as GDM will have them (scripts/gdm-theme.sh commands): clock-show-date=false, no logo;
 # GDM_CLOCK_FORMAT=12h|24h overrides the clock format (default: the user's).
 # GDM_MONITOR=WxH: the virtual monitor (default 2560x1440).
-# Nothing here needs root or touches the real login.
+# Nothing here needs root or touches the real login: the shell sees the system bus through a
+# filter without GDM (sysbus.sh), so its login screen can never start a real PAM check.
 set -eu
 out=$1; fonts=${2:-system}
 H=$(cd "$(dirname "$0")" && pwd)
@@ -48,8 +49,11 @@ rm -f "$out/$GDM_SHOT_TAG-log.jsonl"
 # ~/.fonts and ~/.local/share/fonts are also in fontconfig's default list under HOME: hide HOME
 # for the system run so the greeter's font fallback is what user gdm gets
 [ "$fonts" = system ] && export HOME=$root/home && mkdir -p "$HOME"
+. "$H/sysbus.sh"
+sysbus_start
 timeout ${GDM_TEST_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --mode=gdm \
   --wayland-display "tahoe-gdm-$$" --virtual-monitor ${GDM_MONITOR:-2560x1440}@60 > "$out/shell-$GDM_SHOT_TAG.log" 2>&1 || true
+sysbus_stop
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
 rm -rf "$root" "$XDG_RUNTIME_DIR"
 grep -h "GDM SHOT ERR" -A5 "$out/shell-$GDM_SHOT_TAG.log" || true

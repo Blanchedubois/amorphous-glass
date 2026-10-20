@@ -185,33 +185,62 @@ export default class {
         const avatarTop = Math.min(0.825 * H - 32, 0.96 * H - PROMPT_BELOW);
         const room = [monitor.y + clockBottom + GAP_V, monitor.y + avatarTop - GAP_V];
         const TEXT = 175;    // title, artist, buttons and the card's padding under the cover, logical px
-        const side = Math.max(120, Math.round(Math.min((ipad ? 0.38 : COVER) * H, room[1] - room[0] - TEXT)));
+        const roomH = room[1] - room[0];
+        // Two cards (user, 2026-10-20): tall (the cover over the title and buttons) where there is
+        // room, else wide (the cover on the left, the player on the right, as the desktop's wide
+        // Music widget). Wide when the tall card's cover would be under a quarter of the height.
+        // LOCKMUSIC_CARD=tall|wide forces one.
+        const tallSide = Math.round(Math.min((ipad ? 0.38 : COVER) * H, roomH - TEXT));
+        const forced = GLib.getenv('LOCKMUSIC_CARD');
+        const wide = forced ? forced === 'wide' : tallSide < 0.25 * H;
+        const side = wide
+            ? Math.max(96, Math.round(Math.min(COVER * H, roomH - 2 * CARD_PAD)))
+            : Math.max(120, tallSide);
         const card = new St.Widget({layout_manager: new Clutter.BinLayout()});
         card.add_child(new GlassPane(backgrounds[0], COVER_RADIUS + CARD_PAD));
         const centre = new St.BoxLayout({
-            orientation: Clutter.Orientation.VERTICAL, x_align: Clutter.ActorAlign.CENTER,
-            style: `spacing: 6px; padding: ${CARD_PAD}px ${CARD_PAD}px 20px;`,
+            orientation: wide ? Clutter.Orientation.HORIZONTAL : Clutter.Orientation.VERTICAL,
+            x_align: Clutter.ActorAlign.CENTER,
+            style: wide
+                ? `spacing: ${CARD_PAD}px; padding: ${CARD_PAD}px;`
+                : `spacing: 6px; padding: ${CARD_PAD}px ${CARD_PAD}px 20px;`,
         });
         card.add_child(centre);
         const cover = new St.Widget({
             width: side, height: side, x_align: Clutter.ActorAlign.CENTER,   // square, even when the title is wider
+            y_align: Clutter.ActorAlign.CENTER,
             style: `background-image: url("${track.art}"); background-size: cover; border-radius: ${COVER_RADIUS}px;`,
         });
         centre.add_child(cover);
-        const text = (t, css) => new St.Label({text: t, x_align: Clutter.ActorAlign.CENTER, style: css});
-        centre.add_child(new St.Widget({height: 10}));
+        // the player: under the cover (tall) or beside it, centred on its height (wide)
+        const player = wide
+            ? new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, y_align: Clutter.ActorAlign.CENTER, style: 'spacing: 6px;'})
+            : centre;
+        const align = wide ? Clutter.ActorAlign.START : Clutter.ActorAlign.CENTER;
+        const text = (t, css) => new St.Label({text: t, x_align: align, style: css});
+        if (!wide)
+            centre.add_child(new St.Widget({height: 10}));
+        // the text column: as wide as the cover in the tall card, a little wider in the wide one
+        const textWidth = wide ? Math.max(240, Math.round(side * 1.3)) : side;
         const title = text(track.title, 'font-family: SF Pro Display, Adwaita Sans, sans-serif; font-size: 26px; font-weight: 700; color: #ffffff;');
-        title.clutter_text.ellipsize = 3;   // Pango.EllipsizeMode.END: a long title never widens the card past the cover
-        title.style += ` max-width: ${side}px;`;
-        centre.add_child(title);
-        centre.add_child(text(track.artist, 'font-family: SF Pro Text, Adwaita Sans, sans-serif; font-size: 20px; color: rgba(255, 255, 255, 0.72);'));
-        const buttons = new St.BoxLayout({x_align: Clutter.ActorAlign.CENTER, style: 'spacing: 36px; padding-top: 14px;'});
+        title.clutter_text.ellipsize = 3;   // Pango.EllipsizeMode.END: a long title never widens the card
+        title.style += ` max-width: ${textWidth}px;`;
+        player.add_child(title);
+        const artist = text(track.artist, 'font-family: SF Pro Text, Adwaita Sans, sans-serif; font-size: 20px; color: rgba(255, 255, 255, 0.72);');
+        artist.clutter_text.ellipsize = 3;
+        artist.style += ` max-width: ${textWidth}px;`;
+        player.add_child(artist);
+        const buttons = new St.BoxLayout({x_align: align, style: 'spacing: 36px; padding-top: 14px;'});
         for (const [icon, method] of [['media-skip-backward-symbolic', 'Previous'], ['media-playback-pause-symbolic', 'PlayPause'], ['media-skip-forward-symbolic', 'Next']]) {
             const b = new St.Button({child: new St.Icon({icon_name: icon, icon_size: 30, style: 'color: #ffffff;'}), can_focus: false});
             b.connect('clicked', () => call(track.name, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', method, null, null).catch(() => {}));
             buttons.add_child(b);
         }
-        centre.add_child(buttons);
+        player.add_child(buttons);
+        if (wide) {
+            player.width = textWidth;
+            centre.add_child(player);
+        }
         group.add_child(card);
         this._undo.push(() => card.destroy());
         const [, natH] = card.get_preferred_height(-1);
