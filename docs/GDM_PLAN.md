@@ -166,7 +166,13 @@ access to the user's home. Planned after phase 1.
   0 panes, rows back to GNOME's own), the password field stays where it was with phase 1's capsule.
 - Still to do before installing: a watchdog like tahoe-lockscreen's frame.js (entry visible,
   on screen, clickable), the lock screen's capsule in the same glass (tahoe-lockscreen), real-login check.
-- Shots: `docs/gdm/phase2-glass-controls.png`.
+- Edges: drawn edge to edge, the bend sampled past the pane and the rim was cut flat (the user:
+  "the rounding is clipped"). The glass is now an inner layer PAD (bend + 4) px bigger than its
+  slot on every side, the mask the shape plus that margin, so the anti-aliased edge and the rim
+  lie inside the texture. (A clip on the pane instead does not resize the effect's texture.)
+  The widget cards' CSS rim (`.tahoe-widget-content` border) is off on this glass: the shader's
+  rim is the only edge.
+- Shots: `docs/gdm/phase2-glass-controls.png`, `docs/gdm/phase2-corners.png` (before/after, 6x).
 
 ### Weather and calendar widgets
 
@@ -191,4 +197,9 @@ tahoe-widgets' WeatherSmall, CalendarDay and CalendarMonth on the glass panes ab
   login screen and makes the login screen fetch weather over the network.
 - Legibility: white text on the glass is fine on the darker parts of the wallpaper, weak on the
   bright yellow (weekend dates in the month, the calendar's red weekday on magenta).
-- Shots: `docs/gdm/widgets-workshop.png`, `docs/gdm/widgets-closeup.png`.
+- With music (lock harness `TAHOE_LOCK_PLAYER=1`): Now Playing (wide, 1.5x, 534 px) with the two
+  small widgets under it (356 px): the row is narrower than the card, and Now Playing's glass is
+  Blur My Shell's while the widgets use this shader; both would need matching.
+- Music on the login screen: not possible in a useful way: nobody is logged in, so no player runs,
+  and the greeter (user gdm) cannot see a user session's players.
+- Shots: `docs/gdm/widgets-workshop.png`.

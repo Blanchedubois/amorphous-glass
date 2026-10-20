@@ -139,19 +139,25 @@ function roundedRect(cr, x, y, w, h, r) {
     cr.closePath();
 }
 
-// width, height: physical px; radius in physical px
-export function buildMask(width, height, radius, scale) {
+// The glass is drawn PAD logical px bigger than its shape on every side: the bend near the edge
+// samples the backdrop just outside the shape, and the shape's anti-aliased edge and rim must lie
+// inside the texture; drawn edge to edge, both were cut flat (worst at the corners).
+const PAD = Math.ceil(MATERIAL.bend) + 4;
+
+// width, height: the shape, physical px; radius, pad: physical px. The mask is the shape plus pad
+// on every side.
+export function buildMask(width, height, radius, scale, pad = 0) {
     if (MATERIAL._failForTest)   // set only by tools/gdm (GDM_FAIL_MASK)
         throw new Error('test: mask failed');
-    const surface = new Cairo.ImageSurface(Cairo.Format.RGB24, width, height);
+    const surface = new Cairo.ImageSurface(Cairo.Format.RGB24, width + 2 * pad, height + 2 * pad);
     const cr = new Cairo.Context(surface);
     cr.setSourceRGB(0, 0, 0);
     cr.paint();
-    roundedRect(cr, 0, 0, width, height, radius);
+    roundedRect(cr, pad, pad, width, height, radius);
     cr.setSourceRGB(1, 0, 1);
     cr.fill();
     // green, depth: the shape eaten from the outline inwards a step at a time (as glassclock.js)
-    roundedRect(cr, 0, 0, width, height, radius);
+    roundedRect(cr, pad, pad, width, height, radius);
     cr.pushGroup();
     cr.setOperator(Cairo.Operator.OVER);
     cr.setSourceRGB(0, 1, 0);
@@ -195,17 +201,20 @@ export const GlassPane = GObject.registerClass({
         super._init({
             name: 'tahoe-gdm-glass',
             reactive: false,
-            clip_to_allocation: true,
             x_expand: true,
             y_expand: true,
         });
         this._radius = radius;
+        // the glass itself: PAD px bigger than this pane on every side (the pane does not clip),
+        // holding the backdrop and running the effect over its own allocation
+        this._glass = new St.Widget({reactive: false, clip_to_allocation: true});
+        this.add_child(this._glass);
         this._backdrop = backdrop instanceof Clutter.Actor
             ? new Clutter.Clone({source: backdrop})
             : new St.Widget({style: `background-image: url("${backdrop.get_uri()}"); background-size: cover;`});
-        this.add_child(this._backdrop);
+        this._glass.add_child(this._backdrop);
         this._effect = new GlassEffect();
-        this.add_effect_with_name('tahoe-gdm-glass', this._effect);
+        this._glass.add_effect_with_name('tahoe-gdm-glass', this._effect);
         this._maskSize = '';
         this._maskId = 0;
         this.failed = null;   // set when the mask could not be made; the owner then removes the pane
@@ -226,11 +235,15 @@ export const GlassPane = GObject.registerClass({
 
     vfunc_allocate(box) {
         this.set_allocation(box);
+        const g = new Clutter.ActorBox();
+        g.set_origin(-PAD, -PAD);
+        g.set_size(box.get_width() + 2 * PAD, box.get_height() + 2 * PAD);
+        this._glass.allocate(g);
         // the backdrop covers the monitor, placed so it lines up with the real background
         const monitor = Main.layoutManager.primaryMonitor;
         const [sx, sy] = this.get_transformed_position();
         const b = new Clutter.ActorBox();
-        b.set_origin(monitor.x - sx, monitor.y - sy);
+        b.set_origin(monitor.x - (sx - PAD), monitor.y - (sy - PAD));
         b.set_size(monitor.width, monitor.height);
         this._backdrop.allocate(b);
 
@@ -246,7 +259,8 @@ export const GlassPane = GObject.registerClass({
                     return GLib.SOURCE_REMOVE;
                 try {
                     const r = this._radius === 'capsule' ? ph / 2 : this._radius * scale;
-                    this._effect.setMask(buildMask(pw, ph, r, scale), pw, ph, scale);
+                    const pad = PAD * scale;
+                    this._effect.setMask(buildMask(pw, ph, r, scale, pad), pw + 2 * pad, ph + 2 * pad, scale);
                     this._maskSize = `${pw}x${ph}`;
                 } catch (e) {
                     this.failed = `${e}`;
