@@ -7,6 +7,9 @@
 #             undo both. This script never runs sudo itself. GDM_CLOCK_FORMAT=24h also sets a 24 h
 #             clock on the login screen only; GDM_FONTS=1 adds installing Space Grotesk (OFL)
 #             system-wide, from ~/.local/share/fonts/SpaceGrotesk, so the greeter (user gdm) has it.
+#             GDM_EXTENSION=1 adds the login screen extension (extensions/tahoe-gdm@cachyos-tahoe:
+#             Liquid Glass password field and account rows, the Tahoe proportions on any monitor),
+#             installed system-wide and enabled for the gdm user only.
 # Base theme: the backup made at install (gnome-shell-theme.gresource.pre-gdm-tahoe, the MacTahoe
 # build) if it exists, else the installed file, so a rebuild never stacks our CSS twice.
 set -euo pipefail
@@ -76,13 +79,21 @@ PY
 }
 
 commands() {
-  local fmt=""
+  local fmt="" ext=""
   [ "${GDM_CLOCK_FORMAT:-}" = 24h ] && fmt="clock-format='24h'\\n"
+  [ "${GDM_EXTENSION:-}" = 1 ] && ext="\\n[org/gnome/shell]\\nenabled-extensions=['tahoe-gdm@cachyos-tahoe']\\n"
   if [ "${GDM_FONTS:-}" = 1 ]; then cat <<EOF
 # Space Grotesk for the login screen's clock (SIL Open Font License, so it may be copied)
 sudo install -Dm644 $HOME/.local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf /usr/local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf
 sudo install -Dm644 $HOME/.local/share/fonts/SpaceGrotesk/OFL.txt /usr/local/share/fonts/SpaceGrotesk/OFL.txt
 sudo fc-cache -f /usr/local/share/fonts
+EOF
+  fi
+  if [ "${GDM_EXTENSION:-}" = 1 ]; then cat <<EOF
+# the login screen extension, system-wide (the greeter cannot read your home folder)
+sudo install -d -m 755 /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe
+sudo cp -r $R/extensions/tahoe-gdm@cachyos-tahoe/. /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe/
+sudo chmod -R a+rX /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe
 EOF
   fi
   cat <<EOF
@@ -93,7 +104,7 @@ sudo install -m 644 $OUT/gnome-shell-theme.gresource $SYS
 # the time only, and no distribution logo under the prompt (as on the Mac; it sat behind the field)
 printf 'user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n' | sudo tee $DCONF_PROFILE
 sudo mkdir -p /etc/dconf/db/gdm.d
-printf "[org/gnome/desktop/interface]\nclock-show-date=false\nclock-show-weekday=false\n${fmt}\n[org/gnome/login-screen]\nlogo=''\n" | sudo tee $DCONF_KEYS
+printf "[org/gnome/desktop/interface]\nclock-show-date=false\nclock-show-weekday=false\n${fmt}\n[org/gnome/login-screen]\nlogo=''\n${ext}" | sudo tee $DCONF_KEYS
 sudo dconf update
 # shows at the next logout or boot; the lock screen uses the new file from its next lock
 
@@ -102,6 +113,7 @@ sudo cp $BACKUP $SYS
 sudo rm -rf /etc/dconf/db/gdm.d /etc/dconf/db/gdm $DCONF_PROFILE
 sudo dconf update
 sudo rm -rf /usr/local/share/fonts/SpaceGrotesk && sudo fc-cache -f    # if it was installed
+sudo rm -rf /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe   # if it was installed
 sudo systemctl restart gdm    # only from the text console: it ends any graphical session
 EOF
 }
