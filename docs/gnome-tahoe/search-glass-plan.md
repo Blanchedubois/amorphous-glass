@@ -101,3 +101,13 @@ hidden and shown, and their rows are rebuilt as the user types.
   settings ×50 13.5 → 13.4 ms (both slower than earlier runs: two test shells ran at once).
 
 ![app result selected: a glass capsule](shots/search-glass-tile.jpg)
+
+## Round 3 (user): "It should be a rounded rectangle a squircle"
+
+- App results: the glass is the folder tiles' rounded square, 32 px, around the app icon's own
+  squircle, not a circle. The shader's corners are circular arcs, so it is a rounded rectangle
+  with large corners rather than a true superellipse.
+- Keyboard focus on rows and provider labels showed GNOME's accent ring: now the glass's 1 px
+  edge. The provider label in its panel's corner (round 2), close up:
+
+![provider label in the corner: 12 px inset, concentric](shots/search-glass-provider-corner.jpg)

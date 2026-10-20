@@ -1263,7 +1263,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..159a865 100644
+index 0dce45a..9360da5 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1282,11 +1282,11 @@ index 0dce45a..159a865 100644
 +    'app-folder',
 +    // tahoe glass: the overview's search result panels (docs/gnome-tahoe/search-glass-plan.md)
 +    'search-section-content',
-+    // tahoe glass: the search's app results, a glass capsule while hovered or selected
++    // tahoe glass: the search's app results, a glass rounded square while hovered or selected
 +    'tahoe-search-tile',
  ];
 +// tahoe glass: capsules whatever their height
-+const CAPSULE_STYLE_CLASSES = ['dash-label', 'tahoe-search-tile'];
++const CAPSULE_STYLE_CLASSES = ['dash-label'];
 +// tahoe glass: search result panels, concentric with the capsule in their corner: the provider's
 +// 48 px capsule (24 px ends) plus the 12 px gap (tokens/radius.json 'search')
 +const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 36 };
@@ -1306,17 +1306,18 @@ index 0dce45a..159a865 100644
  
  export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
  export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
-@@ -29,7 +54,8 @@ export const POPUP_CORNER_RADII = [
+@@ -29,7 +54,9 @@ export const POPUP_CORNER_RADII = [
      {
          key: 'calendar-corner-radius',
          property: 'CALENDAR_CORNER_RADIUS',
 -        style_classes: ['datemenu-popover'],
-+        // tahoe glass: app grid folder tiles share the calendar's 32 (tokens/radius.json 'folder')
-+        style_classes: ['datemenu-popover', 'app-folder'],
++        // tahoe glass: app grid folder tiles and the search's app results share the calendar's 32
++        // (tokens/radius.json 'folder'): a rounded square around the app icon's own squircle
++        style_classes: ['datemenu-popover', 'app-folder', 'tahoe-search-tile'],
      },
      {
          key: 'notification-corner-radius',
-@@ -95,6 +121,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -95,6 +122,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
  
          const box = actor._delegate?.box;
@@ -1332,7 +1333,7 @@ index 0dce45a..159a865 100644
          if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
              targets.add(box);
  
-@@ -143,6 +178,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -143,6 +179,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
                  }
              }
  
@@ -1344,7 +1345,7 @@ index 0dce45a..159a865 100644
              if (this.is_blur_target_actor(child)) {
                  targets.add(child);
                  continue;
-@@ -152,6 +192,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -152,6 +193,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
      }
  
@@ -1370,7 +1371,7 @@ index 0dce45a..159a865 100644
      push_children(stack, children) {
          for (let index = children.length - 1; index >= 0; index--)
              stack.push({ actor: children[index], fallback_count: null });
-@@ -167,6 +226,14 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -167,6 +227,14 @@ export const PopupBlurTargets = class PopupBlurTargets {
      }
  
      get_corner_radius(target, root_actor) {
