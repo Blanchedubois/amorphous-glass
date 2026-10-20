@@ -149,3 +149,35 @@ own get a small push at most every 400 ms. No effects while the panel itself is 
    glass textures, GNOME's own first-open work); the one-time setup of tahoe-motion (23 ms) now
    runs while idle 3 s after the shell starts. Normal opens and closes, p95: quick settings
    9.7 / 9.3, submenus 10.2 / 10.2, calendar 9.0 / 8.6, desktop menu 9.0 / 8.5.
+
+## Round 3: fast hands (2026-10-19 night)
+
+The user's notes: a right-click repeated quickly opened the menu away from the pointer; skimming
+the menu bar should still show the liquid animation, partly; "a tiny bit faster", the fade-out
+faster; spamming a menu open and closed. Their screen was recorded while they skimmed
+(`tools/record-screen.js`, GNOME's screencast service, 60 fps) and read frame by frame.
+
+- **The artifact while skimming** (from the recording): the menu being left was still fading out
+  (glass and rows at partial opacity) while the next one faded in over it; at skimming speed two
+  or three translucent menus stacked for several frames. Now the menu left behind stays up for
+  exactly the two frames the next one needs for its layout, then goes at once; the next one is
+  fully opaque from its first frame and its pour only partly plays (it starts 55 % poured, the
+  rows 12 ms apart, quick settings' row delays at 30 %). Never two menus, never a blank frame
+  (stills: `shots/motion5-skim-handover.png`, each pair right after a switch and 30 ms later).
+  Sliding back within those two frames keeps the menu.
+- **The right-click away from the pointer** had two causes. The menu was opened while its close
+  still played; and, measured, reading the source's place on screen as the menu opened made
+  Clutter lay the stage out early, placing the menu at the previous pointer (one click behind,
+  every time; GNOME alone places each one right). The origin is now read once the menu is laid
+  out (frame two); the "same place?" check for a menu reopened while closing compares the
+  source's own coordinates. A menu reopened while closing counts as closed: somewhere else it
+  starts afresh there, at the same place it turns round from where its shape is (spamming).
+  Stills: `shots/motion5-rightclick-spam.png`.
+- **Faster:** card edges 15 % stiffer than M3's fast spatial; the popup's elastic from 0.92 at
+  stiffness 900; rows 24 ms apart within 120 ms; quick settings rows 38 ms within 170 ms, parts
+  28 ms. **Closing faster:** the fold, the rise and the buttons 50 % stiffer, the rows fade on a
+  6000-stiffness critically damped spring, the elastic shrink on spatial fast.
+- Headless, p95 (worst): skimming fast after the first time 12.6 (18.2), slow 8.9 (22.4);
+  spamming the calendar every 60 ms 9.6 (29.0); right-clicking every 90 ms at new places 8.6
+  (9.7); quick settings 9.7 / 9.3; submenus 9.4 / 10.6; calendar 8.7 / 8.6; desktop menu 8.9 / 8.5.
+  The first fast skim of a session still pays once for quick settings' first open.

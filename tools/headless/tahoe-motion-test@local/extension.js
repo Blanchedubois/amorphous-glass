@@ -170,6 +170,49 @@ export default class Driver extends Extension {
             write('log.jsonl', { done: true });
             return;
         }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'spam') {
+            const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
+            const runs = [
+                ['spam-calendar', async i => (i % 2 ? date.close(true) : date.open(true)), 60, 10],
+                ['spam-rightclick', async i => {
+                    Main.layoutManager.setDummyCursorGeometry(300 + (i % 4) * 260, 250 + (i % 3) * 140, 0, 0);
+                    if (bg.isOpen) bg.close(true);
+                    bg.open(true);
+                    await sleep(60);
+                    const r = a => { const [x, y] = a.get_transformed_position(); const [w, h] = a.get_transformed_size(); return [Math.round(x), Math.round(y), Math.round(w), Math.round(h)]; };
+                    const glass = Main.uiGroup.get_children().filter(a => a.name === 'bms-popup-blurred-widget' && a.visible).map(a => `${r(a)} op${a.opacity}`);
+                    write('log.jsonl', { i, menu: r(bg._boxPointer), box: r(bg.box), bpScale: bg._boxPointer.scale_x.toFixed(2), glass });
+                }, 90, 8],
+            ];
+            for (const [label, act, gap, count] of runs) {
+                const p0 = prof();
+                this._frames = [];
+                const start = GLib.get_monotonic_time();
+                for (let i = 0; i < count; i++) {
+                    await act(i);
+                    if (GLib.getenv('TAHOE_TEST_SPAM_SHOTS') === '1') {
+                        await shotRect(`${label}-${i}`, [0, 0, 1600, 700]);
+                        await sleep(Math.max(0, gap - 40));
+                    } else {
+                        await sleep(gap);
+                    }
+                }
+                await sleep(700);
+                if (GLib.getenv('TAHOE_TEST_SPAM_SHOTS') === '1')
+                    await shotRect(`${label}-end`, [0, 0, 1600, 700]);
+                const frames = this._frames;
+                this._frames = null;
+                const iv = [];
+                for (let i = 1; i < frames.length; i++) iv.push((frames[i][0] - frames[i - 1][0]) / 1000);
+                write('log.jsonl', { label, kind: 'spam', first_ms: 0, iv: iv.map(x => Math.round(x * 100) / 100), cpu: frames.map(f => Math.round(f[1] / 10) / 100), prof: diff(p0, prof()),
+                    state: { dateOpen: date.isOpen, dateVisible: date._boxPointer.visible, bgOpen: bg.isOpen, bgVisible: bg._boxPointer.visible, bgScale: bg._boxPointer.scale_x, bgOpacity: bg._boxPointer.opacity } });
+                date.close(false);
+                bg.close(false);
+                await sleep(400);
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'skim') {
             // sliding across the top bar as a hand does, through GNOME's own menu manager
             const manager = Main.panel.menuManager;
@@ -187,9 +230,11 @@ export default class Driver extends Extension {
                 for (let round = 0; round < 2; round++) {
                     for (const menu of [...menus.slice(1), ...menus.slice(0, -1).reverse()]) {
                         manager._changeMenu(menu);
-                        if (shots && label === 'skim-fast' && round === 0) {
+                        if (shots && label === 'skim-fast-again' && round === 0) {
                             await shotRect(`${label}-${shot++}`, [0, 0, 2560, 700]);
-                            await sleep(Math.max(0, gap - 40));
+                            await sleep(30);
+                            await shotRect(`${label}-${shot++}`, [0, 0, 2560, 700]);
+                            await sleep(Math.max(0, gap - 80));
                         } else {
                             await sleep(gap);
                         }

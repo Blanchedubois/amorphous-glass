@@ -24,6 +24,23 @@ import { animationsOn, ButtonPiece, CardPiece, glassApi, Morph, stageRect } from
 import { lerp } from './spring.js';
 
 const BANNER_CIRCLE_PX = 34;
+// two origins this close are the same place (the same icon, or the pointer that did not move)
+const SAME_ORIGIN_PX = 6;
+// a menu left for the next one stays up this many frames, while the next one is laid out
+const HANDOVER_FRAMES = 2;
+
+/// what a popup opens from, without asking Clutter for its place on screen: the source actor and
+/// its own position (the dummy cursor of a right-click moves; a panel button does not)
+function originKey(actor) {
+    return actor ? { actor, x: actor.x, y: actor.y } : null;
+}
+
+function sameOrigin(a, b) {
+    if (!a || !b)
+        return false;
+    return a.actor === b.actor && Math.abs(a.x - b.x) <= SAME_ORIGIN_PX
+        && Math.abs(a.y - b.y) <= SAME_ORIGIN_PX;
+}
 // quick settings is set up this long after the shell starts
 const WARM_MS = 3000;
 const APP_MENU_TYPES = [
@@ -301,6 +318,8 @@ export default class TahoeMotion extends Extension {
     }
 
     disable() {
+        for (const boxPointer of [...(this._closingSoon ?? [])])
+            this.cancelCloseSoon(boxPointer);
         if (this._warmId)
             GLib.source_remove(this._warmId);
         this._warmId = 0;
@@ -322,6 +341,29 @@ export default class TahoeMotion extends Extension {
         this._morphs = null;
     }
 
+    closeSoon(boxPointer, onComplete) {
+        this.cancelCloseSoon(boxPointer);
+        let frames = HANDOVER_FRAMES;
+        const laters = global.compositor.get_laters();
+        (this._closingSoon ??= new Set()).add(boxPointer);
+        boxPointer._tahoeCloseSoon = laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
+            if (--frames > 0)
+                return GLib.SOURCE_CONTINUE;
+            delete boxPointer._tahoeCloseSoon;
+            this._closingSoon.delete(boxPointer);
+            this._boxClose.call(boxPointer, BoxPointer.PopupAnimation.NONE, onComplete);
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    cancelCloseSoon(boxPointer) {
+        if (!boxPointer._tahoeCloseSoon)
+            return;
+        global.compositor.get_laters().remove(boxPointer._tahoeCloseSoon);
+        delete boxPointer._tahoeCloseSoon;
+        this._closingSoon?.delete(boxPointer);
+    }
+
     /// GNOME opens and closes with a fade only when the pointer slides from one menu to the next
     sliding(animate) {
         return (animate & BoxPointer.PopupAnimation.FADE) !== 0
@@ -339,10 +381,21 @@ export default class TahoeMotion extends Extension {
     }
 
     /// stops the animation running on `key`, handing its pieces over (target -> piece)
-    takeOver(key) {
+    takeOver(key, origin = null) {
         const running = this._morphs.get(key);
         this._morphs.delete(key);
-        return new Map((running?.interrupt() ?? []).map(piece => [piece.target, piece]));
+        if (!running)
+            return new Map();
+        const pieces = running.interrupt();
+        // a menu that was closing counts as closed: opened again somewhere else (a right-click at
+        // another place) it starts afresh there; opened again where it was (spamming one menu) it
+        // turns round from where its shape is
+        if (origin && !running.opening && !sameOrigin(running.originKey, origin)) {
+            pieces.forEach(piece => piece.restore());
+            running.resetRoot();
+            return new Map();
+        }
+        return new Map(pieces.map(piece => [piece.target, piece]));
     }
 
     /// the pieces of a popup: those of an interrupted animation as they are, new ones otherwise
@@ -360,19 +413,36 @@ export default class TahoeMotion extends Extension {
     }
 
     open(boxPointer, onComplete, quick = false) {
+        // slid back before its close: it simply stays
+        this.cancelCloseSoon(boxPointer);
         this.patchSubmenus();
         if (this.isQuickSettings(boxPointer))
             this._icons?.track(Main.panel.statusArea.quickSettings.menu);
-        const previous = this.takeOver(boxPointer);
+        const closing = this._morphs.get(boxPointer)?.opening === false;
+        // where it opens from is read after GNOME has laid the menu out (frame two): reading an
+        // actor's place on screen now would make Clutter lay the stage out early and place the
+        // menu at its previous source (found in the right-click test: one click behind)
+        const source = boxPointer._sourceActor;
+        const origin = () => stageRect(source);
+        const previous = this.takeOver(boxPointer, originKey(source));
         boxPointer.remove_all_transitions();
+        // a menu reopened while its close still played counts as closed (user: "setting the drop
+        // down closed while the animation is fading out"): hidden first, so GNOME places it at its
+        // new source (a right-click elsewhere) instead of laying it out where it still was
+        if (closing && previous.size === 0 && boxPointer.visible) {
+            boxPointer.hide();
+            boxPointer._sourceActor?.get_parent()?.queue_relayout();
+        }
         boxPointer.set({ opacity: 255, translation_x: 0, translation_y: 0, scale_x: 1, scale_y: 1 });
         boxPointer._muteKeys.enabled = false;
         boxPointer.show();
         const morph = new Morph(boxPointer, true, {
-            origin: stageRect(boxPointer._sourceActor),
+            origin,
+            originKey: originKey(source),
             pieces: this.piecesOf(boxPointer, previous),
             quickSettings: this.isQuickSettings(boxPointer),
-            quick,
+            // sliding in from another menu: the pour only partly plays (it starts half poured)
+            partial: quick,
             onDone: () => {
                 this._morphs.delete(boxPointer);
                 boxPointer._muteInput.enabled = false;
@@ -383,15 +453,26 @@ export default class TahoeMotion extends Extension {
     }
 
     close(boxPointer, onComplete, quick = false) {
+        // left for the next menu: gone at once, so two liquid bodies never meet (seen in the
+        // user's recording: two or three translucent menus stacked while skimming)
+        if (quick) {
+            this.takeOver(boxPointer).forEach(piece => piece.restore());
+            boxPointer.set_scale(1, 1);
+            // it stays up for the frames the next menu needs for its layout (no blank frame between
+            // the two), then goes at once
+            this.closeSoon(boxPointer, onComplete);
+            return undefined;
+        }
         const previous = this.takeOver(boxPointer);
+        const source = boxPointer._sourceActor;
         boxPointer._muteInput.enabled = true;
         boxPointer._muteKeys.enabled = true;
         boxPointer.remove_all_transitions();
         const morph = new Morph(boxPointer, false, {
-            origin: stageRect(boxPointer._sourceActor),
+            origin: stageRect(source),
+            originKey: originKey(source),
             pieces: this.piecesOf(boxPointer, previous),
             quickSettings: this.isQuickSettings(boxPointer),
-            quick,
             onDone: () => {
                 this._morphs.delete(boxPointer);
                 boxPointer.hide();

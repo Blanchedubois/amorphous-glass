@@ -36,35 +36,42 @@ const SIDE = 0.95;
 const TRAIL = 0.75;
 const EDGE_DAMPING = 0.9;
 // the popup's elastic growth about its origin: from ELASTIC_FROM, overshooting about 2 %
-const ELASTIC_FROM = 0.9;
-const ELASTIC = { damping: 0.6, stiffness: 700 };
+const ELASTIC_FROM = 0.92;
+const ELASTIC = { damping: 0.6, stiffness: 900 };
 // while the popup is past its size, its height gives way to its width (a liquid keeps its volume)
 const JELLY = 0.7;
 // rows: an eased stagger, `inQuad`, at most ROW_SPREAD_MS for all of them
-const ROW_BASE_MS = 30;
-const ROW_SPREAD_MS = 150;
+const ROW_BASE_MS = 24;
+const ROW_SPREAD_MS = 120;
 const ROW_REVEALED = 0.35;
 // and once the glass is this wide (a row never shows outside the glass)
 const ROW_WIDE = 0.85;
 // closing: the edges gather to the drop, then it rises into its origin
 const GATHERED = 0.35;
 // quick settings buttons
-const BUTTON_ROW_MS = 45;
-const BUTTON_ROW_SPREAD_MS = 200;
+const BUTTON_ROW_MS = 38;
+const BUTTON_ROW_SPREAD_MS = 170;
 const BUTTON_COLUMN_MS = 15;
 // the blob a button starts as: this share of its height, round
 const BUTTON_FROM = 0.55;
 const BUTTON_PARTS_AT = 0.35;
 // the height a little softer than the width (spatial fast), so the two settle out of step
 const BUTTON_HEIGHT = { damping: 0.72, stiffness: 560 };
-const BUTTON_PART_MS = 35;
+const BUTTON_PART_MS = 28;
 // the glass circle a card starts from: the clicked icon's capsule, or a small one at the pointer
 const CIRCLE_MIN_PX = 24;
 const CIRCLE_MAX_PX = 48;
 const POINTER_CIRCLE_PX = 18;
-// sliding between menus: the next one settles from QUICK_FROM, the last one shrinks to QUICK_TO
-const QUICK_FROM = 0.96;
-const QUICK_TO = 0.98;
+// one step faster again after the second try on the desktop ("a tiny bit faster"), and closing
+// faster still ("the fade out a bit more faster")
+const FASTER = 1.15;
+const CLOSE_FASTER = 1.5;
+// sliding in from another menu, the pour starts this far along (and the elastic from PARTIAL_FROM)
+const PARTIAL = 0.55;
+const PARTIAL_FROM = 0.97;
+const PARTIAL_ROW_MS = 12;
+const PARTIAL_ROW_SPREAD_MS = 60;
+const PARTIAL_BUTTON_DELAY = 0.3;
 // how long a banner's or app menu's animation waits for its glass to appear
 const LAZY_MS = 150;
 const MORPHING_CLASS = 'tahoe-morphing';
@@ -263,7 +270,7 @@ export class CardPiece {
         const base = count > 1 ? Math.min(ROW_BASE_MS, ROW_SPREAD_MS / (count - 1)) : 0;
         this.rowDelays = this.items.map((_, i) => stagger(i, count, { base }));
         const token = EXPRESSIVE.spatial[this.speed];
-        this.edgeToken = { damping: EDGE_DAMPING, stiffness: token.stiffness };
+        this.edgeToken = { damping: EDGE_DAMPING, stiffness: token.stiffness * FASTER };
         if (opening) {
             if (!this.spreading) {
                 this.drop.setToken(EXPRESSIVE.spatial.fast, LIQUID_MASS);
@@ -275,8 +282,8 @@ export class CardPiece {
             this.items.forEach(item => item.leave());
             this.gathering = true;
             this.rising = false;
-            // gather without bouncing: critically damped
-            this.edges.retarget(this.landingDrop(), { damping: 1, stiffness: token.stiffness },
+            // gather without bouncing: critically damped, quicker than the opening
+            this.edges.retarget(this.landingDrop(), { damping: 1, stiffness: token.stiffness * CLOSE_FASTER },
                 pourFactors(-this.direction));
             this.radius.setToken(EXPRESSIVE.effects.default);
             this.radius.retarget(this.circleRadius, Math.max(1, this.cardRadius - this.circleRadius));
@@ -287,6 +294,25 @@ export class CardPiece {
     landingDrop() {
         const { x, width, height } = this.circle;
         return { x, y: this.landingY - height / 2, width, height };
+    }
+
+    /// sliding in from another menu: the drop has already landed and half poured
+    partial() {
+        if (!this.ready)
+            return;
+        const rect = {
+            x: lerp(this.circle.x, this.card.x, PARTIAL),
+            y: lerp(this.circle.y, this.card.y, PARTIAL),
+            width: lerp(this.circle.width, this.card.width, PARTIAL),
+            height: lerp(this.circle.height, this.card.height, PARTIAL),
+        };
+        this.edges.set(rect);
+        this.drop.value = this.drop.target = this.landingY;
+        this.radius.value = lerp(this.circleRadius, this.cardRadius, PARTIAL);
+        const count = this.items.length;
+        const base = count > 1 ? Math.min(PARTIAL_ROW_MS, PARTIAL_ROW_SPREAD_MS / (count - 1)) : 0;
+        this.rowDelays = this.items.map((_, i) => stagger(i, count, { base }));
+        this.spread();
     }
 
     /// the drop pours out into the card, carrying its own velocity into the edges
@@ -374,7 +400,7 @@ export class CardPiece {
                 this.rising = true;
                 this.drop.value = this.edges.rect.y + this.edges.rect.height / 2;
                 this.drop.velocity = 0;
-                this.drop.setToken({ damping: 1, stiffness: EXPRESSIVE.spatial.fast.stiffness }, LIQUID_MASS);
+                this.drop.setToken({ damping: 1, stiffness: EXPRESSIVE.spatial.fast.stiffness * CLOSE_FASTER }, LIQUID_MASS);
                 this.drop.retarget(this.originY, Math.max(1, Math.abs(this.originY - this.drop.value)));
             }
         } else {
@@ -456,6 +482,15 @@ export class ButtonPiece {
         this.items.forEach(item => item.show());
     }
 
+    /// sliding in from another menu: mostly grown already
+    partial() {
+        if (!this.ready)
+            return;
+        this.width.value = lerp(this.fromX, 1, 0.75);
+        this.height.value = lerp(this.fromY, 1, 0.75);
+        this.fade.value = 0.8;
+    }
+
     begin(opening) {
         this.opening = opening;
         this.partsAt = null;
@@ -470,12 +505,12 @@ export class ButtonPiece {
             this.fade.retarget(1, 1);
         } else {
             this.items.forEach(item => item.leave());
-            const settle = { damping: 1, stiffness: EXPRESSIVE.spatial.fast.stiffness };
+            const settle = { damping: 1, stiffness: EXPRESSIVE.spatial.fast.stiffness * CLOSE_FASTER };
             this.width.setToken(settle, LIQUID_MASS);
             this.height.setToken(settle, LIQUID_MASS);
             this.width.retarget(this.fromX, 1 - this.fromX || 0.4);
             this.height.retarget(this.fromY, 1 - this.fromY || 0.4);
-            this.fade.setToken(EXPRESSIVE.effects.default);
+            this.fade.setToken(EXPRESSIVE.effects.fast);
             this.fade.retarget(0, 1);
         }
     }
@@ -535,13 +570,14 @@ export class Morph {
     /// appears in the first frames (a banner, an app menu); `step(piece)`: called each frame;
     /// `fadeRoot`: fade the popup with the drop; `elastic`: the popup grows about its origin and
     /// settles past its size (one card)
-    /// `quick`: sliding from one menu to the next (GNOME's fade-only open and close): no drop and
-    /// no pour, the menu is there at once, fading in on an effects spring with a light elastic
-    /// settle, and the one left behind only fades out; two liquid bodies never meet
-    constructor(root, opening, { origin, pieces, quickSettings = false, lazy = null, step = null, fadeRoot = !quickSettings, hold = true, elastic = !quickSettings, quick = false, onDone }) {
+    /// `partial`: sliding in from another menu (GNOME's fade-only open): the pour only partly
+    /// plays, starting half poured and fully opaque, the rows close behind each other
+    constructor(root, opening, { origin, originKey = null, pieces, quickSettings = false, lazy = null, step = null, fadeRoot = !quickSettings, hold = true, elastic = !quickSettings, partial = false, onDone }) {
         this.root = root;
         this.opening = opening;
-        this.origin = origin;
+        // a function when the popup is not laid out yet: read once it is (see the origin getter)
+        this._origin = origin;
+        this.originKey = originKey;
         this.quickSettings = quickSettings;
         this.lazy = lazy;
         this.step = step;
@@ -551,12 +587,9 @@ export class Morph {
         this.wantHold = hold;
         this.pieces = [];
         this.last = 0;
-        if (quick) {
-            this.quick = this.startQuick(pieces);
-            pieces = [];
-        } else if (elastic) {
-            this.elastic = this.startElastic(previousScale(root));
-        }
+        this.partial = partial && opening;
+        if (elastic)
+            this.elastic = this.startElastic(previousScale(root) ?? (this.partial ? PARTIAL_FROM : undefined));
         pieces.forEach(piece => this.add(piece));
         this.order();
         this.render(0);
@@ -569,43 +602,49 @@ export class Morph {
     startElastic(from) {
         const root = this.root;
         const saved = { pivot: root.pivot_point, scale_x: 1, scale_y: 1 };
-        if (this.origin && root.width > 0 && root.height > 0) {
-            root.set_scale(1, 1);
-            const [ok, x, y] = root.transform_stage_point(
-                this.origin.x + this.origin.width / 2, this.origin.y + this.origin.height / 2);
-            if (ok)
-                root.set_pivot_point(clamp01(x / root.width), clamp01(y / root.height));
-        }
+        // closing, the popup is where it is; opening, it may just have been placed (a right-click
+        // elsewhere), so the pivot is found once it pours, after its layout
+        if (!this.opening)
+            this.pivotAtOrigin();
         const spring = new Spring(from ?? (this.opening ? ELASTIC_FROM : 1), ELASTIC, { mass: LIQUID_MASS });
         if (!this.opening) {
-            spring.setToken({ damping: 1, stiffness: EXPRESSIVE.spatial.default.stiffness }, LIQUID_MASS);
+            spring.setToken({ damping: 1, stiffness: EXPRESSIVE.spatial.fast.stiffness * CLOSE_FASTER }, LIQUID_MASS);
             spring.retarget(0.94, 0.06);
         }
         return { spring, saved, started: !this.opening };
     }
 
-    startQuick(pieces) {
-        // whatever an interrupted animation left: shown whole at once
-        pieces.forEach(piece => piece.restore());
-        this.handedOver = pieces;
-        const root = this.root;
-        const fade = new Spring(this.opening ? Math.min(root.opacity / 255, 0.35) : root.opacity / 255,
-            EXPRESSIVE.effects.fast);
-        fade.retarget(this.opening ? 1 : 0, 1);
-        const size = new Spring(this.opening ? QUICK_FROM : 1, EXPRESSIVE.spatial.fast);
-        size.retarget(this.opening ? 1 : QUICK_TO, 1 - QUICK_FROM);
-        if (this.origin && root.width > 0 && root.height > 0) {
-            root.set_scale(1, 1);
-            const [ok, x, y] = root.transform_stage_point(
-                this.origin.x + this.origin.width / 2, this.origin.y + this.origin.height / 2);
-            if (ok)
-                root.set_pivot_point(clamp01(x / root.width), clamp01(y / root.height));
+    /// the stage rectangle the popup opens from, read once its layout has happened (frame two of
+    /// an opening): reading it earlier makes Clutter lay the stage out before GNOME has moved
+    /// the popup's source
+    get origin() {
+        if (typeof this._origin === 'function') {
+            if (this.opening && (this.frames ?? 0) < 2)
+                return null;
+            this._origin = this._origin();
         }
-        return { fade, size };
+        return this._origin;
+    }
+
+    /// scales the popup about its origin (the icon or the pointer)
+    pivotAtOrigin() {
+        const root = this.root;
+        if (!this.origin || root.width <= 0 || root.height <= 0)
+            return;
+        const [sx, sy] = [root.scale_x, root.scale_y];
+        root.set_scale(1, 1);
+        const [ok, x, y] = root.transform_stage_point(
+            this.origin.x + this.origin.width / 2, this.origin.y + this.origin.height / 2);
+        if (ok)
+            root.set_pivot_point(clamp01(x / root.width), clamp01(y / root.height));
+        root.set_scale(sx, sy);
     }
 
     add(piece) {
-        this.prepare(piece);
+        // a popup that was just placed (a right-click elsewhere) is laid out at its new place only
+        // in the next frame: a fresh piece is measured then, not from where it was
+        if (!(this.opening && piece.fresh))
+            this.prepare(piece);
         piece.delay = 0;
         piece.startedAt = undefined;
         this.pieces.push(piece);
@@ -618,8 +657,11 @@ export class Morph {
             return false;
         if (piece.fresh && !this.opening)
             piece.full();
+        const fresh = piece.fresh;
         piece.fresh = false;
         piece.begin(this.opening);
+        if (this.partial && fresh)
+            piece.partial();
         return true;
     }
 
@@ -640,8 +682,9 @@ export class Morph {
                 rows.push({ y: entry.rect.y, entries: [entry] });
         }
         const base = rows.length > 1 ? Math.min(BUTTON_ROW_MS, BUTTON_ROW_SPREAD_MS / (rows.length - 1)) : 0;
+        const squeeze = this.partial ? PARTIAL_BUTTON_DELAY : 1;
         rows.forEach((row, r) => row.entries.forEach(({ piece }, c) =>
-            (piece.delay = stagger(r, rows.length, { base }) + c * BUTTON_COLUMN_MS)));
+            (piece.delay = (stagger(r, rows.length, { base }) + c * BUTTON_COLUMN_MS) * squeeze)));
     }
 
     frame() {
@@ -661,9 +704,10 @@ export class Morph {
         let reach = 0;
         let ordered = false;
         let spreading = false;
+        this.frames = (this.frames ?? 0) + 1;
         for (const piece of this.pieces) {
-            if (!piece.ready) {
-                if (this.prepare(piece)) {
+            if (!piece.ready || (piece.fresh && this.opening)) {
+                if (this.frames > 1 && this.prepare(piece)) {
                     ordered = true;
                 } else {
                     piece.hide();
@@ -690,19 +734,11 @@ export class Morph {
             this.order();
         if (this.fadeRoot)
             this.root.opacity = Math.round(255 * smoothstep(0, 1, reach));
-        if (this.quick) {
-            const { fade, size } = this.quick;
-            fade.step(dt);
-            size.step(dt);
-            this.root.opacity = Math.round(255 * clamp01(fade.value));
-            const v = size.value;
-            this.root.set_scale(v, v > 1 ? 1 - (v - 1) * JELLY : v);
-            done = fade.settled && size.settled;
-        }
         if (this.elastic) {
             const { spring } = this.elastic;
             if (this.opening && !this.elastic.started && (spreading || this.pieces.length === 0)) {
                 this.elastic.started = true;
+                this.pivotAtOrigin();
                 spring.retarget(1, 1 - spring.value || 0.14);
             }
             spring.step(dt);
@@ -721,16 +757,11 @@ export class Morph {
         this.release();
         if (this.elastic)
             this.root._tahoe_elastic = this.elastic.spring.value;
-        return this.quick ? this.handedOver : this.pieces;
+        return this.pieces;
     }
 
     finish() {
         this.stopTimeline();
-        if (this.quick) {
-            this.root.set_scale(1, 1);
-            if (this.opening)
-                this.root.opacity = 255;
-        }
         if (this.elastic) {
             this.root.set_scale(1, 1);
             delete this.root._tahoe_elastic;
@@ -744,6 +775,12 @@ export class Morph {
         if (!this.opening)
             this.pieces.forEach(piece => piece.restore());
         this.release();
+    }
+
+    /// the popup as it is at rest (an interrupted close that will not be continued)
+    resetRoot() {
+        this.root.set_scale(1, 1);
+        delete this.root._tahoe_elastic;
     }
 
     stopTimeline() {
@@ -763,7 +800,7 @@ export class Morph {
 
     destroy() {
         this.stopTimeline();
-        if (this.elastic || this.quick)
+        if (this.elastic)
             this.root.set_scale(1, 1);
         this.pieces.forEach(piece => piece.restore());
         this.release();
