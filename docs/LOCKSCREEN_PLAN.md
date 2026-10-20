@@ -14,10 +14,10 @@ Apple's macOS Tahoe press image the user picked (see "The target" below).
 | 1 | The unlock arrow covered the password eye | done (7b28b83), not installed |
 | 2 | Safety frame: guards and tests, nothing visible changes | done, not installed |
 | 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | done, not installed; waiting on the user's look |
-| 4 | The Liquid Glass clock | in the workshop: clear glass, sharp wallpaper, dark-mode tint |
-| 5 | Now Playing: GNOME's own media card as a Tahoe glass card | |
-| 6 | Motion: lock, page change and unlock animations | |
-| 7 | Shipping: VM check, install, tahoe-repair, merge | each step needs the user's go-ahead |
+| 4 | The Liquid Glass clock | done: Space Grotesk SemiBold, 15 %, clear glass, sharp wallpaper |
+| 5 | Now Playing: GNOME's own media card as a Tahoe glass card, with the Music widgets' album-colour swirl; glass on the top-right menu | done, not installed |
+| 6 | Motion: the clock and Now Playing ease in on lock and on wake | done, not installed |
+| 7 | Shipping: VM check, install, tahoe-repair, merge | prepared (`scripts/tahoe-lockscreen.sh`, tahoe-repair opt-in); install and merge wait for the user |
 
 The detailed plan for phases 2 to 7 is in
 [Implementation plan: clock and Now Playing](#implementation-plan-clock-and-now-playing) at the end.
@@ -525,6 +525,52 @@ Still to do in Phase 4 (superseded by the next request):
 
 Exit: G1 to G5, with a fake MPRIS player in the harness (the widgets port already has one).
 
+**Result (2026-10-20, overnight, at the user's request "if safe").** `nowplaying.js`:
+- **The card:** GNOME's own `MediaMessage` (from the unlock dialog's notifications box) is
+  restyled in `lockscreen.css`: clear, radius 24, a bigger cover, round glass buttons. Its
+  behaviour stays GNOME's: no click-through to the player, and the per-app "Show on lock screen"
+  switch.
+- **The glass:** under it sits a clone of the lock picture, in our own layer just above the lock
+  background and below GNOME's dialog contents, so it can never cover or take a click. It follows
+  the card's position, its box's translation and the scroll.
+- **The swirl:** the desktop Music widgets' album-colour swirl
+  (`tahoe-widgets/swirl.js`, merged into main as d8a7f2e), with the same shader idea and the same
+  `palette.js`. The lock screen extension carries an exact copy of `palette.js`;
+  `tools/lockscreen/check-shared.sh` fails if the two drift apart, and `tahoe-lockscreen.sh on`
+  refuses a stale copy.
+  - Colours come from local `file://` covers only: nothing is fetched while locked.
+  - Dark text on light covers, as the widgets.
+- **When it animates:** at 25 fps only while playing, with animations on, the screen not dimming,
+  and input within the last 30 s. Mutter 51 has no readable monitor power state (no property and
+  no getter, only a change signal), so idleness stands in: a screen gone dark is an idle one.
+  Measured: 50 paints in 2 s while active, 0 after 35 s idle, 50 again after a key.
+- **Placement:** the notifications column (Now Playing first) moves under the clock, as on the
+  iPhone, when it fits above the prompt. Otherwise it stays where GNOME puts it, with the prompt
+  above it.
+- **Found on the way:** Blur My Shell's stylesheet stays loaded while locked and colours message
+  titles through `.bms-popup-background-*` on the UI group, so the dark-text rules use the same
+  long selectors.
+
+**Top-right menu (quick settings) glass**, which the user asked for (`menuglass.js`):
+- **Why it was missing:** Blur My Shell's popup glass is off in the lock screen's session mode.
+- **What it does now:** each piece (toggle pills, sliders, round buttons, an open submenu) gets
+  glass of its own, as on the desktop: the lock picture under it, slightly softened, 10 % white,
+  rounded to the piece (capsule, or 32 for a submenu), and the 1 px edge line lit from above. It
+  lives in our own layer just below the menu and follows the menu's open animation.
+- **CSS:** the pills' own fill is all but cleared in `lockscreen.css`; checked toggles keep the
+  theme's fill.
+
+Gates (headless, with a fake MPRIS player, `TAHOE_LOCK_PLAYER=1`):
+- **G1:** the eye and the arrow each hit themselves.
+- **G2:** the own-code faults fail safe with the card shown.
+- **G4:** 30 cycles clean, no JS errors, none of our warnings. Without the extension the same run
+  shows actors 2,579 to 2,619 and memory +24 MB; with it, 2,579 to 2,603 and +28 MB (the font
+  cache warm-up). No leak of ours.
+- **Frame cost while swirling:** stage update p95 1.1 to 1.3 ms, worst 2.6 to 3.8 ms.
+- **Screenshots:** [phase5-lockscreen.png](lockscreen/shots/phase5-lockscreen.png),
+  [phase5-details.png](lockscreen/shots/phase5-details.png).
+- **Visuals:** light and dark, dark text on a light cover, and the menu glass.
+
 ### Phase 6: motion
 
 - **Page change:**
@@ -538,7 +584,25 @@ Exit: G1 to G5, with a fake MPRIS player in the harness (the widgets port alread
 
 Exit: G1 to G5, plus frame times in the harness (p95 under 8.3 ms at 120 Hz).
 
+**Result (2026-10-20).** `motion.js`: the glass clock and Now Playing ease in when the dialog
+first shows and each time the screen comes back from dimming, as the iPhone's clock does.
+- **Springs:** a 3 % grow on the Expressive spatial slow spring (damping 0.8, stiffness 200), and
+  the fade on the effects default (1, 1600). They are copied as numbers from tahoe-motion's
+  `spring.js`, not imported. Now Playing follows 70 ms later.
+- **Measured:** settled at full opacity and scale 1.000 by 250 ms.
+- **What stays GNOME's:** its unlock slide and the wrong-password shake are not touched. Only our
+  own actors move.
+
 ### Phase 7: shipping (each step only with the user's go-ahead)
+
+**Prepared (2026-10-20):**
+- `scripts/tahoe-lockscreen.sh on|off|status`, after `tahoe-widgets.sh`. `on` checks the
+  `palette.js` copy and the Space Grotesk font, copies the extension, sets `lockscreen=on` in the
+  glass state file and enables it. It needs a logout.
+- `tahoe-repair.sh` keeps it enabled only while it is installed *and* switched on. It never turns
+  it on by itself.
+
+Not done: install, logout and merge into main. They wait for the user.
 
 1. **VM (G6):**
    - a real password;

@@ -15,6 +15,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Layout from 'resource:///org/gnome/shell/ui/layout.js';
 
 import { GlassClock, MATERIAL, buildMask, measure } from './glassclock.js';
+import { buildNowPlaying } from './nowplaying.js';
+import { buildMenuGlass } from './menuglass.js';
 
 const DATE_TOP = 0.108;       // top of the date's letters
 // 1.5x Apple's size, as the user asked: digits 15 % of the height (Space Grotesk's digits are
@@ -28,9 +30,13 @@ const TIME_GAP = 0.017;       // from the bottom of the date's letters to the to
 // (these place the plain fallback labels; the glass places its letters from Pango's ink itself)
 const INK_TOP = {date: 0.278, time: 0.270};
 const CAP_HEIGHT = 0.741;
+const DIGITS_EM = 0.730;      // Space Grotesk's digit height
+// the bottom of the clock's digits, as a fraction of the height
+const CLOCK_BOTTOM = DATE_TOP + DATE_SIZE * CAP_HEIGHT + TIME_GAP + TIME_SIZE * DIGITS_EM;
 const AVATAR_CENTRE = 0.825;  // centre of the avatar
 const AVATAR_SIZE = 64;       // logical px, matches lockscreen.css
 const BOTTOM_MARGIN = 0.04;   // the prompt never comes closer to the bottom edge than this
+const COLUMN_GAP = 0.03;      // between the clock, the Now Playing column and the prompt
 
 // GNOME's own clock labels (UnlockDialogClock), hidden while ours shows; GNOME animates the
 // clock box itself, so the frame hides the labels inside it instead.
@@ -68,6 +74,8 @@ export function buildLayout(frame, dialog) {
     for (const name of GNOME_CLOCK_LABELS)
         frame.set(clock[name], 'visible', false);
     placePrompt(frame, dialog);
+    buildNowPlaying(frame, dialog, () => primaryBackground(dialog));
+    buildMenuGlass(frame, dialog, (x, y) => backgroundAt(dialog, x, y));
 }
 
 // ---- the wallpaper: sharp, as the user asked ----
@@ -95,6 +103,13 @@ function primaryBackground(dialog) {
     const monitor = Main.layoutManager.primaryMonitor;
     const backgrounds = [...dialog._backgroundGroup];
     return backgrounds.find(b => b.x === monitor.x && b.y === monitor.y) ?? backgrounds[0] ?? null;
+}
+
+// the background actor under a stage point (for glass on other monitors)
+function backgroundAt(dialog, x, y) {
+    const backgrounds = [...dialog._backgroundGroup];
+    return backgrounds.find(b => x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height) ??
+        primaryBackground(dialog);
 }
 
 // ---- the clock: our own actor over the primary monitor, above GNOME's dialog contents ----
@@ -281,28 +296,41 @@ function buildGlass(frame, dialog, labels) {
 function placePrompt(frame, dialog) {
     const stack = dialog._stack;
     const mainBox = stack.get_parent();
+    const notifications = dialog._notificationsBox;
 
     const place = () => {
-        const prompt = dialog._authPrompt;
-        const user = prompt?._userWell;
-        if (!user || !mainBox)
+        if (!mainBox)
             return;
         const height = mainBox.height;
-        const stackY = stack.get_allocation_box().y1;
-        const avatarTop = layoutY(user, stack);
-        const promptHeight = stack.get_allocation_box().get_height();
+        const avatarTop = Math.round(height * AVATAR_CENTRE - AVATAR_SIZE / 2);
 
-        let y = Math.round(height * AVATAR_CENTRE - AVATAR_SIZE / 2) - (stackY + avatarTop);
-        // never past the bottom margin, and never over GNOME's notifications column
-        const notifications = dialog._notificationsBox;
+        // GNOME's notifications column (Now Playing is its first card): under the clock, as on the
+        // iPhone, when it fits above the prompt; else where GNOME put it, with the prompt above it
+        let moved = false;
+        if (notifications?.visible && notifications.height > 0) {
+            const box = notifications.get_allocation_box();
+            const top = Math.round(height * (CLOCK_BOTTOM + COLUMN_GAP));
+            moved = top + box.get_height() <= avatarTop - Math.round(height * COLUMN_GAP);
+            frame.setTranslationY(notifications, moved ? top - box.y1 : 0);
+        }
+
+        const prompt = dialog._authPrompt;
+        const user = prompt?._userWell;
+        if (!user)
+            return;
+        const stackY = stack.get_allocation_box().y1;
+        const promptHeight = stack.get_allocation_box().get_height();
+        let y = avatarTop - (stackY + layoutY(user, stack));
+        // never past the bottom margin, and never over the notifications column if it stayed down
         let floor = height * (1 - BOTTOM_MARGIN);
-        if (notifications?.visible && notifications.height > 0)
+        if (notifications?.visible && notifications.height > 0 && !moved)
             floor = Math.min(floor, notifications.get_allocation_box().y1);
         y = Math.min(y, Math.floor(floor - (stackY + promptHeight)));
         frame.setTranslationY(stack, Math.max(0, y));
     };
     // GNOME builds the prompt when the screen wakes and destroys it on the clock page; follow
-    // the stack (it resizes through the crossfade) and each new prompt (its avatar can load late)
+    // the stack (it resizes through the crossfade), each new prompt (its avatar can load late)
+    // and the notifications column (a player or a notification comes or goes)
     frame.connect(stack, 'notify::allocation', place);
     frame.connect(dialog._promptBox, 'child-added', (_box, child) => {
         frame.connect(child, 'notify::allocation', place);
@@ -310,5 +338,9 @@ function placePrompt(frame, dialog) {
     });
     if (dialog._authPrompt)
         frame.connect(dialog._authPrompt, 'notify::allocation', place);
+    if (notifications) {
+        frame.connect(notifications, 'notify::allocation', place);
+        frame.connect(notifications, 'notify::visible', place);
+    }
     place();
 }

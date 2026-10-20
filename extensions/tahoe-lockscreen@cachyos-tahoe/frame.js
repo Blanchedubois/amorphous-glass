@@ -196,6 +196,25 @@ export class Frame {
         });
     }
 
+    // Add a style class to one of GNOME's actors (our stylesheet styles it); removed on undo.
+    addStyleClass(actor, name) {
+        this.guard(() => {
+            if (actor.has_style_class_name(name))
+                return;
+            actor.add_style_class_name(name);
+            const watch = new Watch(actor);
+            this._dialogUndo.push(() => {
+                watch.release();
+                if (!watch.gone)
+                    actor.remove_style_class_name(name);
+            });
+        });
+    }
+
+    removeStyleClass(actor, name) {
+        this.guard(() => actor.remove_style_class_name(name));
+    }
+
     // Anything else to undo when the dialog goes or the frame stops.
     addUndo(fn) {
         this._dialogUndo.push(fn);
