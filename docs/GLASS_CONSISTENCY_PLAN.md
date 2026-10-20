@@ -184,3 +184,9 @@ GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
   pieces in glass (menus.js); the calendar keeps its card.
 - Sheets: `phaseE-columns.png`, `phaseE-screens.png`, `phaseE-E2-1280x720.png`,
   `phaseE-menus-nocard.png`.
+- The user (2026-10-20): the system menu's buttons looked odd ("too much blue", a line before each
+  arrow): now drawn as the desktop's (config/gnome-shell-overrides.css, dark): clear glass
+  pieces, a split toggle's round icon white when on, a plain toggle white with accent text when
+  on, GNOME's divider (`quick-toggle-separator`) hidden, the menu 420 px wide so the titles fit.
+  `#uiGroup` in the selectors outranks the lock theme's !important rules.
+  `phaseD-system-menu-os.png`: the desktop's, Super+L's and the login screen's.
