@@ -76,10 +76,13 @@ class DayPane {
         this.actor.add_child(this._events);
     }
 
+    // events: null for none shown at all (not even "No more events today")
     update(now, events) {
         this._weekday.text = now.format('%A').toUpperCase();
         this._day.text = String(now.get_day_of_month());
         this._events.destroy_all_children();
+        if (events === null)
+            return;
         if (events.length === 0) {
             const none = new St.Label({style_class: 'tahoe-widget-secondary', text: 'No more events today'});
             none.clutter_text.line_wrap = true;
@@ -155,10 +158,17 @@ class MonthPane {
 }
 
 class CalendarWidget {
-    constructor() {
+    // events: false leaves the events out (the lock and login screens: the user's rule, no event
+    // titles there); the calendar store is then not opened at all
+    constructor({events = true} = {}) {
         this._day = null;
-        this._source = acquireEvents();
-        this._source.connectObject('changed', () => this._refresh(true), this);
+        this._showEvents = events;
+        this._source = events ? acquireEvents() : null;
+        this._source?.connectObject('changed', () => this._refresh(true), this);
+    }
+
+    _events(now) {
+        return this._source ? remainingEvents(this._source, now) : null;
     }
 
     setMode() {}
@@ -180,7 +190,7 @@ class CalendarWidget {
     }
 
     destroy() {
-        this._source.disconnectObject(this);
+        this._source?.disconnectObject(this);
         this.actor.destroy();
     }
 }
@@ -188,22 +198,22 @@ class CalendarWidget {
 export class CalendarDay extends CalendarWidget {
     static size = 'small';
 
-    constructor() {
-        super();
+    constructor(options) {
+        super(options);
         this._pane = new DayPane(MAX_EVENTS.small);
         this.actor = this._pane.actor;
     }
 
     update(now) {
-        this._pane.update(now, remainingEvents(this._source, now));
+        this._pane.update(now, this._events(now));
     }
 }
 
 export class CalendarMonth extends CalendarWidget {
     static size = 'small';
 
-    constructor() {
-        super();
+    constructor(options) {
+        super(options);
         this._pane = new MonthPane();
         this.actor = this._pane.actor;
     }
@@ -217,8 +227,8 @@ export class CalendarMonth extends CalendarWidget {
 export class CalendarMedium extends CalendarWidget {
     static size = 'medium';
 
-    constructor() {
-        super();
+    constructor(options) {
+        super(options);
         this.actor = new St.BoxLayout({style_class: 'tahoe-cal-medium', x_expand: true, y_expand: true});
         this._dayPane = new DayPane(MAX_EVENTS.medium);
         this._monthPane = new MonthPane();
@@ -227,7 +237,7 @@ export class CalendarMedium extends CalendarWidget {
     }
 
     update(now, dayChanged) {
-        this._dayPane.update(now, remainingEvents(this._source, now));
+        this._dayPane.update(now, this._events(now));
         if (dayChanged)
             this._monthPane.update(now);
     }

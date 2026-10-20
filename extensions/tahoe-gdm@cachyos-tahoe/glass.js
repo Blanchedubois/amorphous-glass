@@ -570,9 +570,14 @@ export const GlassPane = GObject.registerClass({
         // over the whole of the login screen's group, as the theme draws it (any monitor layout)
         const [fx, fy, fw, fh] = this._frame();
         const [sx, sy] = this.get_transformed_position();
+        // a scaled ancestor (a widget column scaled to fit a small monitor): the backdrop is
+        // placed in this pane's own units, so it still lies exactly over the real background
+        const [tw, th] = this.get_transformed_size();
+        const kx = box.get_width() > 0 && tw > 0 ? tw / box.get_width() : 1;
+        const ky = box.get_height() > 0 && th > 0 ? th / box.get_height() : 1;
         const b = new Clutter.ActorBox();
-        b.set_origin(fx - (sx - this._pad), fy - (sy - this._pad));
-        b.set_size(fw, fh);
+        b.set_origin((fx - sx) / kx + this._pad, (fy - sy) / ky + this._pad);
+        b.set_size(fw / kx, fh / ky);
         this._backdrop.allocate(b);
 
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
