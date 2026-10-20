@@ -81,6 +81,38 @@ for item in os.environ.get('TAHOE_TEST_KEYS', '').split():
     out += [f'[{path}]', kv]
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
+# TAHOE_TEST_SEARCH_PIPELINE=1: the overview search panels' glass (pipeline_glassbar_search, as
+# glass-bar.sh writes it for dark mode) added to the test settings
+if [ "${TAHOE_TEST_SEARCH_PIPELINE:-}" = 1 ]; then
+  python3 - "$ext/blur-my-shell@aunetx/schemas" <<'PYS'
+import sys
+from gi.repository import Gio, GLib
+src = Gio.SettingsSchemaSource.new_from_directory(sys.argv[1], Gio.SettingsSchemaSource.get_default(), False)
+root = Gio.Settings.new_full(src.lookup('org.gnome.shell.extensions.blur-my-shell', False), None, None)
+pipes = root.get_value('pipelines').unpack()
+menus = pipes['pipeline_glassbar_menus']
+effect = dict(menus['effects'][0])
+params = dict(effect['params'])
+params.update(tint=0.55, shadow=0.32, rim_light=0.70, ao=0.42)
+def v(x):
+    if isinstance(x, bool): return GLib.Variant('b', x)
+    if isinstance(x, float): return GLib.Variant('d', x)
+    if isinstance(x, int): return GLib.Variant('d', float(x))
+    if isinstance(x, str): return GLib.Variant('s', x)
+    if isinstance(x, list): return GLib.Variant('ad', [float(i) for i in x])
+    raise TypeError(x)
+eff = GLib.Variant('a{sv}', {'type': v('refraction'), 'id': v('effect_glassbar_search'),
+                             'params': GLib.Variant('a{sv}', {k: v(val) for k, val in params.items()})})
+old = root.get_value('pipelines')
+out = {}
+for i in range(old.n_children()):
+    e = old.get_child_value(i); f = e.get_child_value(1)
+    out[e.get_child_value(0).get_string()] = {f.get_child_value(j).get_child_value(0).get_string(): f.get_child_value(j).get_child_value(1).get_variant() for j in range(f.n_children())}
+out['pipeline_glassbar_search'] = {'name': GLib.Variant('s', 'Glass search'), 'effects': GLib.Variant('av', [eff])}
+root.set_value('pipelines', GLib.Variant('a{sa{sv}}', out))
+Gio.Settings.sync()
+PYS
+fi
 timeout ${TAHOE_TEST_TIMEOUT:-90} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
   --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
 cp "$kf" "$out/keyfile.after" 2>/dev/null; rm -rf "$root"
