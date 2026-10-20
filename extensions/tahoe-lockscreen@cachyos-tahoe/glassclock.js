@@ -26,11 +26,12 @@ import St from 'gi://St';
 
 // The material, tuned against Apple's press image (the workshop changes these)
 export const MATERIAL = {
-    timeFont: 'SF Pro Display Heavy',
-    dateFont: 'SF Pro Display Semibold',
+    timeFont: 'Space Grotesk SemiBold',   // the user's choice (OFL, ~/.local/share/fonts)
+    dateFont: 'Space Grotesk SemiBold',
     round: 0,           // logical px: corners softened by growing the glyphs with round joins (off: the user wants SF Pro's own corners)
-    edge: 10,           // logical px of bevel inside the time's strokes
-    bend: 22,           // logical px the backdrop is pushed at the very edge of the time
+    edge: 10,           // logical px of bevel inside the time's strokes, at 192 px type
+    bend: 22,           // logical px the backdrop is pushed at the time's very edge, at 192 px type
+    refSize: 192,       // the type size edge and bend are given for; they scale with the time
     dateScale: 0.3,     // the date's bevel, bend and rim, as a fraction of the time's
     dateMilk: 0.30,     // extra white in the date, so its thin strokes stay legible
     blur: 0,            // logical px of softening of the backdrop (0: clear glass)
@@ -121,13 +122,13 @@ class TahoeLockGlyphGlassEffect extends Clutter.OffscreenEffect {
         this._snippet.set_replace(SHADER);
     }
 
-    setMask(texture, width, height, scale, dark = false) {
+    setMask(texture, width, height, scale, dark = false, sizeScale = 1) {
         this._mask = texture;
         this._pipeline = null;
         const M = MATERIAL;
         this._uniforms = {
             px_x: 1 / width, px_y: 1 / height,
-            bend_px: M.bend * scale, blur_px: M.blur * scale,
+            bend_px: M.bend * sizeScale * scale, blur_px: M.blur * scale,
             contrast: M.contrast, saturation: M.saturation,
             brightness: dark ? M.darkBrightness : M.brightness, dark_tint: dark ? M.darkTint : 0,
             milk: dark ? M.darkMilk : M.milk, rim: M.rim, rim_base: M.rimBase, shade: M.shade, split: M.split,
@@ -235,7 +236,8 @@ export function buildMask(width, height, spec, scale) {
         cr.setSourceRGB(0, 1, 0);
         cr.fillPreserve();
         cr.setOperator(Cairo.Operator.DEST_OUT);
-        const steps = Math.max(2, Math.round(2 * MATERIAL.edge * glyphScale * scale));
+        const sizeScale = spec.timeSize / (MATERIAL.refSize * scale);
+        const steps = Math.max(2, Math.round(2 * MATERIAL.edge * sizeScale * glyphScale * scale));
         for (let k = 1; k <= steps; k++) {
             cr.setSourceRGBA(0, 0, 0, 1 / k);
             cr.setLineWidth(k);
@@ -286,8 +288,8 @@ export class GlassClock {
         this._clone.set_position(-x, -y);
     }
 
-    setMask(texture, width, height, scale, dark) {
-        this.effect.setMask(texture, width, height, scale, dark);
+    setMask(texture, width, height, scale, dark, sizeScale) {
+        this.effect.setMask(texture, width, height, scale, dark, sizeScale);
     }
 
     get hasBackdrop() {

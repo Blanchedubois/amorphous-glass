@@ -457,7 +457,7 @@ Gates with the glass:
   waits for the real unlock instead of a fixed 1.2 s, which was too short there.
 
 Later the same day:
-- **Corners:** "not softened" (corner softening off, SF Pro's own corners).
+- **Corners:** "not softened" (corner softening off, the font's own corners).
 - **Dark-mode tint:** "tinted light since it's hard to see". Dark mode now gets a light tint
   (milk 0.24, brightness +0.07) in place of the darker tint; light mode is unchanged.
   [phase4-glass-clock.png](lockscreen/shots/phase4-glass-clock.png).
@@ -480,6 +480,27 @@ More gates:
   | Worst frame | 3.0 to 3.3 ms | 14 to 17 ms |
 
   Switching the blur off saves more than the glass costs.
+
+Then:
+- **Font:** "Space Grotesk" (SemiBold, chosen by the user over SF Pro). It was downloaded with the
+  user's OK from its official repository (floriankarsten/space-grotesk, OFL-1.1, variable TTF,
+  sha256 acad6de1…) and installed in `~/.local/share/fonts/SpaceGrotesk` with its licence. Pango
+  gets SemiBold from the weight axis (`@wght=600`). The date is in the same face. The plain
+  fallback labels' CSS is `"Space Grotesk", sans-serif`: a list with two quoted names was ignored
+  by St, which fell back to the interface font.
+- **Size:** "much bigger", then "15 %, not 20 %". Space Grotesk's digits are 0.730 em, so the time
+  type is 0.2055 of the height (296 px at 1440: digits 216 px, measured 15.00 %). The date (54 px)
+  and the gap scale in proportion. The bevel and the bend scale with the type size (given at
+  192 px). Measured: date letters at 10.8 %, digits from 15.3 % to 30.3 %, far above the prompt
+  (78 %).
+- **Harness bug found:** run.sh gives the test shell its own `XDG_DATA_HOME`, which also hid
+  `~/.local/share/fonts` from fontconfig. Every in-shell screenshot before this round fell back to
+  **Noto Sans**: the Phase 3 layout sheet and the earlier glass sheets. (The font options sheet
+  was drawn outside the shell and is right.) Fixed by linking the user's fonts into the test
+  shell. The driver now logs the font Pango really resolved for the clock, not just the name asked
+  for.
+
+[phase4-glass-clock.png](lockscreen/shots/phase4-glass-clock.png): both pages in light and dark.
 
 Still to do in Phase 4 (superseded by the next request):
 - the user's pick of face A or B;

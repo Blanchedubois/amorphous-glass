@@ -7,6 +7,9 @@ import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 import Clutter from 'gi://Clutter';
+import Cairo from 'cairo';
+import Pango from 'gi://Pango';
+import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import GObject from 'gi://GObject';
@@ -393,8 +396,35 @@ async function run() {
     write({ label: 'background', effects: [...dialog._backgroundGroup].map(b => ({ x: b.x, name: b.name,
         effects: b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`) })) });
     const nameLabel = prompt._userWell?.get_child?.()?._label ?? null;
+    // the font Pango really used (not the name asked for): a fallback face would show here
+    const resolved = label => {
+        try {
+            return label.clutter_text.get_layout().get_line_readonly(0).runs[0].item.analysis.font.describe().to_string();
+        } catch (e) {
+            return `? ${e}`;
+        }
+    };
+    const timeLabel = (() => { let t = null; const w = a => { if (a.style_class === 'tahoe-lock-clock-time') t = a; for (const c of a.get_children()) w(c); }; w(global.stage); return t; })();
     write({ label: 'fonts', userName: nameLabel?.get_theme_node().get_font().to_string() ?? null,
-        entry: entry.get_theme_node().get_font().to_string() });
+        entry: entry.get_theme_node().get_font().to_string(),
+        clockTimeResolved: timeLabel ? resolved(timeLabel) : null,
+        clockTimeThemeFont: timeLabel?.get_theme_node().get_font().to_string() ?? null,
+        maskFontResolved: (() => {
+            try {
+                const surface = new Cairo.ImageSurface(Cairo.Format.A8, 4, 4);
+                const cr = new Cairo.Context(surface);
+                const l = PangoCairo.create_layout(cr);
+                const d = Pango.FontDescription.from_string('Space Grotesk SemiBold');
+                d.set_absolute_size(40 * Pango.SCALE);
+                l.set_font_description(d);
+                l.set_text('1:47', -1);
+                const out = l.get_line_readonly(0).runs[0].item.analysis.font.describe().to_string();
+                cr.$dispose();
+                return out;
+            } catch (e) {
+                return `? ${e}`;
+            }
+        })() });
     await shotRect('full', [0, 0, sw, sh]);
     const a = box(prompt._entryArea);
     if (a) await shotRect('entry', [a[0] - 40, a[1] - 40, a[2] + 80, a[3] + 80]);
