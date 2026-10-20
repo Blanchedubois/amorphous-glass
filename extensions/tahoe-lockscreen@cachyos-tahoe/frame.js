@@ -266,6 +266,12 @@ export class Frame {
             'notify::allocation', () => this.scheduleCheck(),
             this);
         dialog._adjustment.connectObject('notify::value', () => this.scheduleCheck(), this);
+        for (const lightbox of this._lightboxes()) {
+            lightbox.connectObject(
+                'notify::active', () => this.scheduleCheck(),
+                'notify::visible', () => this.scheduleCheck(),
+                this);
+        }
         dialog._promptBox.connectObject(
             'child-added', () => this.scheduleCheck(),
             'notify::visible', () => this.scheduleCheck(),
@@ -289,6 +295,14 @@ export class Frame {
             }
         }
         this._checks = [];
+        // the shield's lightboxes outlive the dialog: always let go of them
+        for (const lightbox of this._lightboxes()) {
+            try {
+                lightbox.disconnectObject(this);
+            } catch (e) {
+                log(`disconnect failed: ${e}`);
+            }
+        }
         if (dialog && !destroyed) {
             try {
                 dialog.disconnectObject(this);
@@ -336,6 +350,11 @@ export class Frame {
         const dialog = this._dialog;
         if (!dialog)
             return null;
+        // while the screen dims (GNOME's own lightbox fades over everything, idle or before
+        // sleep) every hit test lands on the lightbox: nothing to judge until it lifts, and the
+        // lightbox's own notify re-schedules the check then
+        if (this._dimming())
+            return null;
         const page = dialog._adjustment.value;
         if (page !== Math.round(page))
             return 'unsettled';
@@ -352,6 +371,15 @@ export class Frame {
                 return `${name}: ${problem}`;
         }
         return null;
+    }
+
+    _lightboxes() {
+        const shield = Main.screenShield;
+        return [shield?._shortLightbox, shield?._longLightbox].filter(Boolean);
+    }
+
+    _dimming() {
+        return this._lightboxes().some(l => l.active || l.visible);
     }
 
     _inspectPrompt(prompt) {
@@ -374,7 +402,7 @@ export class Frame {
         if (!onScreen)
             return 'the password field is off screen';
         if (!this._hits(entry, cx, cy))
-            return 'something covers the password field';
+            return `something covers the password field (${this._describeHit(cx, cy)})`;
 
         const next = prompt._nextButton;
         if (next?.mapped && next.opacity === 255 && !this._hitsCentre(next))
@@ -383,6 +411,19 @@ export class Frame {
         if (peek?.mapped && peek.visible && !this._hitsCentre(peek))
             return 'something covers the show-password eye';
         return null;
+    }
+
+    // what a click at a point would hit, for the journal
+    _describeHit(x, y) {
+        const hit = global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, x, y);
+        if (!hit)
+            return 'nothing';
+        const chain = [];
+        for (let a = hit; a && chain.length < 4; a = a.get_parent())
+            chain.push(`${a.constructor.name}${a.name ? `#${a.name}` : ''}${a.style_class ? `.${a.style_class.split(' ').join('.')}` : ''}`);
+        const [ax, ay] = hit.get_transformed_position();
+        const [aw, ah] = hit.get_transformed_size();
+        return `${chain.join(' < ')} at ${Math.round(ax)},${Math.round(ay)} ${Math.round(aw)}x${Math.round(ah)}`;
     }
 
     _hitsCentre(actor) {

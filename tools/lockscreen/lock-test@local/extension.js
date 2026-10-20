@@ -189,6 +189,22 @@ async function runQs() {
     write({ label: 'qs-closed', frame: frameState().frame, stillLocked: Main.sessionMode.isLocked });
 }
 
+// the screen dims (GNOME's lightbox over everything) and comes back: our lock screen must stay
+async function runDim() {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    await sleep(1200);
+    const before = frameState().frame;
+    const lb = Main.screenShield._shortLightbox;
+    lb.lightOn();
+    await sleep(2500);
+    const during = frameState().frame;
+    lb.lightOff();
+    await sleep(2000);
+    const after = { ...frameState(), ...(await usable(dialog)) };
+    write({ label: 'dim', before, during, after });
+}
+
 // the top-right menu's submenus (Wi-Fi, Power Mode arrows) while locked
 async function runQsSub() {
     await sleep(3000);
@@ -620,7 +636,7 @@ export default class Driver extends Extension {
         this._started = true;
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
