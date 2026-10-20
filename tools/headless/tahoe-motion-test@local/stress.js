@@ -6,8 +6,10 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import St from 'gi://St';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import { WindowMenu } from 'resource:///org/gnome/shell/ui/windowMenu.js';
 
 const sleep = ms => new Promise(r => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { r(); return GLib.SOURCE_REMOVE; }));
 
@@ -64,6 +66,18 @@ export async function runStress(write) {
             await sleep(12);
         }
     };
+    const keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+    const key = async (...keys) => {
+        for (const k of keys)
+            keyboard.notify_keyval(t(), k, Clutter.KeyState.PRESSED);
+        await sleep(20);
+        for (const k of [...keys].reverse())
+            keyboard.notify_keyval(t(), k, Clutter.KeyState.RELEASED);
+        await sleep(10);
+    };
+    // the window menu: a new menu per open, in uiGroup until GNOME destroys it
+    const windowMenu = () => Main.wm._windowMenuManager._manager.activeMenu;
+    const windowMenus = () => Main.layoutManager.uiGroup.get_children().filter(a => a._delegate instanceof WindowMenu);
     const escape = async () => {
         // GNOME sometimes opens the overview at startup: over the desktop it took the desktop's
         // right-clicks (the "covered desktop" of earlier runs)
@@ -72,6 +86,7 @@ export async function runStress(write) {
         Main.panel.menuManager.activeMenu?.close({ animate: false });
         desktopMenu()?.close({ animate: false });
         dockMenu()?.close({ animate: false });
+        windowMenu()?.close({ animate: false });
         await sleep(300);
     };
 
@@ -108,9 +123,14 @@ export async function runStress(write) {
     let jump = 0;
     const proto = BoxPointer.BoxPointer.prototype;
     const boxOpen = proto.open;
+    // and how many of those opens tahoe-motion animated (a morph running right after)
+    let morphed = 0;
     proto.open = function (...args) {
         opens++;
-        return boxOpen.apply(this, args);
+        const result = boxOpen.apply(this, args);
+        if (Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj?._morphs?.get(this)?.opening)
+            morphed++;
+        return result;
     };
     const mapId = global.window_manager.connect('map', (_, actor) => {
         if (actor.meta_window?.get_window_type() !== 0)
@@ -157,7 +177,7 @@ export async function runStress(write) {
         await escape();
         await sleep(400);
         const before = snapshot();
-        opens = appMaps = 0;
+        opens = appMaps = morphed = 0;
         jump = 0;
         jumpTrace = '';
         frames = [];
@@ -169,7 +189,7 @@ export async function runStress(write) {
             error = `${e}`;
         }
         const busy = stats(frames);
-        const did = { opens, app_maps: appMaps, max_jump: Math.round(jump * 100) / 100, jump_trace: jumpTrace };
+        const did = { opens, morphed, app_maps: appMaps, max_jump: Math.round(jump * 100) / 100, jump_trace: jumpTrace };
         await sleep(700);
         await escape();
         await sleep(600);
@@ -204,6 +224,9 @@ export async function runStress(write) {
             qs.menu._boxPointer.visible ? 'quick settings visible' : null,
             date.menu._boxPointer.visible ? 'calendar visible' : null,
             desktopMenu()?._boxPointer.visible ? 'desktop menu visible' : null,
+            windowMenu() ? 'window menu open' : null,
+            windowMenus().length ? `${windowMenus().length} window menus left` : null,
+            m.window_menus_closing ? `${m.window_menus_closing} window menus waiting to close` : null,
             g.holds ? `${g.holds} holds` : null,
             g.settling ? `${g.settling} settling` : null,
             g.frozen ? `${g.frozen} frozen` : null,
@@ -295,6 +318,26 @@ export async function runStress(write) {
     });
     await runCase('spam desktop right-click, moving (60 ms)', 14, i =>
         right([300 + (i % 5) * 220, 260 + (i % 3) * 180]).then(() => sleep(60)));
+    // Dash to Dock makes an icon's menu on its first right-click and opens it at once, before its
+    // glass exists: every first open must morph too
+    await runCase('dock: first right-click on each icon', 1, async () => {
+        const icons = [];
+        const stack = [Main.uiGroup];
+        while (stack.length) {
+            const a = stack.pop();
+            if (a.constructor?.name?.includes('AppIcon') && a.mapped && a.reactive && !a._menu)
+                icons.push(a);
+            stack.push(...a.get_children());
+        }
+        if (!icons.length)
+            throw new Error('no dock icon without a menu');
+        for (const icon of icons) {
+            await right(centre(icon));
+            await sleep(450);
+            await left([1280, 500]);
+            await sleep(400);
+        }
+    });
     await runCase('spam dock icon right-click (60 ms)', 1, async () => {
         const icon = dockIcon();
         if (!icon)
@@ -422,6 +465,150 @@ export async function runStress(write) {
         await right([400 + (i % 4) * 200, 300 + (i % 3) * 150]);
         await sleep(80);
     });
+
+    // the window menu (a right-click on a GTK header bar, Alt+Space), with a GTK 4 window of its
+    // own (stress-window.js)
+    let appWindow = null;
+    const gtkWindow = () => global.get_window_actors().map(a => a.meta_window)
+        .find(w => w.get_gtk_application_id?.() === 'org.tahoe.StressWindow');
+    const ensureWindow = async () => {
+        if (!appWindow?.get_compositor_private()) {
+            appWindow = null;
+            GLib.spawn_async(null, ['gjs', `${GLib.getenv('TAHOE_TEST_TOOLS')}/stress-window.js`], null,
+                GLib.SpawnFlags.SEARCH_PATH, null);
+            for (let i = 0; i < 100 && !appWindow; i++) {
+                await sleep(50);
+                appWindow = gtkWindow() ?? null;
+            }
+            if (!appWindow)
+                throw new Error('no GTK window');
+            await sleep(500);
+            // a first click into it: the first right-click after it maps opens nothing
+            const r = appWindow.get_frame_rect();
+            await left([r.x + r.width / 2, r.y + r.height / 2]);
+            await sleep(200);
+        }
+        appWindow.activate(global.get_current_time());
+        return appWindow;
+    };
+    const titleBar = (win, dx = 90) => {
+        const r = win.get_frame_rect();
+        return [r.x + dx, r.y + 22];
+    };
+    const closeWindow = async () => {
+        appWindow?.delete(global.get_current_time());
+        await sleep(500);
+        appWindow = null;
+    };
+    // where the last window menu opened, and whether it was inside the monitor
+    const placed = [];
+    const notePlace = () => {
+        const box = windowMenu()?._boxPointer;
+        if (!box)
+            return;
+        const [x, y] = box.get_transformed_position();
+        const [w, h] = box.get_transformed_size();
+        const mon = Main.layoutManager.primaryMonitor;
+        placed.push({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h),
+            inside: x >= mon.x - 1 && y >= mon.y - 1 && x + w <= mon.x + mon.width + 1 && y + h <= mon.y + mon.height + 1 });
+    };
+    const windowCase = (name, cycles, step) => runCase(`window menu: ${name}`, cycles, async i => {
+        await ensureWindow();
+        await step(i);
+    });
+    await windowCase('right-click title bar, open/close', 6, async () => {
+        await right(titleBar(appWindow));
+        await sleep(350);
+        // the glass and rows at rest (docs/STANDARD.md: shell menus 18, rows 14)
+        const box = windowMenu()?._boxPointer;
+        const surfaces = globalThis.__tahoeGlass?.surfaces(box) ?? [];
+        const rows = windowMenu()?._getMenuItems().filter(item => item.visible).map(item => {
+            const node = item.get_theme_node();
+            return { h: Math.round(item.height), r: node.get_border_radius(St.Corner.TOPLEFT) };
+        });
+        write({ note: 'window menu at rest', glass: surfaces.map(s => ({ radius: s.corner_radius, rect: s.glass_rect() })),
+            content_radius: windowMenu()?.box.get_theme_node().get_border_radius(St.Corner.TOPLEFT), rows: rows?.slice(0, 3) });
+        await key(Clutter.KEY_Escape);
+        await sleep(300);
+    });
+    await windowCase('spam right-click title bar (40 ms)', 20, () => right(titleBar(appWindow)).then(() => sleep(40)));
+    await windowCase('spam right-click title bar, random 20-200 ms', 20, () =>
+        right(titleBar(appWindow)).then(() => sleep(20 + Math.floor(Math.random() * 180))));
+    await windowCase('Alt+Space (keyboard, no pointer)', 8, async () => {
+        move(5, 700);
+        await key(Clutter.KEY_Alt_L, Clutter.KEY_space);
+        await sleep(350);
+        if (!windowMenu())
+            throw new Error('Alt+Space opened no window menu');
+        await key(Clutter.KEY_Escape);
+        await sleep(300);
+    });
+    await windowCase('near the screen edges', 8, async i => {
+        const mon = Main.layoutManager.primaryMonitor;
+        const r = appWindow.get_frame_rect();
+        const right_ = i % 2 === 1;
+        const bottom = i % 4 >= 2;
+        appWindow.move_frame(true, right_ ? mon.x + mon.width - r.width : mon.x, bottom ? mon.y + mon.height - r.height : mon.y + Main.panel.height + 4);
+        await sleep(300);
+        await right(titleBar(appWindow, right_ ? r.width - 130 : 12));
+        await sleep(400);
+        if (!windowMenu())
+            throw new Error(`no window menu at ${right_ ? 'right' : 'left'} ${bottom ? 'bottom' : 'top'}`);
+        notePlace();
+        await key(Clutter.KEY_Escape);
+        await sleep(300);
+        if (i === 7)
+            write({ note: 'window menu places', placed: placed.splice(0) });
+    });
+    await windowCase('Move and Resize (menu closes, a grab starts)', 6, async i => {
+        const label = i % 2 ? 'Resize' : 'Move';
+        await right(titleBar(appWindow, 200));
+        await sleep(350);
+        const item = windowMenu()?._getMenuItems().find(it => it.label?.text === label);
+        if (!item)
+            throw new Error(`no ${label} item`);
+        await left(centre(item));
+        await sleep(250);
+        if (windowMenu())
+            throw new Error(`${label}: the window menu stayed open`);
+        // the keyboard grab moves or resizes the window; Escape ends it where it started
+        await key(Clutter.KEY_Right);
+        await key(Clutter.KEY_Escape);
+        await sleep(300);
+    });
+    await windowCase('window closed mid-open', 5, async () => {
+        await right(titleBar(appWindow));
+        await sleep(60);
+        await closeWindow();
+    });
+    await windowCase('window closed mid-close', 5, async () => {
+        await right(titleBar(appWindow));
+        await sleep(350);
+        await key(Clutter.KEY_Escape);
+        await sleep(30);
+        await closeWindow();
+    });
+    await windowCase('workspace switched mid-open', 6, async () => {
+        const wm = global.workspace_manager;
+        if (wm.n_workspaces < 2)
+            wm.append_new_workspace(false, global.get_current_time());
+        await right(titleBar(appWindow));
+        await sleep(60);
+        wm.get_workspace_by_index(1).activate(global.get_current_time());
+        await sleep(450);
+        wm.get_workspace_by_index(0).activate(global.get_current_time());
+        await sleep(450);
+        if (windowMenu())
+            await key(Clutter.KEY_Escape);
+        await sleep(250);
+    });
+    await windowCase('leak check: right-click title bar x50', 50, async () => {
+        await right(titleBar(appWindow));
+        await sleep(90);
+        await key(Clutter.KEY_Escape);
+        await sleep(60);
+    });
+    await closeWindow();
 
     ids.forEach(id => global.stage.disconnect(id));
     global.stage.disconnect(sampleId);

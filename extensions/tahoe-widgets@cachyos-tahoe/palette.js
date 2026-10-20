@@ -8,7 +8,10 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 const SAMPLE = 40;      // px the cover is read at
 const CLUSTERS = 5;
 const KEEP = 4;         // colours the swirl uses
-const INK_THRESHOLD = 0.56;   // mean swirl luma over which the text turns dark
+const INK_THRESHOLD = 0.70;   // shown lightness over which the text turns dark
+// how light each glass mode's own glass is, roughly (the swirl keeps most of it, swirl.js)
+const GLASS_LIGHTNESS = {dark: 0.22, milky: 0.36, light: 0.78};
+const SWIRL_PULL = 0.38;      // swirl.js PULL: how much of the swirl's own lightness shows
 const CACHE_ENTRIES = 32;
 
 // ---- colour spaces: sRGB 0..1 <-> OkLab ----
@@ -180,9 +183,29 @@ export function swirlPalette(colours) {
 
 const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-// dark text over a light swirl, white over the rest: the swirl's colours, not the glass mode,
-// decide (the swirl is what the text sits on)
-export function wantsDarkInk(palette) {
-    return palette.reduce((s, c) => s + luma(c), 0) / palette.length > INK_THRESHOLD;
+// Dark text only over a swirl that really shows light: the glass keeps its own lightness under
+// the swirl's hue and moves only SWIRL_PULL of the way to the swirl's lightness, so a pale cover
+// on dark glass is still a mid grey, where white text (with its scrim) reads better (user,
+// 2026-10-20: black text on vaguely light swirls was hard to see). In practice: light glass with a
+// light cover.
+export function wantsDarkInk(palette, mode = 'dark') {
+    const swirl = palette.reduce((s, c) => s + luma(c), 0) / palette.length;
+    const glass = GLASS_LIGHTNESS[mode] ?? GLASS_LIGHTNESS.dark;
+    return (1 - SWIRL_PULL) * glass + SWIRL_PULL * swirl > INK_THRESHOLD;
 }
 
+// The text's colour, tinted by the cover (user, 2026-10-20): its most colourful colour, very light
+// for white text and deep for dark text, with only a little of its chroma so the text stays
+// text-coloured. A cover with no real colour gives plain white or near-black. sRGB 0..1.
+export function inkColour(colours, dark) {
+    if (!colours?.length)
+        return null;
+    const chroma = c => Math.hypot(c[1], c[2]);
+    const pick = colours.reduce((best, c) => chroma(c) > chroma(best) ? c : best);
+    const C = chroma(pick);
+    const [L, maxC] = dark ? [0.27, 0.06] : [0.96, 0.035];
+    if (C < 0.03)
+        return labToRgb([L, 0, 0]);
+    const f = Math.min(C, maxC) / C;
+    return labToRgb([L, pick[1] * f, pick[2] * f]);
+}
