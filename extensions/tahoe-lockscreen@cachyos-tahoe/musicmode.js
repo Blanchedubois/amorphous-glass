@@ -111,6 +111,12 @@ class TahoeLockBackgroundSwirl extends Clutter.OffscreenEffect {
     }
 });
 
+// how many music mode swirls are moving right now (tools/lockscreen music-idle gate)
+const running = new Set();
+export function musicFramesRunning() {
+    return running.size;
+}
+
 // backdrop: () => the primary monitor's lock background actor (the glass copies it); onChange: music
 // mode went on or off (the layout places things again); onWake: input after idle (others' ticks)
 export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, onWake) {
@@ -221,10 +227,12 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
     // ---- the swirl's frames: while fading, or playing and the gate allows ----
     let frameId = 0;
     let last = 0;
+    const token = {};   // this instance in `running`
     const stopFrames = () => {
         if (frameId)
             GLib.source_remove(frameId);
         frameId = 0;
+        running.delete(token);
     };
     const animating = () => St.Settings.get().enable_animations;
     const syncFrames = () => {
@@ -232,6 +240,7 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
         const moving = active && gate() && animating();
         if ((fading || moving) && !frameId) {
             last = GLib.get_monotonic_time() / 1e6;
+            running.add(token);
             frameId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.round(1000 / FPS), () =>
                 frame.guard(() => {
                     const now = GLib.get_monotonic_time() / 1e6;
@@ -248,8 +257,9 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
                     if (amount !== target || (active && gate() && animating()))
                         return GLib.SOURCE_CONTINUE;
                     frameId = 0;
+                    running.delete(token);
                     return GLib.SOURCE_REMOVE;
-                }) ?? GLib.SOURCE_REMOVE);
+                }) ?? (running.delete(token), frameId = 0, GLib.SOURCE_REMOVE));
         } else if (!fading && !moving) {
             stopFrames();
         }
