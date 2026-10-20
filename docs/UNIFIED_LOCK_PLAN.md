@@ -214,3 +214,18 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
   no-load (state INITIALIZED, enabled false). Fix: every key the install sets is locked
   (/etc/dconf/db/gdm.d/locks), so the account's settings cannot override them; with the locks the
   same planted value is refused and the extension is ACTIVE.
+- 2026-10-20, from the user's first look at the real login screen:
+  - account rows: the top row's top edge was cut too (the same viewport clip): rows 4 px clear
+    vertically as well, the rim measured whole;
+  - the song on the login screen is the Large card, as Super+L's (1.5x, 1.25x or 1x, the biggest
+    that fits; the wide card below that); display only;
+  - the password capsule's edge thinner on both screens (glass.js THIN_EDGE: 1 px line, 3 px glow);
+  - Super+L's password glass was nearly invisible (it copied the field's fade but missed GNOME's
+    fade on an ancestor: 8 of 255): it follows every ancestor's fade now;
+  - GNOME's buttons as glass capsules: Not listed?, back, session and accessibility (login screen,
+    buttons.js), back and Switch User (Super+L, promptglass.js);
+  - menus on frosted glass with a live blur of everything behind them (menus.js, shared with the
+    lock screen as widgets/glassmenus.js): the calendar under the clock, the system menu, the
+    accessibility menu; a 24-sample blur in the shader above 2 px, weighted by coverage;
+  - all dark (the user: light glass with dark menus looked mixed): GLASS_LOOK dark on both
+    screens, on toggles in the accent colour on both (over the desktop theme's white while locked).

@@ -37,7 +37,16 @@ const IDLE = 30;                 // s without input: the swirl holds still (as o
 const RADIUS = 24;               // tokens/radius.json widget
 const PAD = 16;                  // the card's padding, as the widgets'
 const COVER_RADIUS = 8;          // tokens/radius.json cover
-const COVER = [0.085, 64, 144];  // the cover's side: share of the monitor's height, least, most
+// the card, as the lock screen's music mode (tahoe-lockscreen musicmode.js CARDS): the Large card
+// (the cover across the top, the song under it) at 1.5x, 1.25x or 1x, the biggest that fits the
+// room and 42 % of the width; else the wide one (the cover on the left), shrunk to fit
+const LARGE_SCALES = [1.5, 1.25, 1];
+const LARGE_ART = 324;           // tahoe-widgets music.js LARGE_ART
+const LARGE_TYPE = [22, 16];     // the Large card's title and artist size at 1x (widgets.css)
+const LARGE_TITLE_GAP = 12;      // .tahoe-music-title-row-large padding-top at 1x
+const ROOM_SHARE = 0.92;
+const WIDTH_SHARE = 0.42;
+const COVER = [0.085, 64, 144];  // the wide card's cover side: share of the height, least, most
 const COVER_SMALLEST = 44;       // shrunk to fit a small room, never below this (then no card)
 const TEXT = [2.2, 200];         // the text column's width: in covers, least px
 const TYPE = [[0.15, 14], [0.12, 12]];   // title and artist size: share of the cover, least px
@@ -264,25 +273,49 @@ export function buildNowPlaying(ext, backdrop) {
         const top = (CLOCK_BOTTOM + GAP) * H;
         const under = below();
         const bottom = (under === null ? 0.75 * H : (under - m.y) / scale) - GAP * H;
-        let side = Math.round(Math.min(COVER[2], Math.max(COVER[1], COVER[0] * H)));
-        side = Math.min(side, Math.floor(bottom - top - 2 * PAD));
-        fits = side >= COVER_SMALLEST;
-        if (!fits) {
-            syncCard();
-            return;
-        }
-        const textWidth = Math.max(TEXT[1], Math.round(side * TEXT[0]));
-        const w = PAD + side + PAD + textWidth + PAD;
-        const h = PAD + side + PAD;
+        const room = bottom - top;
         const coverCss = coverUri
             ? `background-image: url("${coverUri}"); background-size: cover;`
             : 'background-color: rgba(255,255,255,0.18);';
-        cover.style = `width: ${side}px; height: ${side}px; border-radius: ${COVER_RADIUS}px; ${coverCss}`;
-        row.style = `padding: ${PAD}px; spacing: ${PAD}px;`;
-        column.style = `width: ${textWidth}px; spacing: ${Math.round(side * 0.04)}px;`;
-        [title, artist].forEach((label, i) => {
-            label.style = `font-size: ${Math.max(TYPE[i][1], Math.round(side * TYPE[i][0]))}px;`;
-        });
+        // the Large card: its height measured from its type (one line each, as the lock screen's)
+        const large = LARGE_SCALES.map(k => {
+            const art = Math.round(LARGE_ART * k);
+            const type = LARGE_TYPE.map(t => Math.round(t * k));
+            const h = PAD + art + Math.round(LARGE_TITLE_GAP * k) + Math.ceil(type[0] * 1.3) + Math.ceil(type[1] * 1.35) + PAD;
+            return {k, art, type, w: PAD + art + PAD, h};
+        }).find(c => c.h <= room * ROOM_SHARE && c.w <= (m.width / scale) * WIDTH_SHARE);
+        let w, h;
+        if (large) {
+            fits = true;
+            row.orientation = Clutter.Orientation.VERTICAL;
+            row.style = `padding: ${PAD}px; spacing: ${Math.round(LARGE_TITLE_GAP * large.k)}px;`;
+            cover.style = `width: ${large.art}px; height: ${large.art}px; border-radius: ${COVER_RADIUS}px; ${coverCss}`;
+            column.style = `width: ${large.art}px; spacing: 0;`;
+            column.y_align = Clutter.ActorAlign.START;
+            title.style = `font-family: "SF Pro Display", sans-serif; font-size: ${large.type[0]}px;`;
+            artist.style = `font-size: ${large.type[1]}px;`;
+            w = large.w;
+            h = large.h;
+        } else {
+            let side = Math.round(Math.min(COVER[2], Math.max(COVER[1], COVER[0] * H)));
+            side = Math.min(side, Math.floor(room - 2 * PAD));
+            fits = side >= COVER_SMALLEST;
+            if (!fits) {
+                syncCard();
+                return;
+            }
+            const textWidth = Math.max(TEXT[1], Math.round(side * TEXT[0]));
+            w = PAD + side + PAD + textWidth + PAD;
+            h = PAD + side + PAD;
+            row.orientation = Clutter.Orientation.HORIZONTAL;
+            row.style = `padding: ${PAD}px; spacing: ${PAD}px;`;
+            cover.style = `width: ${side}px; height: ${side}px; border-radius: ${COVER_RADIUS}px; ${coverCss}`;
+            column.style = `width: ${textWidth}px; spacing: ${Math.round(side * 0.04)}px;`;
+            column.y_align = Clutter.ActorAlign.CENTER;
+            [title, artist].forEach((label, i) => {
+                label.style = `font-size: ${Math.max(TYPE[i][1], Math.round(side * TYPE[i][0]))}px;`;
+            });
+        }
         card.set_size(w * scale, h * scale);
         const y = (top + bottom - h) / 2;
         card.set_position(m.x + Math.round((m.width - w * scale) / 2), m.y + Math.round(y * scale));

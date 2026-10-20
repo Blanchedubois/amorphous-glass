@@ -51,7 +51,20 @@ export const MATERIAL = {
     dark: {brightness: -0.02, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
 };
 
-export const GLASS_LOOK = 'light';
+// the password capsule's edge: thinner than the cards' (the user, 2026-10-20), on both screens
+export const THIN_EDGE = {rimLine: 1, rimGlow: 3, glow: 0.3};
+
+// a menu's glass: frosted (a wide blur of what moves behind it), a softer bend, the thin edge,
+// a little darker so GNOME's light menu text reads
+export const MENU_GLASS = {
+    ...THIN_EDGE, blur: 30, bend: 6, edge: 8, contrast: 0.8, saturation: 1.3,
+    light: {brightness: -0.16, milk: 0.04, tint: [0, 0, 0], tintAmount: 0},
+    dark: {brightness: -0.04, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.5},
+};
+
+// dark glass on both screens over the dark picture (the user, 2026-10-20: light glass, white
+// toggles and dark menus together looked mixed: "make it all darkmode")
+export const GLASS_LOOK = 'dark';
 
 export function darkScheme() {
     if (GLASS_LOOK !== 'scheme')
@@ -86,6 +99,22 @@ uniform float sd_r;
 
 vec3 tahoe_backdrop(vec2 uv) {
     vec2 b = vec2(blur_px * px_x, blur_px * px_y);
+    if (blur_px > 2.0) {
+        // a real blur (a menu's frosted glass): 24 samples on a golden-angle spiral out to blur_px,
+        // each weighted by its coverage, so nothing (past the screen's edge) does not darken it
+        vec4 c0 = texture2D(cogl_sampler0, uv);
+        vec3 acc = c0.rgb;
+        float wsum = c0.a;
+        for (int i = 1; i < 24; i++) {
+            float r = sqrt(float(i) / 23.0);
+            float a = float(i) * 2.39996;
+            float w = 1.0 - 0.6 * r;
+            vec4 t = texture2D(cogl_sampler0, uv + vec2(cos(a), sin(a)) * r * b);
+            acc += t.rgb * w;
+            wsum += t.a * w;
+        }
+        return acc / max(wsum, 0.0001);
+    }
     return (texture2D(cogl_sampler0, uv).rgb * 2.0 +
             texture2D(cogl_sampler0, uv + vec2(b.x, 0.0)).rgb +
             texture2D(cogl_sampler0, uv - vec2(b.x, 0.0)).rgb +
@@ -289,7 +318,7 @@ export const GlassPane = GObject.registerClass({
         this._radius = radius;
         this._material = {...MATERIAL, ...material};
         // room around the shape for the bend and the edge: PAD, more for a bigger bend (a clock)
-        this._pad = Math.max(PAD, Math.ceil(this._material.bend) + 4);
+        this._pad = Math.max(PAD, Math.ceil(this._material.bend) + 4, Math.ceil(this._material.blur) + 4);
         // the glass itself: PAD px bigger than this pane on every side (the pane does not clip),
         // holding the backdrop and running the effect over its own allocation
         this._glass = new St.Widget({reactive: false, clip_to_allocation: true});
