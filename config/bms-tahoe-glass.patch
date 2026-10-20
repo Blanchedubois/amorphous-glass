@@ -13,7 +13,7 @@ index 67d4d97..e6c759a 100644
  .PHONY: build install pot test-shell test-prefs test-vm remove clean
  
 diff --git a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
-index d983d96..562bbba 100644
+index d983d96..7a28e95 100644
 --- a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 +++ b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 @@ -296,6 +296,11 @@
@@ -39,7 +39,7 @@ index d983d96..562bbba 100644
 +        </key>
 +        <!-- TAHOE GLASS: MOTION FREEZE -->
 +        <key type="b" name="motion-freeze">
-+            <default>true</default>
++            <default>false</default>
 +            <summary>Boolean, whether a popup's glass keeps its backdrop while the popup opens, closes or resizes (captured once where it comes to rest), going live when the motion is over</summary>
 +        </key>
          <!-- SIGMA -->
@@ -677,10 +677,10 @@ index 3130fdd..058815e 100644
  };
 diff --git a/src/components/popup/surface/motion.js b/src/components/popup/surface/motion.js
 new file mode 100644
-index 0000000..3264319
+index 0000000..ad1bf43
 --- /dev/null
 +++ b/src/components/popup/surface/motion.js
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,285 @@
 +import GLib from 'gi://GLib';
 +import Meta from 'gi://Meta';
 +import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
@@ -900,6 +900,25 @@ index 0000000..3264319
 +        };
 +    },
 +
++    /// counts for stress tests (tools/headless): motion groups, holds, surfaces settling or frozen,
++    /// running frame callbacks and signal handlers held by the popup glass
++    debug() {
++        const out = { groups: groups.size, holds: 0, frame_callbacks: 0, surfaces: 0, settling: 0, frozen: 0, handlers: 0 };
++        for (const group of groups.values()) {
++            out.holds += group.holds;
++            out.frame_callbacks += group.frame_id ? 1 : 0;
++            out.handlers += [...group.movers.values()].reduce((n, mover) => n + mover.ids.length, 0);
++            for (const surface of group.surfaces) {
++                out.surfaces++;
++                out.settling += surface.settling ? 1 : 0;
++                out.frozen += surface.frozen ? 1 : 0;
++                for (const record of surface.signals?.connections?.records?.values() ?? [])
++                    out.handlers += record.ids.size + (record.destroy_id ? 1 : 0);
++            }
++        }
++        return out;
++    },
++
 +    /// the popup's motion root for an actor in it, or null when it has no glass
 +    root_of(actor) {
 +        const found = actor ? find_root(actor) : null;
@@ -948,7 +967,7 @@ index 0000000..3264319
 +    }
 +}
 diff --git a/src/components/popup/surface/placement.js b/src/components/popup/surface/placement.js
-index df5351e..0382f60 100644
+index df5351e..a26590b 100644
 --- a/src/components/popup/surface/placement.js
 +++ b/src/components/popup/surface/placement.js
 @@ -25,12 +25,15 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
@@ -967,7 +986,18 @@ index df5351e..0382f60 100644
  
          const geometry = this.get_unclipped_surface_geometry();
          if (!this.has_valid_geometry(geometry))
-@@ -259,6 +262,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+@@ -50,6 +53,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+     }
+ 
+     get_unclipped_surface_geometry() {
++        // tahoe glass: lay the stage out first if it needs it (Clutter does, when an allocation is
++        // read), so the glass takes this frame's size: a menu growing under a transition (a
++        // submenu expanding in it) was measured as it was a frame before, and its glass trailed it
++        this.surface.target.get_allocation_box();
+         const geometry = this.geometry.get(
+             this.surface.target,
+             !this.surface.uses_full_actor_geometry()
+@@ -259,6 +266,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
          blur_actor.set_size(local.width, local.height);
          blur_actor.set_pivot_point(0, 0);
          blur_actor.set_transform(this.get_target_transform(local));
@@ -978,7 +1008,7 @@ index df5351e..0382f60 100644
          this.x = geometry.x;
          this.y = geometry.y;
          this.width = local.width;
-@@ -287,6 +294,22 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+@@ -287,6 +298,22 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
          };
      }
  
@@ -1001,7 +1031,7 @@ index df5351e..0382f60 100644
      get_target_transform(local) {
          const target = this.surface.target;
          const parent = this.surface.parent;
-@@ -340,6 +363,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
+@@ -340,6 +367,10 @@ export const PopupBlurSurfacePlacement = class PopupBlurSurfacePlacement {
      }
  
      clear() {
@@ -1013,20 +1043,38 @@ index df5351e..0382f60 100644
          this.y = null;
          this.width = null;
 diff --git a/src/components/popup/surface/signals.js b/src/components/popup/surface/signals.js
-index 72d27e7..4f87b97 100644
+index 72d27e7..6e3a967 100644
 --- a/src/components/popup/surface/signals.js
 +++ b/src/components/popup/surface/signals.js
-@@ -82,6 +82,10 @@ export const PopupBlurSurfaceSignals = class PopupBlurSurfaceSignals {
+@@ -30,6 +30,15 @@ const VISIBILITY_SIGNALS = new Set([
+     'notify::visible',
+     'notify::mapped',
+ ]);
++// a popup that changes size (a submenu expanding inside a menu) has its glass follow in the same
++// frame: on an idle later it waited for the end of the animation, then jumped
++const SIZE_SIGNALS = new Set([
++    'notify::allocation',
++    'notify::size',
++    'notify::width',
++    'notify::height',
++    'notify::clip-rect',
++]);
+ const ANIMATION_SIGNALS = new Set([
+     'notify::opacity',
+     'notify::translation-x',
+@@ -82,7 +91,11 @@ export const PopupBlurSurfaceSignals = class PopupBlurSurfaceSignals {
              return;
          }
  
+-        if (is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal)) {
 +        // the popup's motion group moves the glass once per frame until it settles
 +        if (this.surface.settling)
 +            return;
 +
-         if (is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal)) {
++        if (is_visibility_change || is_heavy_surface || ANIMATION_SIGNALS.has(signal) || SIZE_SIGNALS.has(signal)) {
              this.remove_idle_update();
              this.surface.queue_update();
+             return;
 diff --git a/src/components/popup/surface/transitions.js b/src/components/popup/surface/transitions.js
 index d13b7f3..cf8ab85 100644
 --- a/src/components/popup/surface/transitions.js

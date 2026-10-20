@@ -55,15 +55,23 @@ export default class TahoeMotion extends Extension {
         this._boxClose = proto.close;
         const motion = this;
         proto.open = function (animate, onComplete) {
-            if (!motion.handles(this, animate))
+            if (!motion.handles(this, animate)) {
+                motion.stop(this);
                 return motion._boxOpen.call(this, animate, onComplete);
+            }
             return motion.open(this, onComplete, motion.sliding(animate));
         };
         proto.close = function (animate, onComplete) {
             if (!this.visible)
                 return undefined;
-            if (!motion.handles(this, animate))
-                return motion._boxClose.call(this, animate, onComplete);
+            if (!motion.handles(this, animate)) {
+                // a close already waiting (a menu left for the next) has its callback run too
+                const waiting = motion.stop(this);
+                return motion._boxClose.call(this, animate, waiting ? () => {
+                    waiting();
+                    onComplete?.();
+                } : onComplete);
+            }
             return motion.close(this, onComplete, motion.sliding(animate));
         };
         this.patchBanners();
@@ -346,22 +354,42 @@ export default class TahoeMotion extends Extension {
         let frames = HANDOVER_FRAMES;
         const laters = global.compositor.get_laters();
         (this._closingSoon ??= new Set()).add(boxPointer);
+        boxPointer._tahoeCloseSoonDone = onComplete ?? (() => {});
         boxPointer._tahoeCloseSoon = laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
             if (--frames > 0)
                 return GLib.SOURCE_CONTINUE;
             delete boxPointer._tahoeCloseSoon;
+            delete boxPointer._tahoeCloseSoonDone;
             this._closingSoon.delete(boxPointer);
             this._boxClose.call(boxPointer, BoxPointer.PopupAnimation.NONE, onComplete);
             return GLib.SOURCE_REMOVE;
         });
     }
 
+    /// gives the callback of the close it stops
     cancelCloseSoon(boxPointer) {
         if (!boxPointer._tahoeCloseSoon)
-            return;
+            return null;
         global.compositor.get_laters().remove(boxPointer._tahoeCloseSoon);
+        const done = boxPointer._tahoeCloseSoonDone ?? null;
         delete boxPointer._tahoeCloseSoon;
+        delete boxPointer._tahoeCloseSoonDone;
         this._closingSoon?.delete(boxPointer);
+        return done;
+    }
+
+    /// counts for stress tests (tools/headless): animations running, menus waiting to close, icon
+    /// effects and the handlers this extension holds
+    debug() {
+        const icons = this._icons;
+        return {
+            morphs: this._morphs?.size ?? 0,
+            morph_timelines: [...(this._morphs?.values() ?? [])].filter(m => m.timeline).length,
+            closing_soon: this._closingSoon?.size ?? 0,
+            icon_buttons: icons?.tracked.size ?? 0,
+            icon_timelines: [...(icons?.motions.values() ?? [])].filter(m => m.timeline).length
+                + [...(icons?.squishes.values() ?? [])].filter(m => m.timeline).length,
+        };
     }
 
     /// GNOME opens and closes with a fade only when the pointer slides from one menu to the next
@@ -396,6 +424,21 @@ export default class TahoeMotion extends Extension {
             return new Map();
         }
         return new Map(pieces.map(piece => [piece.target, piece]));
+    }
+
+    /// GNOME opens or closes a popup at once (menu.close(false): the overview, the lock screen, a
+    /// grab lost) in the middle of an animation: the animation ends where it is, the glass at rest
+    /// and released (found in the stress test: left running, its glass stayed held)
+    stop(boxPointer) {
+        const waiting = this.cancelCloseSoon(boxPointer);
+        const running = this._morphs.get(boxPointer);
+        if (running) {
+            this.takeOver(boxPointer).forEach(piece => piece.restore());
+            running.resetRoot();
+            if (running.fadeRoot)
+                boxPointer.opacity = 255;
+        }
+        return waiting;
     }
 
     /// the pieces of a popup: those of an interrupted animation as they are, new ones otherwise

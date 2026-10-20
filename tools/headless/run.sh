@@ -7,7 +7,7 @@ H=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d -p "$H" root.XXXX)
 mkdir -p "$out"; rm -f "$out"/*.png "$out"/log.jsonl
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
-export GSETTINGS_BACKEND=keyfile TAHOE_TEST_OUT=$out TAHOE_TEST_RUNS=$runs
+export GSETTINGS_BACKEND=keyfile TAHOE_TEST_OUT=$out TAHOE_TEST_RUNS=$runs TAHOE_TEST_TOOLS=$H
 ext=$XDG_DATA_HOME/gnome-shell/extensions
 mkdir -p "$ext/blur-my-shell@aunetx" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
 unzip -q "$zip" -d "$ext/blur-my-shell@aunetx"
@@ -49,12 +49,17 @@ dump('/org/gnome/desktop/background/')
 out += ['[org/gnome/shell]',
         "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local'" + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
         'disable-extension-version-validation=true',
+        "favorite-apps=['org.gnome.Nautilus.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop']",
         'welcome-dialog-last-shown-version=\'999\'',
         '[org/gnome/shell/extensions/user-theme]', "name='MacTahoe-Dark'",
         '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", 'enable-animations=true']
+# TAHOE_TEST_KEYS="path:key=value ...": settings changed for this run (after the user's)
+for item in os.environ.get('TAHOE_TEST_KEYS', '').split():
+    path, kv = item.split(':', 1)
+    out += [f'[{path}]', kv]
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
-timeout 90 dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
+timeout ${TAHOE_TEST_TIMEOUT:-90} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
   --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
 cp "$kf" "$out/keyfile.after" 2>/dev/null; rm -rf "$root"
 echo "done: $(grep -c . "$out/log.jsonl" 2>/dev/null || echo 0) records"
