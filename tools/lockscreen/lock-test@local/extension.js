@@ -13,6 +13,8 @@ import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import GObject from 'gi://GObject';
+import Gdm from 'gi://Gdm';
+import * as UserVerifier from 'resource:///org/gnome/shell/gdm/userVerifier.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const FAULT = GLib.getenv('TAHOE_LOCK_FAULT');
@@ -630,10 +632,26 @@ async function run() {
     await shotRect('clock', [0, 0, sw, sh]);
 }
 
+// The throwaway shell must never talk to the real GDM: its unlock prompt would start a real
+// gdm-password PAM conversation for the user, and every conversation the test shell drops counts
+// as a failed login with pam_faillock (three locked the user's account on 2026-10-20). So before
+// anything locks: no verifier ever begins, and the GDM client refuses to open a channel.
+function isolateFromGdm() {
+    UserVerifier.ShellUserVerifier.prototype.begin = async function () {
+        write({ label: 'pam-blocked', note: 'ShellUserVerifier.begin refused in the test shell' });
+    };
+    for (const name of ['open_reauthentication_channel', 'get_user_verifier', 'open_reauthentication_channel_sync', 'get_user_verifier_sync']) {
+        if (Gdm.Client.prototype[name])
+            Gdm.Client.prototype[name] = function () { throw new Error('test shell: no GDM'); };
+    }
+    write({ label: 'pam-isolated' });
+}
+
 export default class Driver extends Extension {
     enable() {
         if (this._started) return;
         this._started = true;
+        isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
         (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
