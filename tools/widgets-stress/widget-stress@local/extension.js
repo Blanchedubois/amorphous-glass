@@ -473,6 +473,50 @@ async function swirlTest(players) {
     }, errors: errors()});
 }
 
+// ---- the app button: a click focuses the player's own window ----
+async function appButtonTest(players) {
+    players.forEach(p => {
+        p.status = 'Paused';
+        p.changed(['PlaybackStatus']);
+    });
+    const proc = Gio.Subprocess.new(['gjs', `${HARNESS}/fake-player-app.js`, '40000'], Gio.SubprocessFlags.NONE);
+    const pid = Number(proc.get_identifier());
+    const fakeWindow = () => global.get_window_actors().map(a => a.meta_window).find(w => w.get_pid() === pid);
+    for (let i = 0; i < 60 && !fakeWindow(); i++)
+        await sleep(100);
+    await sleep(1500);   // the player found, its app read
+    const other = Gio.Subprocess.new(['gjs', `${HARNESS}/fullscreen.js`, '30000'], Gio.SubprocessFlags.NONE);
+    const otherPid = Number(other.get_identifier());
+    for (let i = 0; i < 60 && global.display.focus_window?.get_pid() !== otherPid; i++)
+        await sleep(100);
+    const appButtons = () => musicWidgets().flatMap(w => find(w, a => a.has_style_class_name?.('tahoe-music-app')));
+    const focusedFake = () => global.display.focus_window?.get_pid() === pid;
+    const r = {fakeWindow: Boolean(fakeWindow()), otherFocused: global.display.focus_window?.get_pid() === otherPid,
+        buttons: appButtons().length, visible: appButtons().filter(b => b.visible).length,
+        titles: titles()};
+    // 1: behind another window
+    appButtons()[0]?.emit('clicked', 1);
+    await sleep(700);
+    r.focusedFromBehind = focusedFake();
+    // 2: minimised
+    fakeWindow()?.minimize();
+    Main.activateWindow(global.get_window_actors().map(a => a.meta_window).find(w => w.get_pid() === otherPid));
+    await sleep(500);
+    appButtons()[1]?.emit('clicked', 1);
+    await sleep(700);
+    r.focusedFromMinimised = focusedFake() && !fakeWindow()?.minimized;
+    // 3: on another workspace
+    fakeWindow()?.change_workspace_by_index(1, false);
+    await sleep(300);
+    appButtons()[2]?.emit('clicked', 1);
+    await sleep(900);
+    r.focusedOnOtherWorkspace = focusedFake() && global.workspace_manager.get_active_workspace_index() === 1;
+    r.ok = r.visible === r.buttons && r.focusedFromBehind && r.focusedFromMinimised && r.focusedOnOtherWorkspace;
+    write({scenario: 'app button focuses the player window', ...r, errors: errors()});
+    other.force_exit();
+    proc.force_exit();
+}
+
 // errors and criticals the shell has logged so far (its stderr is $SHOT_OUT/shell.log)
 function errors() {
     try {
@@ -532,6 +576,10 @@ export default class Stress extends Extension {
             await idle('only minute widgets (digital, glass text, calendar, weather), 65 s', 65000);
             players[0].status = 'Paused';
             players[0].changed(['PlaybackStatus']);
+            return;
+        }
+        if (GLib.getenv('STRESS_ONLY') === 'app') {
+            await appButtonTest(players);
             return;
         }
         if (GLib.getenv('STRESS_ONLY') === 'swirl') {

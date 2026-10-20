@@ -58,7 +58,8 @@ function setTint(mode) {
 
 // a fake MPRIS player (only when SHOT_FAKE_PLAYER=1): made-up song, generated art, sidecar .lrc
 const MPRIS_XML = `<node>
-<interface name="org.mpris.MediaPlayer2"><property name="Identity" type="s" access="read"/></interface>
+<interface name="org.mpris.MediaPlayer2"><method name="Raise"/><property name="Identity" type="s" access="read"/>
+  <property name="DesktopEntry" type="s" access="read"/><property name="CanRaise" type="b" access="read"/></interface>
 <interface name="org.mpris.MediaPlayer2.Player">
   <method name="PlayPause"/><method name="Next"/><method name="Previous"/>
   <signal name="Seeked"><arg type="x"/></signal>
@@ -92,6 +93,9 @@ function fakePlayer() {
     const info = Gio.DBusNodeInfo.new_for_xml(MPRIS_XML);
     const props = {
         Identity: new GLib.Variant('s', 'Fake Player'),
+        // SHOT_APP: the desktop entry the player claims (its icon shows on the app button)
+        DesktopEntry: new GLib.Variant('s', GLib.getenv('SHOT_APP') ?? 'firefox'),
+        CanRaise: new GLib.Variant('b', true),
         PlaybackStatus: new GLib.Variant('s', GLib.getenv('SHOT_STATUS') ?? 'Playing'),
         Metadata: new GLib.Variant('a{sv}', {
             'mpris:trackid': new GLib.Variant('o', '/fake/track/1'),

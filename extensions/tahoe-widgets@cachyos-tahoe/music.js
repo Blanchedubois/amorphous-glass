@@ -8,7 +8,10 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Graphene from 'gi://Graphene';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
@@ -121,6 +124,103 @@ class Progress {
 // does not recolour (Tahoe-Material: a light outline that vanishes on dark text)
 const ICONS = GLib.build_filenamev([GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]), 'icons']);
 const icon = name => Gio.FileIcon.new(Gio.File.new_for_path(GLib.build_filenamev([ICONS, `${name}.svg`])));
+
+// The player's app icon; a click brings the player forward: Raise (browsers switch to the
+// playing tab), then the shell activates the player's window itself, since Wayland may not let
+// the player take the focus: the window that just asked for attention, else the most recently
+// used one, found by the player's process, else by its app. Activating unminimises it and moves
+// to its workspace.
+const RAISE_SETTLE = 150;   // ms for the player to switch tab (and ask for attention) first
+
+function playerApp(app) {
+    if (!app)
+        return null;
+    const system = Shell.AppSystem.get_default();
+    const entry = app.desktopEntry;
+    return (entry && (system.lookup_app(`${entry}.desktop`) ?? system.lookup_desktop_wmclass(entry) ??
+            system.lookup_app(`${Shell.AppSystem.search(entry)[0]?.[0] ?? ''}`))) ||
+        (app.pid ? Shell.WindowTracker.get_default().get_app_from_pid(app.pid) : null);
+}
+
+function playerWindow(app) {
+    let windows = app.pid
+        ? global.get_window_actors().map(a => a.meta_window).filter(w => w.get_pid() === app.pid)
+        : [];
+    if (!windows.length)
+        windows = playerApp(app)?.get_windows() ?? [];
+    windows = windows.filter(w => !w.skip_taskbar);
+    return windows.find(w => w.demands_attention || w.urgent) ??
+        windows.sort((a, b) => b.get_user_time() - a.get_user_time())[0] ?? null;
+}
+
+class AppButton {
+    constructor(player, size, badge = false) {
+        this._player = player;
+        this._size = size;
+        this.actor = new St.Button({
+            style_class: badge ? 'tahoe-music-app tahoe-music-app-badge' : 'tahoe-music-app',
+            can_focus: false,
+            visible: false,
+            child: new St.Icon({icon_size: size}),
+        });
+        this.actor.connect('clicked', () => this._open());
+        this._settleId = 0;
+        this._shown = undefined;
+    }
+
+    update(state) {
+        const app = state?.app ?? null;
+        this._app = app;
+        this.actor.visible = Boolean(state);
+        const key = app ? `${app.desktopEntry}|${app.pid}` : null;
+        if (key === this._shown)
+            return;
+        this._shown = key;
+        const shellApp = playerApp(app);
+        this.actor.child.gicon = shellApp?.get_icon() ?? Gio.ThemedIcon.new('audio-x-generic');
+        this.actor.accessible_name = app?.identity || shellApp?.get_name() || 'Player';
+    }
+
+    _open() {
+        const app = this._app;
+        if (!app)
+            return;
+        this._player.raise();
+        if (this._settleId)
+            GLib.source_remove(this._settleId);
+        this._settleId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, app.canRaise ? RAISE_SETTLE : 0, () => {
+            this._settleId = 0;
+            const win = playerWindow(app);
+            if (win)
+                Main.activateWindow(win);
+            else
+                playerApp(app)?.activate();   // no window yet (in the tray): the app opens one
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    destroy() {
+        if (this._settleId)
+            GLib.source_remove(this._settleId);
+        this._settleId = 0;
+    }
+}
+
+// the cover with the app button as a badge on its bottom-right corner, pushed a little past it
+// (as on iOS widgets); placed exactly, the badge does not take part in the row's layout
+function withBadge(art, button, artSize, badgeSize) {
+    const scale = scaleFactor();
+    const holder = new St.Widget({
+        layout_manager: new Clutter.FixedLayout(),
+        width: artSize * scale, height: artSize * scale,
+        x_align: Clutter.ActorAlign.START, y_align: Clutter.ActorAlign.START,
+    });
+    holder.add_child(art.actor);
+    holder.add_child(button.actor);
+    const at = Math.round((artSize - badgeSize + 5) * scale);
+    button.actor.set_position(at, at);
+    return holder;
+}
 
 // previous, play/pause, next
 class Transport {
@@ -327,6 +427,7 @@ class MusicWidget {
             this._swirl.setCover(art);
         this._swirl.setPlaying(Boolean(state?.playing));
         this._transport?.update(state);
+        this._app?.update(state);
         this._progress?.update(state ? this._player.position() : 0, state?.length ?? 0);
         this._refreshLyrics(state);
         if (this.wantsSeconds !== wanted)
@@ -334,6 +435,31 @@ class MusicWidget {
     }
 
     _refreshLyrics() {}
+
+    // the Large widget's column (also the Extra Large ones'): the cover across the width, the
+    // song with the app at its right, the progress with times, the controls
+    _buildPlayer(box) {
+        this._art = new Art(LARGE_ART);
+        box.add_child(this._art.actor);
+        box.add_child(new St.Widget({y_expand: true}));
+        this._title.add_style_class_name('tahoe-music-title-large');
+        this._artist.add_style_class_name('tahoe-music-artist-large');
+        const titleRow = new St.BoxLayout({style_class: 'tahoe-music-title-row tahoe-music-title-row-large'});
+        const song = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+        song.add_child(this._title);
+        song.add_child(this._artist);
+        titleRow.add_child(song);
+        this._app = new AppButton(this._player, 24);
+        this._app.actor.y_align = Clutter.ActorAlign.CENTER;
+        titleRow.add_child(this._app.actor);
+        box.add_child(titleRow);
+        this._progress = new Progress(true);
+        box.add_child(this._progress.actor);
+        this._transport = new Transport(this._player, 28);
+        this._transport.actor.add_style_class_name('tahoe-music-transport-large');
+        this._transport.actor.x_align = Clutter.ActorAlign.CENTER;
+        box.add_child(this._transport.actor);
+    }
 
     // the text, the progress, the lyrics and the controls in the cover's tint (null: the CSS's)
     _setInk(rgb) {
@@ -349,6 +475,7 @@ class MusicWidget {
             GLib.source_remove(this._lyricTimer);
         this._lyricTimer = 0;
         this._swirl.destroy();
+        this._app?.destroy();
         this._player.unlisten(this._onChange);
         this._player = null;
         releasePlayer();
@@ -363,7 +490,8 @@ export class MusicSmall extends MusicWidget {
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row'});
         this._art = new Art(76);
-        top.add_child(this._art.actor);
+        this._app = new AppButton(this._player, 20, true);
+        top.add_child(withBadge(this._art, this._app, 76, 20));
         top.add_child(new St.Widget({x_expand: true}));
         this._transport = new Transport(this._player, 20, false);
         this._transport.actor.y_align = Clutter.ActorAlign.START;
@@ -386,7 +514,14 @@ export class MusicMedium extends MusicWidget {
         this._art = new Art(138);   // 170 less 16 px top and bottom
         top.add_child(this._art.actor);
         const info = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
-        info.add_child(this._title);
+        // the app at the top right, level with the title, which ellipsizes before it
+        const titleRow = new St.BoxLayout({style_class: 'tahoe-music-title-row'});
+        this._title.x_expand = true;
+        titleRow.add_child(this._title);
+        this._app = new AppButton(this._player, 20);
+        this._app.actor.y_align = Clutter.ActorAlign.START;
+        titleRow.add_child(this._app.actor);
+        info.add_child(titleRow);
         info.add_child(this._artist);
         info.add_child(new St.Widget({y_expand: true}));
         this._transport = new Transport(this._player, 20);
@@ -408,20 +543,9 @@ export class MusicLarge extends MusicWidget {
     static height = 504;
 
     _build() {
-        this._art = new Art(LARGE_ART);
-        this.actor.add_child(this._art.actor);
-        this.actor.add_child(new St.Widget({y_expand: true}));
-        this._title.add_style_class_name('tahoe-music-title-large');
-        this._artist.add_style_class_name('tahoe-music-artist-large');
-        this.actor.add_child(this._title);
-        this.actor.add_child(this._artist);
-        this._progress = new Progress(true);
-        this.actor.add_child(this._progress.actor);
-        this._transport = new Transport(this._player, 28);
-        this._transport.actor.add_style_class_name('tahoe-music-transport-large');
-        this._transport.actor.x_align = Clutter.ActorAlign.CENTER;
-        this.actor.add_child(this._transport.actor);
+        this._buildPlayer(this.actor);
     }
+
 }
 
 // small art and the song on top, the synced lyrics under it, then the progress
@@ -431,7 +555,8 @@ export class MusicLyrics extends MusicWidget {
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row'});
         this._art = new Art(52);
-        top.add_child(this._art.actor);
+        this._app = new AppButton(this._player, 18, true);
+        top.add_child(withBadge(this._art, this._app, 52, 18));
         const info = new St.BoxLayout({
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
