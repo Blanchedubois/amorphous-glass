@@ -312,15 +312,17 @@ export class MusicMedium extends MusicWidget {
     }
 }
 
-// big art with the song beside it, the progress with times, the controls centred
+// the cover across the full width (inside the padding, concentric with the card), the song,
+// the progress with times and the controls under it; taller than a large widget to fit
+export const LARGE_ART = 324;   // 356 less 16 px each side
+
 export class MusicLarge extends MusicWidget {
     static size = 'large';
+    static height = 496;
 
     _build() {
-        const top = new St.BoxLayout({style_class: 'tahoe-music-row'});
-        this._art = new Art(150);
-        top.add_child(this._art.actor);
-        this.actor.add_child(top);
+        this._art = new Art(LARGE_ART);
+        this.actor.add_child(this._art.actor);
         this.actor.add_child(new St.Widget({y_expand: true}));
         this._title.add_style_class_name('tahoe-music-title-large');
         this.actor.add_child(this._title);

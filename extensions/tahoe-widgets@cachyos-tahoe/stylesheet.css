@@ -79,14 +79,18 @@
   background-gradient-end: #ffd60a;
 }
 
-/* music: art rounded concentric with the card (24 - 16) */
+/* music: 16 px on every side, art rounded concentric with the card (24 - 16) */
+.tahoe-widget-music-small .tahoe-widget-content,
+.tahoe-widget-music-medium .tahoe-widget-content,
+.tahoe-widget-music-large .tahoe-widget-content,
+.tahoe-widget-music-lyrics .tahoe-widget-content { padding: 16px; }
 .tahoe-music-row { spacing: 14px; }
 .tahoe-music-art { border-radius: 8px; background-color: rgba(255, 255, 255, 0.12); }
 .tahoe-widget-light .tahoe-music-art { background-color: rgba(0, 0, 0, 0.06); }
 .tahoe-music-art-image { background-color: transparent; background-size: cover; }
 .tahoe-widget-light .tahoe-music-art-image { background-color: transparent; }
 .tahoe-music-title { font-size: 14px; font-weight: 700; }
-.tahoe-music-title-large { font-size: 17px; padding-top: 8px; }
+.tahoe-music-title-large { font-size: 17px; padding-top: 14px; }
 .tahoe-music-artist { font-size: 13px; }
 .tahoe-music-progress { spacing: 4px; padding-top: 10px; }
 .tahoe-music-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.20); }
