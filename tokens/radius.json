@@ -3,7 +3,7 @@
   "menu":         { "radius": 18, "gap": 4,  "row": 14, "_comment": "shell menus: rows are about 28 px tall, so a row capsule rounds at 14 at most" },
   "app_menu":     { "radius": 17, "gap": 4,  "row": 13, "_comment": "GTK app menus: rows are 26 px tall, so a row capsule rounds at 13 at most" },
   "submenu":      { "radius": 32, "gap": 16, "row": 16, "_comment": "quick settings submenus: rows are 32 px tall, a capsule at 16; the card matches a 64 px toggle's 32 px ends, so the gap is 16" },
-  "calendar":     { "radius": 32, "gap": 12, "card": 20 },
+  "calendar":     { "radius": 32, "gap": 12, "card": 20, "button": 40, "_comment": "button: the height of the notification list's Clear button, a capsule (radius 20, as the cards) set the gap in from the corner, so 20 + 12 = 32" },
   "notification": { "radius": 20 },
   "window":       { "radius": 24 },
   "widget":       { "radius": 24 },
@@ -12,6 +12,7 @@
   "switcher":     { "radius": 28, "gap": 8, "item": 20, "_comment": "Alt-Tab and the workspace switcher: items concentric, 28 - 8" },
   "osd":          { "radius": 9999, "_comment": "volume and brightness HUD: a glass capsule" },
   "folder":       { "radius": 32, "_comment": "the app folder popup in the overview, as the calendar" },
+  "search":       { "radius": 30, "gap": 12, "_comment": "overview search result panels: capsule rows (36 px tall, 18 px ends) in a 12 px gap; the patch holds the same 30 for the glass" },
   "tooltip":      { "radius": 8 },
   "blur_my_shell": {
     "popup/menu-corner-radius": "menu.radius",
