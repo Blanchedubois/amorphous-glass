@@ -138,3 +138,6 @@ Super+L's clock): B1 dark glass (the cards' A1 glass on the glyphs: frosted, dar
 rim light) and B2 clear blur (the picture blurred through the digits, a little lighter, no tint,
 only the hairline), next to today's clear glass. Sheets: `phaseB-clock.png`, `phaseB-clock-3x.png`.
 The pick then goes on Super+L too (its clock is drawn by glassclock.js today).
+- The user's pick (2026-10-20): B2 clear blur on both screens. The clock's panes are one module
+  now (tahoe-gdm clockpanes.js, an exact copy in the lock screen's widgets/): Super+L no longer uses
+  glassclock.js. `phaseB-both-clocks.png`: Super+L and the login screen, the same.

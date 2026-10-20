@@ -302,6 +302,10 @@ class TahoeGdmGlassEffect extends Clutter.OffscreenEffect {
             this._pipeline = pipeline;
         }
         super.vfunc_paint_target(node, paintContext);
+        // how often it painted, and a hook for the first paint (the lock screen hides its plain
+        // clock labels once the glass clock is there)
+        this.paints = (this.paints ?? 0) + 1;
+        this.onPaint?.();
     }
 });
 
@@ -490,6 +494,11 @@ export const GlassPane = GObject.registerClass({
             this._frosted = actor;
         }
         this._backdrop.source = shown;
+    }
+
+    // the glass effect (its paint count and first-paint hook)
+    get effect() {
+        return this._effect;
     }
 
     // the shape changed without a size change (a clock's new minute): draw it again

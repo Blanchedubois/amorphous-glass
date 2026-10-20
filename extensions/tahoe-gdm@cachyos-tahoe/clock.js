@@ -1,22 +1,19 @@
-// The login screen's clock in Liquid Glass, as the lock screen's (tahoe-lockscreen layout.js and
-// glassclock.js): the date above the time, in Space Grotesk SemiBold, the digits 12 % of the
-// monitor's height, the date's letters at 10.8 %, each a glass pane shaped like its glyphs
-// (glass.js, a glyph mask) over the login screen's picture, so the strokes bend and lighten it.
-// The material is the lock screen clock's: clearer than the cards, the date a little frosted. The
-// time as the login screen's clock format: 12 h without AM/PM (as the lock screen) or 24 h.
+// The login screen's clock in Liquid Glass, as the lock screen's (tahoe-lockscreen layout.js): the
+// date above the time, in Space Grotesk SemiBold, the digits 12 % of the monitor's height, the
+// date's letters at 10.8 %, each a glass pane shaped like its glyphs (clockpanes.js, shared with
+// the lock screen) in the clock's glass (B2 clear blur, the user's pick). The time as the login
+// screen's clock format: 12 h without AM/PM (as the lock screen) or 24 h.
 // GNOME's own panel clock stays, transparent (its menu still opens).
 
-import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GnomeDesktop from 'gi://GnomeDesktop';
-import Pango from 'gi://Pango';
-import PangoCairo from 'gi://PangoCairo';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {GlassPane} from './glass.js';
+import {ClockPanes, clockMaterial} from './clockpanes.js';
 
 // tahoe-lockscreen/layout.js
 const DIGITS = 0.12;          // the digits' height, share of the monitor's
@@ -25,61 +22,6 @@ const DATE_TOP = 0.108;       // the top of the date's letters
 const DATE_RATIO = 0.1825;    // date type size / time type size
 const GAP_RATIO = 0.0827;     // gap under the date's letters / time type size
 const CAP_HEIGHT = 0.741;
-const FONT = 'Space Grotesk SemiBold';
-
-// Phase B (docs/GLASS_CONSISTENCY_PLAN.md): the clock in the cards' glass. B1 dark glass: the
-// cards' frosted dark glass (A1) on the glyphs. B2 clear blur: the picture blurred through the
-// digits, lightened a little, no tint, only the hairline. The test shells pick one
-// (TAHOE_CLOCK_VARIANT=B1|B2); unset: the clock before Phase B.
-const CLOCK_VARIANTS = {
-    B1: {
-        desk: 1, frost: 18, bend: 0, blur: 0, edge: 6, contrast: 1, saturation: 1, split: 0,
-        rimLight: 0.55, rimLightWidth: 0.45, ao: 0.3, aoWidth: 0.2, shadow: 0, band: 8,
-        light: {brightness: 0, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
-        dark: {brightness: 0, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
-    },
-    B2: {
-        desk: 1, frost: 18, bend: 0, blur: 0, edge: 6, contrast: 1, saturation: 1.1, split: 0,
-        rimLight: 0.35, rimLightWidth: 0.45, ao: 0, aoWidth: 0.2, shadow: 0, band: 8,
-        light: {brightness: 0.10, milk: 0.10, tint: [1, 1, 1], tintAmount: 0},
-        dark: {brightness: 0.10, milk: 0.10, tint: [1, 1, 1], tintAmount: 0},
-    },
-};
-const CLOCK_VARIANT = CLOCK_VARIANTS[GLib.getenv('TAHOE_CLOCK_VARIANT') ?? ''];
-
-// tahoe-lockscreen/glassclock.js MATERIAL, at the lock screen's size; the edge is the shared one (C)
-function clockMaterial(timeSize, date) {
-    if (CLOCK_VARIANT)
-        return {...CLOCK_VARIANT, hairAlpha: {light: 0.16, dark: 0.16}};
-    const k = timeSize / 192 * (date ? 0.3 : 1);   // the date's bevel and bend: 0.3 of the time's
-    const milk = date ? 0.30 : 0;                  // the date's thin strokes a little frosted
-    return {
-        desk: 0, frost: 0,   // the clock keeps its own glass (Phase B decides it)
-        edge: 6 * k, bend: 10 * k, blur: 0, contrast: 1.0, saturation: 1.0, split: 0.05,
-        rim: 0.22, rimBase: 0.08, shade: 0.04,
-        light: {brightness: 0.05, milk: 0.06 + milk, tint: [0, 0, 0], tintAmount: 0},
-        dark: {brightness: 0.07, milk: 0.24 + milk, tint: [0, 0, 0], tintAmount: 0},
-    };
-}
-
-function fontFor(size) {
-    const desc = Pango.FontDescription.from_string(FONT);
-    desc.set_absolute_size(size * Pango.SCALE);
-    return desc;
-}
-
-// the text's ink box, px (Pango)
-function inkOf(text, size) {
-    const surface = new Cairo.ImageSurface(Cairo.Format.A8, 1, 1);
-    const cr = new Cairo.Context(surface);
-    const layout = PangoCairo.create_layout(cr);
-    layout.set_font_description(fontFor(size));
-    layout.set_text(text, -1);
-    const [ink] = layout.get_pixel_extents();
-    cr.$dispose();
-    surface.finish();
-    return ink;
-}
 
 export function buildClock(ext) {
     const group = Main.screenShield?._lockDialogGroup;
@@ -92,38 +34,11 @@ export function buildClock(ext) {
     ext._undo.push(() => layer.destroy());
 
     const settings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
-    const panes = {};
-    const pane = (key, material) => {
-        if (panes[key])
-            return panes[key];
-        const shape = {text: '', size: 0, ink: null};
-        const p = new GlassPane(backdrop, {
-            path: (cr, x, y) => {
-                const layout = PangoCairo.create_layout(cr);
-                layout.set_font_description(fontFor(shape.size));
-                layout.set_text(shape.text, -1);
-                cr.newPath();
-                cr.moveTo(x - shape.ink.x, y - shape.ink.y);
-                PangoCairo.layout_path(cr, layout);
-            },
-        }, material);
-        p.shape = shape;
-        p.connect('mask-failed', () => ext._fail(`clock glass: ${p.failed}`));
-        layer.add_child(p);
-        panes[key] = p;
-        return p;
-    };
-
+    const panes = new ClockPanes(layer, backdrop, GlassPane, reason => ext._fail(`clock glass: ${reason}`));
+    ext._undo.push(() => panes.destroy());
     const place = (key, text, size, top, material) => {
-        const p = pane(key, material);
-        const ink = inkOf(text, size);
-        const changed = p.shape.text !== text || p.shape.size !== size;
-        Object.assign(p.shape, {text, size, ink});
         const monitor = Main.layoutManager.primaryMonitor;
-        p.set_size(ink.width, ink.height);
-        p.set_position(monitor.x + Math.round((monitor.width - ink.width) / 2), monitor.y + Math.round(top));
-        if (changed)
-            p.reshape();
+        panes.place(key, text, size, monitor.y + top, monitor.x, monitor.width, material);
     };
 
     const update = () => {
