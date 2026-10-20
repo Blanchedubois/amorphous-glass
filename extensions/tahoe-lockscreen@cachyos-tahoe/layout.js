@@ -14,12 +14,12 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Layout from 'resource:///org/gnome/shell/ui/layout.js';
 
-import { GlassClock, MATERIAL, buildMask, measure } from './glassclock.js';
+import { ClockPanes, clockMaterial } from './widgets/clockpanes.js';
 import { buildNowPlaying } from './nowplaying.js';
 import { buildMusicMode } from './musicmode.js';
 import { buildWidgetStack } from './widgetstack.js';
 import { buildPromptGlass } from './promptglass.js';
-import { darkScheme, GlassPane, MENU_GLASS } from './widgets/paneglass.js';
+import { GlassPane, MENU_GLASS } from './widgets/paneglass.js';
 import { buildMenus } from './widgets/glassmenus.js';
 import { buildMenuGlass } from './menuglass.js';
 
@@ -209,8 +209,6 @@ function buildClock(frame, dialog) {
 // painted, and come back if the glass cannot be built or never paints. A glass failure therefore
 // costs the glass, not the layout, and never sends the lock screen back to GNOME's.
 
-const GLASS_PAD = 64;   // logical px around the letters, room for the bevel and the bend
-
 function buildGlass(frame, dialog, labels) {
     const area = new St.Widget({
         name: 'glass-area',
@@ -231,7 +229,7 @@ function buildGlass(frame, dialog, labels) {
             return;
         failed = true;
         console.warn(`tahoe-lockscreen: glass clock: ${reason}; showing the plain clock`);
-        glass?.actor.destroy();
+        glass?.destroy();
         glass = null;
         labels.opacity = 255;
     };
@@ -247,28 +245,15 @@ function buildGlass(frame, dialog, labels) {
         if (!(height > 0 && width > 0))
             return;
         try {
-            glass ??= new GlassClock();
-            if (!glass.actor.get_parent())
-                area.add_child(glass.actor);
-            const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+            // the date and time as glass panes (clockpanes.js, the login screen's: the clock's
+            // glass, B2 clear blur), placed as the plain labels' letters
+            glass ??= new ClockPanes(area, backgroundOf, GlassPane, reason => giveUp(`glass: ${reason}`));
             const px = f => Math.round(f * height);
-            const spec = {
-                date: dateString, time: timeString,
-                dateSize: px(DATE_SIZE_OF()) * scale, timeSize: px(timeSizeOf()) * scale,
-                dateTop: GLASS_PAD * scale, gap: px(TIME_GAP_OF()) * scale,
-            };
-            const ink = measure(spec);
-            const boxWidth = Math.ceil(ink.width / scale) + 2 * GLASS_PAD;
-            const boxHeight = Math.ceil(ink.bottom / scale) + GLASS_PAD;
-            const x = Math.round((width - boxWidth) / 2);
-            const y = px(DATE_TOP) - GLASS_PAD;
-            glass.actor.set_position(x, y);
-            glass.actor.set_size(boxWidth, boxHeight);
-            glass.setBackdrop(backgroundOf(), x, y);
-            // the clock's glass as every glass surface (paneglass.js GLASS_LOOK: dark on both screens)
-            const dark = darkScheme();
-            glass.setMask(buildMask(boxWidth * scale, boxHeight * scale, spec, scale),
-                boxWidth * scale, boxHeight * scale, scale, dark, spec.timeSize / (MATERIAL.refSize * scale));
+            const dateSize = px(DATE_SIZE_OF()), timeSize = px(timeSizeOf());
+            const dateTop = px(DATE_TOP);
+            const digitsTop = dateTop + Math.round(dateSize * CAP_HEIGHT) + px(TIME_GAP_OF());
+            glass.place('date', dateString, dateSize, dateTop, 0, width, clockMaterial(timeSize, true));
+            glass.place('time', timeString, timeSize, digitsTop, 0, width, clockMaterial(timeSize, false));
         } catch (e) {
             giveUp(`${e}`);
             return;
@@ -276,8 +261,7 @@ function buildGlass(frame, dialog, labels) {
         // hide the plain labels as soon as the glass has painted (until then both showed, the date
         // and time doubled for about half a second on Super+L, 2026-10-20); not from inside the paint
         if (labels.opacity !== 0) {
-            glass.effect.onPaint = () => {
-                glass.effect.onPaint = null;
+            glass.onPaint = () => {
                 let id = GLib.idle_add(GLib.PRIORITY_HIGH_IDLE, () => {
                     id = 0;
                     frame.guard(() => {
@@ -296,16 +280,16 @@ function buildGlass(frame, dialog, labels) {
         // and the check that it did: else the plain labels stay (or come back)
         if (verifyId)
             GLib.source_remove(verifyId);
-        const before = glass.effect.paints;
+        const before = glass.paints;
         verifyId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 600, () => {
             verifyId = 0;
             if (!glass)
                 return GLib.SOURCE_REMOVE;
-            if (!glass.hasBackdrop)
+            if (!backgroundOf())
                 giveUp('no lock background to show through');
-            else if (glass.effect.paints > before || labels.opacity === 0)
+            else if (glass.paints > before || labels.opacity === 0)
                 labels.opacity = 0;
-            else if (glass.actor.mapped)
+            else if (area.mapped)
                 giveUp('the glass did not paint');
             return GLib.SOURCE_REMOVE;
         });
@@ -314,7 +298,8 @@ function buildGlass(frame, dialog, labels) {
     frame.connect(area, 'notify::size', () => rebuild());
     frame.connect(interfaceSettings, 'changed::color-scheme', () => rebuild());
     // GNOME rebuilds the backgrounds when monitors change: follow the new one
-    frame.connect(dialog._backgroundGroup, 'child-added', () => glass?.setBackdrop(backgroundOf(), glass.actor.x, glass.actor.y));
+    // (the panes look the background up again at each layout: GNOME rebuilds it when monitors change)
+    frame.connect(dialog._backgroundGroup, 'child-added', () => area.queue_relayout());
 
     return {
         rebuild,

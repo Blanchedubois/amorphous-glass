@@ -14,3 +14,5 @@ clocks.js clocks.js
 ../tahoe-gdm@cachyos-tahoe/glass.js paneglass.js
 # GNOME's menus on frosted glass while locked (the system menu), as on the login screen
 ../tahoe-gdm@cachyos-tahoe/menus.js glassmenus.js
+# the clock's glass panes (date and time), shared with the login screen
+../tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
