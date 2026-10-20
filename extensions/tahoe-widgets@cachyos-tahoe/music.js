@@ -6,15 +6,22 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Graphene from 'gi://Graphene';
 import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
+import {GlassInkEffect} from './glassink.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
 import {Swirl} from './swirl.js';
 
-const DIM = 92;          // opacity of the lines not being sung (of 255)
-const SCROLL_MS = 520;   // the lyrics column gliding to the next line
-const FADE_MS = 360;     // a line brightening or dimming
+// lyrics motion
+const DIM = 125;          // opacity of the lines not being sung (of 255)
+const LINE_SCALE = 0.84;  // size of the lines not being sung
+const DRIFT_MS = 900;     // a line drifting up to its new place
+const GROW_MS = 650;      // a line growing (the new one) or shrinking (the old one)
+const STAGGER_MS = 55;    // each line below starts this much after the one above it
+const STAGGER_LINES = 6;
+const NEAR = 10;          // lines further than this from the sung one are not drawn
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
 
 function clock(seconds) {
@@ -135,11 +142,13 @@ class Transport {
     }
 }
 
-// Every line of the song in one column that scrolls: at each line's own time the column glides
-// up so the new line sits second from the top, the new line brightens and the last one dims,
-// as Apple Music's lyrics. All lines share one size (a size change would reflow and jump); only
-// opacity and the column's position move, eased on the compositor (no work between lines).
-// With GNOME animations off the eases end at once.
+// Every line of the song in one column, as Apple Music's lyrics. The sung line is full size and
+// bright, the others smaller and dim. At each line's own time the lines drift up one by one, each
+// a little after the one above it, so the text flows like a wave; the old line shrinks and dims
+// as it goes up and the new one grows into its place. Layout never changes (scale and translation
+// only), and every line's motion is eased on the compositor between lines only. The text is
+// Liquid Glass (glassink.js). With GNOME animations off the eases end at once.
+
 // a viewport that asks for no height of its own: it takes what the card has left (y_expand),
 // however long the song's column inside it is
 const LyricsViewport = GObject.registerClass(
@@ -162,9 +171,11 @@ class LyricsView {
             orientation: Clutter.Orientation.VERTICAL,
         });
         this.actor.add_child(this._column);
+        // on the viewport, not the column: the glass is rendered only for the part on screen
+        this.actor.add_effect_with_name('tahoe-lyrics-glass', new GlassInkEffect(0.45));
         // the column is as wide as the view; its height follows the wrapped lines
         this.actor.connect('notify::width', () => (this._column.width = this.actor.width));
-        // once laid out (or reflowed), the current line is placed again without animation
+        // once laid out (or reflowed), every line is placed again without animation
         this._column.connect('notify::height', () => this._place(false));
         this._labels = [];
         this._lines = null;
@@ -174,16 +185,15 @@ class LyricsView {
     setLines(lines, message) {
         this._lines = lines;
         this._shown = -2;
-        this._column.remove_all_transitions();
         this._column.destroy_all_children();
-        this._column.translation_y = 0;
         const texts = lines ? lines.map(l => l[1] || '♪') : [message];
         this._labels = texts.map(text => {
-            const l = new St.Label({style_class: 'tahoe-music-lyric', text, opacity: lines ? DIM : 255});
+            const l = new St.Label({style_class: 'tahoe-music-lyric', text, pivot_point: new Graphene.Point({x: 0, y: 0.5})});
             l.clutter_text.line_wrap = true;
             this._column.add_child(l);
             return l;
         });
+        this._place(false);
     }
 
     // the index of the line being sung at this position
@@ -199,10 +209,7 @@ class LyricsView {
             return null;
         const index = this._index(position);
         if (index !== this._shown) {
-            const last = this._labels[this._shown];
             this._shown = index;
-            last?.ease({opacity: DIM, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
-            this._labels[index]?.ease({opacity: 255, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
             this._place(true);
         }
         // seconds until the next line
@@ -210,18 +217,34 @@ class LyricsView {
         return next ? next[0] - position : null;
     }
 
-    // the line before the current one at the top, so the sung line is second
+    // Every line where it belongs: the line before the sung one at the top, so the sung line is
+    // second; the sung line full size and bright, the rest small and dim; lines far from it not
+    // drawn at all (they are out of view).
     _place(animate) {
-        if (!this._lines || !this._column.has_allocation())
+        if (!this._column.has_allocation())
             return;
+        const lyrics = Boolean(this._lines);
         const top = this._labels[Math.max(0, this._shown - 1)];
-        const y = this._shown > 0 && top ? -top.y : 0;
-        if (!animate) {
-            this._column.remove_all_transitions();
-            this._column.translation_y = y;
-        } else if (this._column.translation_y !== y) {
-            this._column.ease({translation_y: y, duration: SCROLL_MS, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
-        }
+        const y = lyrics && this._shown > 0 && top ? -top.y : 0;
+        this._labels.forEach((l, i) => {
+            const away = i - this._shown;
+            const current = !lyrics || away === 0;
+            const scale = current ? 1 : LINE_SCALE;
+            const opacity = Math.abs(away) > NEAR && lyrics ? 0 : current ? 255 : DIM;
+            if (!animate || Math.abs(away) > NEAR) {
+                l.remove_all_transitions();
+                l.set({translation_y: y, scale_x: scale, scale_y: scale, opacity});
+                return;
+            }
+            // the lines from the one above the sung one downwards start one after another
+            const delay = Math.min(STAGGER_LINES, Math.max(0, away + 1)) * STAGGER_MS;
+            l.ease({translation_y: y, duration: DRIFT_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+            l.ease({
+                scale_x: scale, scale_y: scale, opacity,
+                duration: GROW_MS, delay: current ? delay + 60 : delay,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        });
     }
 }
 
