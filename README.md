@@ -49,8 +49,8 @@ small 170, medium 356 x 170, large 356 x 356 (logical px), all on the 24 px glas
 Clock II and III, Glass Text, Weather and Music follow the designs of
 [liquidglass-kde-widgets](https://github.com/jaxparrow07/liquidglass-kde-widgets) by jaxparrow07
 (GPL-3.0), redrawn for GNOME Shell; no code, fonts or icons are taken from it (its fonts and icons
-are Apple's). Where the KDE look differs from the glass standard (weather-coloured cards, own glass
-shader), the standard wins.
+are Apple's). Where the KDE look differs from the glass standard (weather-coloured cards, its own card
+glass), the standard wins.
 
 ## Where this came from
 
