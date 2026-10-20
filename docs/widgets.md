@@ -61,9 +61,9 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   card now has 16 px padding.
 - **Lyrics drift, Apple Music style** (user, 2026-10-20 follow-ups): every line of the song sits in
   one column. The sung line is full size and bright, the others at 84 % and dim. At each line's
-  time the lines drift up one by one (900 ms, ease-out cubic), each 55 ms after the one above it,
+  time the lines drift up one by one (480 ms, ease-out quart; user: sharper), each 28 ms after the one above it,
   so the text flows like a wave; the old line shrinks and dims as it goes up and the new one grows
-  into its place (650 ms). Only scale, translation and opacity move, so the column never reflows;
+  into its place (340 ms). Only scale, translation and opacity move, so the column never reflows;
   lines more than 10 away are not drawn. The eases run on the compositor between lines only, and
   end at once with GNOME animations off. Checked frame by frame (`SHOT_BURST=count,ms`).
 - **Text in the cover's tint** (user follow-up): the text, artist, times, progress bar, lyrics
