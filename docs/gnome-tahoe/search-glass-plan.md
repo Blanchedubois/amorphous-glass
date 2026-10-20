@@ -111,3 +111,20 @@ hidden and shown, and their rows are rebuilt as the user types.
   edge. The provider label in its panel's corner (round 2), close up:
 
 ![provider label in the corner: 12 px inset, concentric](shots/search-glass-provider-corner.jpg)
+
+## Round 4 (user): "the rounding isnt right for the selected label, measure it and confirm"
+
+Measured in the headless shell (the survey's `provider-geometry` record):
+
+| | Before | After |
+|---|---|---|
+| Provider label | 188 × 60 px (ends 30) | 188 × 60 px (ends 30) |
+| Inset from the panel's top and side | 12, 12 | 12, 12 |
+| Panel corner (CSS and glass) | 36 | **42** |
+| Concentric corner (ends + inset) | 42: off by 6 | 42: exact |
+
+The label was meant to be 48 px. St's `min-height` sizes the content box, and its padding (6 + 6)
+comes on top, so it was 60. The label's content (icon and two lines) is 48 px on its own, so
+rather than squeeze it, the label stays 60 (content fixed at 48) and the panel's corner is
+30 + 12 = 42, in the CSS and in the patch's glass. The glass's corner, traced from the
+screenshot's pixels, follows a 42 px circle within about 1 px near the top edge.

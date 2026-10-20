@@ -12,7 +12,7 @@
   "switcher":     { "radius": 28, "gap": 8, "item": 20, "_comment": "Alt-Tab and the workspace switcher: items concentric, 28 - 8" },
   "osd":          { "radius": 9999, "_comment": "volume and brightness HUD: a glass capsule" },
   "folder":       { "radius": 32, "_comment": "the app folder popup in the overview, as the calendar" },
-  "search":       { "radius": 36, "gap": 12, "provider": 48, "_comment": "overview search result panels: the provider's capsule in the corner is 48 px tall (24 px ends) in a 12 px gap, so 36; the patch holds the same 36 for the glass. Rows are capsules too" },
+  "search":       { "radius": 42, "gap": 12, "provider": 60, "provider_content": 48, "provider_padding": 6, "_comment": "overview search result panels: the provider's label in the corner is 60 px tall (measured: 48 px of icon and two lines, 6 px padding above and below; St's min-height sizes the content box), its ends 30 px, 12 px in from the top and the side, so the panel's corner is 30 + 12 = 42 (the patch holds the same 42 for the glass). Rows are capsules too" },
   "tooltip":      { "radius": 8 },
   "blur_my_shell": {
     "popup/menu-corner-radius": "menu.radius",
