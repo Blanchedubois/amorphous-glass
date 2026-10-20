@@ -24,6 +24,8 @@ const GRID = 8;   // logical px
 const GAP = 16;   // between widgets, logical px
 // Tahoe widget sizes, logical px
 const SIZES = {small: [170, 170], medium: [356, 170], large: [356, 356]};
+// a widget class can be taller than its size (static height, logical px): the large Music widget
+const dims = cls => [SIZES[cls.size][0], cls.height ?? SIZES[cls.size][1]];
 
 const TYPES = {
     'clock-analog': {name: 'Analog Clock', cls: AnalogClock},
@@ -135,7 +137,7 @@ export default class TahoeWidgets extends Extension {
     _place(entry) {
         const monitor = Main.layoutManager.monitors[entry.card.monitorIndex];
         const scale = scaleFactor();
-        const [w, h] = SIZES[entry.widget.constructor.size];
+        const [w, h] = dims(entry.widget.constructor);
         entry.card.actor.set_size(w * scale, h * scale);
         entry.card.actor.set_position(monitor.x + entry.spec.x * scale, monitor.y + entry.spec.y * scale);
     }
@@ -201,7 +203,7 @@ export default class TahoeWidgets extends Extension {
         const monitor = monitors[index];
         const area = Main.layoutManager.getWorkAreaForMonitor(index);
         const scale = scaleFactor();
-        const [w, h] = SIZES[entry.widget.constructor.size];
+        const [w, h] = dims(entry.widget.constructor);
         const minX = (area.x - monitor.x) / scale, minY = (area.y - monitor.y) / scale;
         // the far edges round down to the grid too, so a widget pushed against them stays on it
         const maxX = Math.floor((minX + area.width / scale - w) / GRID) * GRID;
@@ -233,13 +235,13 @@ export default class TahoeWidgets extends Extension {
         const monitor = Main.layoutManager.monitors[monitorIndex];
         const area = Main.layoutManager.getWorkAreaForMonitor(monitorIndex);
         const scale = scaleFactor();
-        const [w, h] = SIZES[TYPES[type].cls.size];
+        const [w, h] = dims(TYPES[type].cls);
         const left = Math.ceil(((area.x - monitor.x) / scale + 40) / GRID) * GRID;
         const top = Math.ceil(((area.y - monitor.y) / scale + GAP) / GRID) * GRID;
         const right = (area.x - monitor.x + area.width) / scale - w;
         const bottom = (area.y - monitor.y + area.height) / scale - h;
         const taken = this._entries.filter(e => e.card.monitorIndex === monitorIndex).map(e => {
-            const [ew, eh] = SIZES[e.widget.constructor.size];
+            const [ew, eh] = dims(e.widget.constructor);
             return [e.spec.x, e.spec.y, ew, eh];
         });
         const free = (x, y) => taken.every(([tx, ty, tw, th]) =>

@@ -9,6 +9,10 @@ set -eu
 out=$(realpath -m "$1"); layout=$(realpath "$2"); extsrc=${3:-$(cd "$(dirname "$0")/../.." && pwd)/extensions/tahoe-widgets@cachyos-tahoe}
 H=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d -t tahoe-widgets-test.XXXX)
+# its own runtime dir (short: the socket path has a length limit), so the test shell never creates
+# or deletes the real session's crash guard file in /run/user
+export XDG_RUNTIME_DIR=$(mktemp -d "/tmp/wsrun.XXXX")
+chmod 700 "$XDG_RUNTIME_DIR"
 mkdir -p "$out"; rm -f "$out"/*.png
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
 export GSETTINGS_BACKEND=keyfile SHOT_OUT=$out DRIVER=${DRIVER:-widget-shot@local} STRESS_HARNESS=$H
@@ -46,5 +50,7 @@ open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 timeout ${SHOT_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "wshot-$$" \
   --virtual-monitor 2560x1440@60 > "$out/shell.log" 2>&1 || true
-rm -rf "$root"
+# the test session's document portal mounts a FUSE file system in its runtime dir
+fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
+rm -rf "$root" "$XDG_RUNTIME_DIR"
 ls "$out"
