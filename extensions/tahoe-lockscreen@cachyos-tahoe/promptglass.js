@@ -6,7 +6,7 @@
 // screen: the stack's translation (layout.js), GNOME's page crossfade (the prompt box's opacity,
 // scale and translation), the password/text entry swap and each new prompt (GNOME builds one each
 // time the screen wakes). In the crossfade it follows the scale with its own scale, so its glass
-// mask is not rebuilt every frame. While the glass shows (.tahoe-lock-glass-prompt on the dialog)
+// mask is not rebuilt every frame. It shakes along with GNOME's wrong-password wiggle. While the glass shows (.tahoe-lock-glass-prompt on the dialog)
 // lockscreen.css clears the entry's own fill.
 
 import Clutter from 'gi://Clutter';
@@ -94,6 +94,7 @@ export function buildPromptGlass(frame, dialog, backdrop) {
         const area = prompt._entryArea;
         if (area) {
             frame.connect(area, 'notify::allocation', schedule);
+            frame.connect(area, 'notify::translation-x', schedule);   // GNOME's wrong-password wiggle
             frame.connect(area, 'child-added', schedule);   // the password/text entry swap
         }
     };
