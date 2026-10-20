@@ -23,6 +23,9 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
   gap around it. A row can be no rounder than a capsule (half its height), so the surface radius
   follows the row: radius = min(row, row height / 2) + gap. Measured row heights: shell menu rows
   about 28 px (capsule 14), GTK menu rows 26 px (13), quick settings submenu rows 32 px (16).
+- **Buttons in a card's corner follow the corner.** A button there is a capsule. Its gap to
+  both edges is the same, and half its height plus that gap is the card's radius. The calendar's
+  Clear button: 40 px tall, 12 px in, 20 + 12 = 32 (`calendar.button` in `tokens/radius.json`).
 
 ## Radius per surface
 
@@ -32,6 +35,7 @@ keys are written from it. Tint, rim light and edge shadow come from `glass_param
 | Dock | 28 | | | follows the dock's own outline | theme `.dash-background` 28 |
 | Shell menus: top bar menus, dock menus, desktop right-click menu | **18** | 4 | rows **14** | `popup menu-corner-radius` 18 | `.popup-menu-content` 18 (theme draws 14) |
 | Calendar | **32** | 12 | cards (events, weather, clocks, notifications) **20** | `popup calendar-corner-radius` 32 (30 today) | `.datemenu-popover` 32 (20 today) |
+| Calendar: the notification list's Clear button | capsule, **40** tall (20) | 12 from the left and bottom edges | concentric with the 32 corner: 20 + 12 | | `.message-list-clear-button` 9999, 40 tall; `.message-list-controls` padding 5 |
 | Notification banners | **20** | | | `popup notification-corner-radius` 20 (18 today) | `.notification-banner`, `.message` 20 (theme 14) |
 | Quick settings toggles, sliders, round buttons | capsule / circle | | | 9999 (patch) | 9999 |
 | Quick settings submenus | **32** (a 64 px toggle's end) | 16 | rows **16** | `popup submenu-corner-radius` 32 (36 before) | `.quick-toggle-menu` 32 |
