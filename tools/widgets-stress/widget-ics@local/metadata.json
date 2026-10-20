@@ -1,0 +1,1 @@
+{ "uuid": "widget-ics@local", "name": "widget ics", "description": "headless test of the Schedule widgets calendar feed", "shell-version": ["51"], "session-modes": ["user", "unlock-dialog"] }
