@@ -118,3 +118,14 @@ Gate: every monitor size from 1280x720 to 3840x2160, both screens.
 Both screens side by side with the desktop widgets; every surface at 4x; the fault, churn,
 music-idle and verifying gates; then install (lock screen: `scripts/tahoe-lockscreen.sh on`;
 login screen: `scripts/gdm-theme.sh install`, the user's sudo).
+
+## Phase A results (2026-10-20, test shells)
+
+Built: the desktop widgets' edge model in the glass shader (glass.js `desk`: inner edge shadow,
+rim light, 1 px hairline anti-aliased over a whole pixel, darker toward the bottom), the desktop's
+dark tint, and a frosted backdrop (GNOME Shell's blur, radius 18, one shared copy per backdrop,
+read by every pane). The old edge's line is now anti-aliased over a whole pixel too (it stepped
+on curves). Variants by `TAHOE_GLASS_VARIANT` in the test shells only (installed screens unchanged
+until the user picks): A1 no bend, A2 3 px, A3 9 px.
+Sheets: `phaseA-weather-1x.png`, `phaseA-corner-4x.png` (desktop widget, today, A1, A2, A3),
+`phaseA-row-3x.png`, `phaseA-screens.png`. No errors in any variant on either screen.
