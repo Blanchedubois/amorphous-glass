@@ -27,8 +27,30 @@ const GAP_RATIO = 0.0827;     // gap under the date's letters / time type size
 const CAP_HEIGHT = 0.741;
 const FONT = 'Space Grotesk SemiBold';
 
+// Phase B (docs/GLASS_CONSISTENCY_PLAN.md): the clock in the cards' glass. B1 dark glass: the
+// cards' frosted dark glass (A1) on the glyphs. B2 clear blur: the picture blurred through the
+// digits, lightened a little, no tint, only the hairline. The test shells pick one
+// (TAHOE_CLOCK_VARIANT=B1|B2); unset: the clock before Phase B.
+const CLOCK_VARIANTS = {
+    B1: {
+        desk: 1, frost: 18, bend: 0, blur: 0, edge: 6, contrast: 1, saturation: 1, split: 0,
+        rimLight: 0.55, rimLightWidth: 0.45, ao: 0.3, aoWidth: 0.2, shadow: 0, band: 8,
+        light: {brightness: 0, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
+        dark: {brightness: 0, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
+    },
+    B2: {
+        desk: 1, frost: 18, bend: 0, blur: 0, edge: 6, contrast: 1, saturation: 1.1, split: 0,
+        rimLight: 0.35, rimLightWidth: 0.45, ao: 0, aoWidth: 0.2, shadow: 0, band: 8,
+        light: {brightness: 0.10, milk: 0.10, tint: [1, 1, 1], tintAmount: 0},
+        dark: {brightness: 0.10, milk: 0.10, tint: [1, 1, 1], tintAmount: 0},
+    },
+};
+const CLOCK_VARIANT = CLOCK_VARIANTS[GLib.getenv('TAHOE_CLOCK_VARIANT') ?? ''];
+
 // tahoe-lockscreen/glassclock.js MATERIAL, at the lock screen's size; the edge is the shared one (C)
 function clockMaterial(timeSize, date) {
+    if (CLOCK_VARIANT)
+        return {...CLOCK_VARIANT, hairAlpha: {light: 0.16, dark: 0.16}};
     const k = timeSize / 192 * (date ? 0.3 : 1);   // the date's bevel and bend: 0.3 of the time's
     const milk = date ? 0.30 : 0;                  // the date's thin strokes a little frosted
     return {

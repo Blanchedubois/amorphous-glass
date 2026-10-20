@@ -129,3 +129,12 @@ on curves). Variants by `TAHOE_GLASS_VARIANT` in the test shells only (installed
 until the user picks): A1 no bend, A2 3 px, A3 9 px.
 Sheets: `phaseA-weather-1x.png`, `phaseA-corner-4x.png` (desktop widget, today, A1, A2, A3),
 `phaseA-row-3x.png`, `phaseA-screens.png`. No errors in any variant on either screen.
+- The user's pick (2026-10-20): A1 (frosted, no bend) on both screens; now the default in glass.js.
+
+## Phase B workshop (2026-10-20)
+
+Clock variants on the login screen (`TAHOE_CLOCK_VARIANT`, the same type, size and place as
+Super+L's clock): B1 dark glass (the cards' A1 glass on the glyphs: frosted, dark tint, hairline,
+rim light) and B2 clear blur (the picture blurred through the digits, a little lighter, no tint,
+only the hairline), next to today's clear glass. Sheets: `phaseB-clock.png`, `phaseB-clock-3x.png`.
+The pick then goes on Super+L too (its clock is drawn by glassclock.js today).
