@@ -185,3 +185,22 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
     setting, month), the glass clock.
   The user's session ran the lock screen installed at 15:25 (started 15:46): today's later fixes
   load at the next login.
+- 2026-10-20, the song on the login screen for Switch User (the user: "build the display-only
+  music card with the swirl on the login screen"):
+  - the lock screen (musicmode.js), while locked, writes what plays into /run/tahoe-nowplaying:
+    state.json (title, artist, playing, its shell's pid, the cover's name) and the cover as
+    cover-<sha1>, only what GNOME would show on the lock screen; all of it goes on unlock. The
+    swirl moved into bgswirl.js, shared with the login screen (tools/gdm/shared.list);
+  - the login screen (tahoe-gdm nowplaying.js): the picture is one actor that every glass pane
+    copies, the swirl on it in the cover's colours; the cover, title and artist on a glass card
+    between the clock and the rows (or the avatar), fitted to the real room, hidden if even the
+    smallest card does not fit. Shown only while state.json says playing and its pid is still the
+    file owner's gnome-shell (checked every 5 s): a crashed session's file is ignored. Display
+    only, no controls. A fault there hides the song and keeps the rest;
+  - install: scripts/gdm-theme.sh makes /run/tahoe-nowplaying at every boot (tmpfiles.d, the
+    user's, readable by all); undo removes it;
+  - the account rows' round ends were flat (the user): the list's scroll viewport clips at its
+    content box, exactly the rows' sides, which cut the outer half of the 2 px rim. Rows 6 px clear
+    of it now; measured: full semicircles with the rim all round;
+  - tests: live pid (card and swirl), dead pid (plain picture, no card), the glass fault (GNOME's
+    login screen back, no warnings), 1280x720, 2560x1440, 3440x1440.

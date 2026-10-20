@@ -18,6 +18,7 @@ import { GlassPane } from './glass.js';
 import { buildLayout } from './layout.js';
 import { buildClock } from './clock.js';
 import { buildWidgets } from './widgets.js';
+import { buildBackdrop, buildNowPlaying } from './nowplaying.js';
 
 // GNOME versions this was tested on; the private parts of LoginDialog it relies on
 const TESTED_MAJORS = [51];
@@ -86,23 +87,30 @@ export default class TahoeLoginScreen extends Extension {
         // While it has no text it stays hidden, so LoginDialog leaves it out of its layout.
         this._hideEmptyBanner(dialog);
 
+        // the picture as one actor, which every glass pane copies (the swirl goes on it)
+        const backdrop = buildBackdrop(this, background);
+        this.backdrop = backdrop;
+        this._undo.push(() => delete this.backdrop);
+
         // the clock, the prompt and the rows in the Tahoe proportions for this monitor
         buildLayout(this, dialog);
         // the time and date in Liquid Glass, as on the lock screen
         buildClock(this);
         // the weather and the month on the left, as on the lock screen
         buildWidgets(this, this.dir);
+        // the song from the locked session behind this login screen (Switch User)
+        buildNowPlaying(this, backdrop);
 
         // the password capsule: glass under the entry, in the entry's own BinLayout slot (GNOME
         // swaps the password and text entries in that slot with replace_child, which keeps ours)
-        this._addPane(entryArea, 0, background, 'capsule');
+        this._addPane(entryArea, 0, backdrop, 'capsule');
 
         // the account rows: each row's content goes into a BinLayout box over a glass pill
         for (const item of userList._items.values())
-            this._glassRow(item, background);
+            this._glassRow(item, backdrop);
         const id = userList.connect('item-added', (list, item) => {
             try {
-                this._glassRow(item, background);
+                this._glassRow(item, backdrop);
             } catch (e) {
                 this._fail(`row: ${e}`);
             }

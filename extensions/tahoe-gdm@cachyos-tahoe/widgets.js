@@ -28,9 +28,9 @@ const WEATHER_WAIT = 4000; // ms: the weather shows by then, forecast or not
 
 export function buildWidgets(ext, dir) {
     const group = Main.screenShield?._lockDialogGroup;
-    const backdrop = group?.get_theme_node()?.get_background_image();
-    if (!backdrop)
-        throw new Error('no background picture in the theme for the widgets');
+    const backdrop = ext.backdrop;   // the picture's actor (nowplaying.js buildBackdrop)
+    if (!group || !backdrop)
+        throw new Error('no backdrop for the widgets');
 
     // the widgets' own styles (the desktop's stylesheet), loaded while the login screen shows
     const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();

@@ -60,9 +60,9 @@ function inkOf(text, size) {
 
 export function buildClock(ext) {
     const group = Main.screenShield?._lockDialogGroup;
-    const backdrop = group?.get_theme_node()?.get_background_image();
-    if (!backdrop)
-        throw new Error('no background picture in the theme for the clock');
+    const backdrop = ext.backdrop;   // the picture's actor (nowplaying.js buildBackdrop)
+    if (!group || !backdrop)
+        throw new Error('no backdrop for the clock');
 
     const layer = new Clutter.Actor({name: 'tahoe-gdm-clock', reactive: false});
     group.add_child(layer);
