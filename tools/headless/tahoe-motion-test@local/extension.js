@@ -555,6 +555,39 @@ export default class Driver extends Extension {
             write('log.jsonl', { done: true });
             return;
         }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'clear') {
+            // the notification list's Clear button against the calendar card's corner: geometry
+            // of both, the card's radius, a still of the card and a crop of its bottom-left corner
+            for (let i = 0; i < 3; i++) Main.notify(`Clear test ${i + 1}`, 'A notification for the list');
+            await sleep(1500);
+            date.open(false);
+            await sleep(1200);
+            const find = (root, cls) => {
+                const st = [root];
+                while (st.length) {
+                    const a = st.pop();
+                    if (a.has_style_class_name?.(cls)) return a;
+                    st.push(...a.get_children());
+                }
+                return null;
+            };
+            const card = find(date._boxPointer, 'datemenu-popover') ?? date.box;
+            const btn = find(date._boxPointer, 'message-list-clear-button');
+            const box = a => { const [x, y] = a.get_transformed_position(); const [w, h] = a.get_transformed_size(); return [x, y, w, h].map(Math.round); };
+            const c = box(card), b = box(btn);
+            const s = global.display.get_monitor_scale(0);
+            write('log.jsonl', {
+                scale: s, card: c, button: b,
+                card_radius: card.get_theme_node().get_border_radius(St.Corner.BOTTOMLEFT),
+                button_radius: btn.get_theme_node().get_border_radius(St.Corner.BOTTOMLEFT),
+                inset_left: (b[0] - c[0]) / s, inset_bottom: (c[1] + c[3] - b[1] - b[3]) / s, button_height: b[3] / s,
+            });
+            await shotRect('clear-card', stageBox(card));
+            const r = Math.round(card.get_theme_node().get_border_radius(St.Corner.BOTTOMLEFT) * 2.2);
+            await shotRect('clear-corner', [Math.max(0, c[0] - 16), c[1] + c[3] - r, b[0] - c[0] + b[2] + 32, r + 16]);
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'switch') {
             for (let i = 0; i < RUNS; i++) {
                 qs.open(true);
