@@ -68,8 +68,10 @@ const MPRIS_XML = `<node>
   <property name="CanGoNext" type="b" access="read"/>
   <property name="CanGoPrevious" type="b" access="read"/>
 </interface></node>`;
+// SHOT_ART: a cover file to use instead (or "none" for no cover); SHOT_STATUS: Playing or Paused
 function fakePlayer() {
-    const art = `${OUT}/art.png`;
+    const given = GLib.getenv('SHOT_ART');
+    const art = given && given !== 'none' ? given : `${OUT}/art.png`;
     const surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, 300, 300);
     const cr = new Cairo.Context(surface);
     const g = new Cairo.LinearGradient(0, 0, 300, 300);
@@ -80,7 +82,8 @@ function fakePlayer() {
     cr.setSourceRGBA(1, 1, 1, 0.85);
     cr.arc(150, 150, 70, 0, 2 * Math.PI);
     cr.fill();
-    surface.writeToPNG(art);
+    if (!given)
+        surface.writeToPNG(art);
     cr.$dispose();
     GLib.file_set_contents(`${OUT}/song.lrc`, [
         '[00:30.00]First line of a made-up song', '[00:36.00]The second line, a bit longer than the first',
@@ -89,14 +92,14 @@ function fakePlayer() {
     const info = Gio.DBusNodeInfo.new_for_xml(MPRIS_XML);
     const props = {
         Identity: new GLib.Variant('s', 'Fake Player'),
-        PlaybackStatus: new GLib.Variant('s', 'Playing'),
+        PlaybackStatus: new GLib.Variant('s', GLib.getenv('SHOT_STATUS') ?? 'Playing'),
         Metadata: new GLib.Variant('a{sv}', {
             'mpris:trackid': new GLib.Variant('o', '/fake/track/1'),
             'xesam:title': new GLib.Variant('s', 'Made-Up Song Title'),
             'xesam:artist': new GLib.Variant('as', ['Test Artist']),
             'xesam:album': new GLib.Variant('s', 'Test Album'),
             'xesam:url': new GLib.Variant('s', `file://${OUT}/song.ogg`),
-            'mpris:artUrl': new GLib.Variant('s', `file://${art}`),
+            ...given === 'none' ? {} : {'mpris:artUrl': new GLib.Variant('s', `file://${art}`)},
             'mpris:length': new GLib.Variant('x', 214 * 1e6),
         }),
         Position: new GLib.Variant('x', 38 * 1e6),
@@ -128,6 +131,11 @@ export default class Shot extends Extension {
             await sleep(2500);
             await shot(mode);
             log(`shot ${mode}`);
+            // SHOT_MOTION=ms: a second shot that much later, to see what moved
+            if (GLib.getenv('SHOT_MOTION')) {
+                await sleep(Number(GLib.getenv('SHOT_MOTION')));
+                await shot(`${mode}-later`);
+            }
         }
     }
     disable() {}

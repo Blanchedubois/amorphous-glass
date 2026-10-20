@@ -9,6 +9,7 @@ import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
+import {Swirl} from './swirl.js';
 
 const LYRIC_LINES = 7;
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
@@ -199,6 +200,14 @@ class MusicWidget {
             x_expand: true, y_expand: true,
         });
         this._player = acquirePlayer();
+        this._swirl = new Swirl();
+        // the text follows the swirl's colours (light covers: dark text), not the glass mode
+        this._swirl.onInk = dark => {
+            this.actor.remove_style_class_name('tahoe-music-ink-dark');
+            this.actor.remove_style_class_name('tahoe-music-ink-white');
+            if (dark !== null)
+                this.actor.add_style_class_name(dark ? 'tahoe-music-ink-dark' : 'tahoe-music-ink-white');
+        };
         this._title = ellipsized('tahoe-music-title');
         this._artist = ellipsized('tahoe-widget-secondary tahoe-music-artist');
         this._build();
@@ -208,7 +217,14 @@ class MusicWidget {
         this._refresh();
     }
 
-    setMode() {}
+    // the album-colour swirl lives in the card's glass
+    attachCard(card) {
+        this._swirl.attachCard(card);
+    }
+
+    setMode(mode) {
+        this._swirl.setMode(mode);
+    }
 
     // the progress moves each second while playing
     get wantsSeconds() {
@@ -216,6 +232,7 @@ class MusicWidget {
     }
 
     tick() {
+        this._swirl.check();   // a window may have moved over the card, or away
         if (this._state?.playing)
             this._progress?.update(this._player.position(), this._state.length);
     }
@@ -227,7 +244,12 @@ class MusicWidget {
         const state = this._state = this._player.state;
         this._title.text = state?.title || 'Not Playing';
         this._artist.text = state ? state.artist : '';
-        this._art?.set(state ? this._player.art(state.artUrl) : null);
+        const art = state ? this._player.art(state.artUrl) : null;
+        this._art?.set(art);
+        // a web cover still downloading keeps the last colours until it is here
+        if (art || !/^https?:/.test(state?.artUrl ?? ''))
+            this._swirl.setCover(art);
+        this._swirl.setPlaying(Boolean(state?.playing));
         this._transport?.update(state);
         this._progress?.update(state ? this._player.position() : 0, state?.length ?? 0);
         this._refreshLyrics(state);
@@ -241,6 +263,7 @@ class MusicWidget {
         if (this._lyricTimer)
             GLib.source_remove(this._lyricTimer);
         this._lyricTimer = 0;
+        this._swirl.destroy();
         this._player.unlisten(this._onChange);
         this._player = null;
         releasePlayer();
@@ -267,37 +290,41 @@ export class MusicSmall extends MusicWidget {
     }
 }
 
-// art at the left; the song and the controls beside it; the progress across the bottom
+// the cover inset 16 px from the top, left and bottom (as tall as the card less two gaps); the
+// song at its top right; the controls right-aligned (their hover circles end on the column's
+// edge, as the progress does), over the progress, which ends level with the cover's bottom edge
 export class MusicMedium extends MusicWidget {
     static size = 'medium';
 
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row', y_expand: true});
-        this._art = new Art(96);
+        this._art = new Art(138);   // 170 less 16 px top and bottom
         top.add_child(this._art.actor);
         const info = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
         info.add_child(this._title);
         info.add_child(this._artist);
         info.add_child(new St.Widget({y_expand: true}));
         this._transport = new Transport(this._player, 20);
-        this._transport.actor.x_align = Clutter.ActorAlign.START;
+        this._transport.actor.x_align = Clutter.ActorAlign.END;
         info.add_child(this._transport.actor);
+        this._progress = new Progress(false);
+        info.add_child(this._progress.actor);
         top.add_child(info);
         this.actor.add_child(top);
-        this._progress = new Progress(false);
-        this.actor.add_child(this._progress.actor);
     }
 }
 
-// big art with the song beside it, the progress with times, the controls centred
+// the cover across the full width (inside the padding, concentric with the card), the song,
+// the progress with times and the controls under it; taller than a large widget to fit
+export const LARGE_ART = 324;   // 356 less 16 px each side
+
 export class MusicLarge extends MusicWidget {
     static size = 'large';
+    static height = 496;
 
     _build() {
-        const top = new St.BoxLayout({style_class: 'tahoe-music-row'});
-        this._art = new Art(150);
-        top.add_child(this._art.actor);
-        this.actor.add_child(top);
+        this._art = new Art(LARGE_ART);
+        this.actor.add_child(this._art.actor);
         this.actor.add_child(new St.Widget({y_expand: true}));
         this._title.add_style_class_name('tahoe-music-title-large');
         this.actor.add_child(this._title);
