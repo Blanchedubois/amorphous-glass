@@ -12,6 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 const PREFIX = 'org.mpris.MediaPlayer2.';
 const PATH = '/org/mpris/MediaPlayer2';
 const IFACE = 'org.mpris.MediaPlayer2.Player';
+const ROOT = 'org.mpris.MediaPlayer2';   // the player itself: DesktopEntry, Identity, Raise
 const CACHE = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-widgets', 'art']);
 const USER_AGENT = 'tahoe-widgets (https://github.com/Blanchedubois/liquid-glass)';
 
@@ -111,6 +112,7 @@ class Player {
                     }),
                 ];
                 this._proxies.set(name, proxy);
+                this._readApp(proxy);
                 this._changed();
             } catch {}
         });
@@ -125,6 +127,47 @@ class Player {
         this._changed();
     }
 
+    // which app the player is, read once when it appears: {desktopEntry, identity, canRaise, pid}
+    _readApp(proxy) {
+        const app = proxy._app = {desktopEntry: '', identity: '', canRaise: false, pid: 0};
+        const done = () => {
+            if (this._watch && this._proxies.get(proxy.g_name) === proxy)
+                this._listeners.forEach(fn => fn());
+        };
+        Gio.DBus.session.call(proxy.g_name, PATH, 'org.freedesktop.DBus.Properties', 'GetAll',
+            new GLib.Variant('(s)', [ROOT]), null, Gio.DBusCallFlags.NONE, 2000, null, (bus, res) => {
+                try {
+                    const [props] = bus.call_finish(res).recursiveUnpack();
+                    app.desktopEntry = `${props.DesktopEntry ?? ''}`;
+                    app.identity = `${props.Identity ?? ''}`;
+                    app.canRaise = Boolean(props.CanRaise);
+                } catch {}
+                done();
+            });
+        Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+            'GetConnectionUnixProcessID', new GLib.Variant('(s)', [proxy.g_name]), null,
+            Gio.DBusCallFlags.NONE, 2000, null, (bus, res) => {
+                try {
+                    [app.pid] = bus.call_finish(res).deep_unpack();
+                } catch {}
+                done();
+            });
+    }
+
+    // ask the current player to show itself (browsers switch to the playing tab); the caller
+    // brings its window forward too, as Wayland may not let the player do that itself
+    raise() {
+        const proxy = this.current;
+        if (!proxy?._app?.canRaise)
+            return;
+        Gio.DBus.session.call(proxy.g_name, PATH, ROOT, 'Raise', null, null,
+            Gio.DBusCallFlags.NONE, 2000, null, (bus, res) => {
+                try {
+                    bus.call_finish(res);
+                } catch {}
+            });
+    }
+
     get current() {
         let best = null;
         for (const proxy of this._proxies.values()) {
@@ -136,7 +179,8 @@ class Player {
         return best;
     }
 
-    // {key, title, artist, album, artUrl, url, length, playing, canPrev, canNext} or null
+    // {key, title, artist, album, artUrl, url, length, playing, canPrev, canNext, app} or null;
+    // app: {desktopEntry, identity, canRaise, pid} (filled in shortly after a player appears)
     get state() {
         const proxy = this.current;
         if (!proxy)
@@ -157,6 +201,7 @@ class Player {
             playing: prop('PlaybackStatus') === 'Playing',
             canPrev: prop('CanGoPrevious') ?? true,
             canNext: prop('CanGoNext') ?? true,
+            app: proxy._app ?? null,
         };
     }
 
