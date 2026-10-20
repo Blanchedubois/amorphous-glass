@@ -52,11 +52,18 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   The hover circle of the last button (not its icon) ends on the column's edge, as the bar does.
 - **Lyrics** and **small** share the same swirl (all music cards are `MusicWidget`s); every music
   card now has 16 px padding.
-- **Lyrics glide** (user, 2026-10-20 follow-up): every line of the song sits in one column that
-  scrolls. At each line's time the column eases up (520 ms, ease-out cubic) so the sung line is
-  second from the top, and the new line fades to full while the last one dims (360 ms, to 36 %).
-  All lines share one size (SF Pro Display 20 bold), so nothing reflows mid-glide. The eases run on
-  the compositor between lines only, and end at once with GNOME animations off.
+- **Lyrics drift, Apple Music style** (user, 2026-10-20 follow-ups): every line of the song sits in
+  one column. The sung line is full size and bright, the others at 84 % and dim. At each line's
+  time the lines drift up one by one (900 ms, ease-out cubic), each 55 ms after the one above it,
+  so the text flows like a wave; the old line shrinks and dims as it goes up and the new one grows
+  into its place (650 ms). Only scale, translation and opacity move, so the column never reflows;
+  lines more than 10 away are not drawn. The eases run on the compositor between lines only, and
+  end at once with GNOME animations off. Checked frame by frame (`SHOT_BURST=count,ms`).
+- **Liquid Glass lyrics** (`glassink.js`): an OffscreenEffect on the lyrics viewport turns the text
+  into glass from its own coverage, with no mask. The body is translucent in the ink's colour (45 %
+  for light ink, about a third more for dark ink, to read on mid-tone swirls), with a bright rim on
+  the top-left edges and a shade on the bottom-right. Dark ink keeps only the lit-side rim, for
+  contrast. The viewport is rendered again only while lines move.
 - **Fonts** (same follow-up): Apple's SF throughout, Text under 20 px and Display from 20 px. Song
   titles are bigger: small 15, wide 17, lyrics 16, large 22 (SF Pro Display); artists 13 to 16. The
   large card grew to 356 x 504 to fit.
