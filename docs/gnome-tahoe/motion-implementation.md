@@ -181,3 +181,28 @@ faster; spamming a menu open and closed. Their screen was recorded while they sk
   spamming the calendar every 60 ms 9.6 (29.0); right-clicking every 90 ms at new places 8.6
   (9.7); quick settings 9.7 / 9.3; submenus 9.4 / 10.6; calendar 8.7 / 8.6; desktop menu 8.9 / 8.5.
   The first fast skim of a session still pays once for quick settings' first open.
+
+## Round 4: the right-click broke (2026-10-19 night)
+
+The user recorded it again: the right-click menu stuck on screen, not following the pointer and not
+closing; a frozen, half-poured glass shape (rows running past the glass); swiping through the bar
+left the previous menu printed in the next one's glass. Reproduced in the headless shell with real
+clicks through a virtual pointer (`clicks` test: GNOME's grabs and menu managers, not direct
+calls), compared with GNOME alone:
+
+- **Stuck menu, my round 3 bug:** to reset a menu reopened while closing, it was hidden for a
+  moment; GNOME had just grabbed input on it, and hiding it dropped the grab: no click outside
+  could close it any more. Removed (the misplacement it was meant to fix had another cause, fixed
+  in round 3).
+- **Clicks swallowed:** GNOME mutes a popup's input until its open animation ends (150 ms). With
+  ours (up to 700 ms) right-clicks and outside clicks in that time were lost. The popup now takes
+  input from its first frame.
+- **Frozen half-poured glass:** an animation can no longer stop half way: a watchdog finishes any
+  that runs past 1.5 s, an error in a frame puts the popup at rest (and is logged), and finishing
+  is guarded so every piece is restored.
+- **The imprint:** a menu reached by swiping froze its glass while the menu just left was still
+  up for its two handover frames, so that menu stayed printed in the new glass for the whole
+  animation. Swiped-in menus now freeze their glass only after those frames (`hold: 'late'`).
+- Now, with real clicks 40, 120 and 250 ms apart: a click outside closes the menu, the next
+  right-click opens at the new pointer, exactly as GNOME alone. Frame times p95: fast skim 12.8,
+  slow 9.0; spamming 9.8; normal opens unchanged. Stills: `shots/motion6-skim.png`.

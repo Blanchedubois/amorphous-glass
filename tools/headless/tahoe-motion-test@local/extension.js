@@ -5,6 +5,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
@@ -167,6 +168,63 @@ export default class Driver extends Extension {
             await sleep(600);
             write('log.jsonl', { surfaces2: glass.surfaces(vitals._boxPointer).length });
             await shotRect('vitals-open2', stageBox(vitals._boxPointer));
+            write('log.jsonl', { done: true });
+            return;
+        }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'rows') {
+            const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
+            Main.layoutManager.setDummyCursorGeometry(500, 400, 0, 0);
+            bg.open(true);
+            for (let k = 0; k < 6; k++) {
+                await sleep(80);
+                const motion = Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj;
+                const m = motion?._morphs?.get(bg._boxPointer);
+                const p = m?.pieces?.[0];
+                write('log.jsonl', { k, frames: m?.frames, card: p?.card, lastRect: p?.lastRect, rowDelays: p?.rowDelays?.map(x => Math.round(x)), lastStart: p?.lastStart,
+                    items: p?.items?.map(i => `${i.actor.constructor.name}.${i.actor.get_style_class_name?.() ?? ''} ${Math.round(i.rect.x)},${Math.round(i.rect.y)} ${Math.round(i.rect.width)}x${Math.round(i.rect.height)} s${i.started ? 1 : 0}`) });
+            }
+            write('log.jsonl', { done: true });
+            return;
+        }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'clicks') {
+            // real pointer events in this throwaway shell, through GNOME's grabs and menu managers
+            const seat = (global.stage.get_context?.()?.get_backend?.() ?? global.backend).get_default_seat();
+            const mouse = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+            const t = () => GLib.get_monotonic_time();
+            const move = (x, y) => mouse.notify_absolute_motion(t(), x, y);
+            const click = async (button, x, y) => {
+                move(x, y);
+                await sleep(16);
+                mouse.notify_button(t(), button, Clutter.ButtonState.PRESSED);
+                await sleep(40);
+                mouse.notify_button(t(), button, Clutter.ButtonState.RELEASED);
+            };
+            const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
+            const r = a => { const [x, y] = a.get_transformed_position(); return [Math.round(x), Math.round(y)]; };
+            const state = (step) => {
+                const motion = Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj;
+                const m = motion?._morphs?.get(bg._boxPointer);
+                write('log.jsonl', { step, isOpen: bg.isOpen, visible: bg._boxPointer.visible, scale: bg._boxPointer.scale_x.toFixed(2), at: r(bg._boxPointer),
+                    muted: bg._boxPointer._muteInput?.enabled, morph: m ? { opening: m.opening, frames: m.frames, timeline: Boolean(m.timeline), pieces: m.pieces.map(p => `${p.constructor.name} ready${p.ready} fresh${p.fresh} spreading${p.spreading} edges${p.edges?.settled} items${p.items?.map(i => i.settled ? 1 : 0).join('')}`), elastic: m.elastic ? `${m.elastic.started}/${m.elastic.spring.settled}/${m.elastic.spring.value.toFixed(3)}` : null } : null });
+            };
+            const gap = Number(GLib.getenv('TAHOE_TEST_GAP') ?? 120);
+            const plan = [
+                ['right', 600, 400], ['left', 900, 500], ['right', 1000, 300], ['right', 400, 600],
+                ['left', 1200, 700], ['right', 700, 700], ['right', 720, 710], ['left', 300, 300],
+                ['right', 1300, 400],
+            ];
+            let n = 0;
+            for (const [b, x, y] of plan) {
+                await click(b === 'right' ? Clutter.BUTTON_SECONDARY : Clutter.BUTTON_PRIMARY, x, y);
+                await sleep(gap);
+                state(`${n} ${b} ${x},${y}`);
+                if (GLib.getenv('TAHOE_TEST_CLICK_SHOTS') === '1')
+                    await shotRect(`click-${n}`, [0, 0, 1600, 900]);
+                n++;
+            }
+            await sleep(800);
+            state('end');
+            await shotRect('click-end', [0, 0, 1600, 900]);
             write('log.jsonl', { done: true });
             return;
         }
