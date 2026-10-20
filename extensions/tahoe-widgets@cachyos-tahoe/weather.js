@@ -20,20 +20,22 @@ const REFRESH_SECONDS = 30 * 60;
 const HOURS = 6;
 const DAYS = 5;
 
+// The shell's WeatherClient has no teardown (it holds settings, Geoclue and D-Bus watches), so
+// one is made per shell session and kept across disable/enable, e.g. every screen lock; only
+// its refresh timer stops with the last weather widget.
 let client = null;
 let clientUsers = 0;
 let refreshId = 0;
 
 function acquireClient() {
-    if (!client) {
-        client = new Weather.WeatherClient();
+    client ??= new Weather.WeatherClient();
+    if (clientUsers++ === 0) {
         client.update();
         refreshId = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, REFRESH_SECONDS, () => {
             client.update();
             return GLib.SOURCE_CONTINUE;
         });
     }
-    clientUsers++;
     return client;
 }
 
@@ -42,8 +44,6 @@ function releaseClient() {
         return;
     GLib.source_remove(refreshId);
     refreshId = 0;
-    // the shell's client has no teardown; with nothing connected and no refresh it stays idle
-    client = null;
 }
 
 const temp = info => {

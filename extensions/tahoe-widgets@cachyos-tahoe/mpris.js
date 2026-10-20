@@ -35,12 +35,22 @@ async function fetchBytes(url) {
 }
 
 const unpack = v => (v?.unpack ? v.unpack() : v);
+const CACHE_ENTRIES = 64;   // art and lyrics remembered per session
+
+// a Map that forgets its oldest entries past CACHE_ENTRIES
+function remember(map, key, value) {
+    map.delete(key);
+    map.set(key, value);
+    while (map.size > CACHE_ENTRIES)
+        map.delete(map.keys().next().value);
+}
 
 class Player {
     constructor() {
         this._listeners = new Set();
         this._proxies = new Map();
-        this._position = {key: null, base: 0, at: 0};
+        this._position = {key: null, base: 0, at: 0, reading: false, again: false};
+        this._calls = new Set();    // methods waiting for the player's answer
         this._art = new Map();      // web url -> local file uri, or a promise
         this._lyrics = new Map();   // track key -> [[seconds, line]] or null, or a promise
         this._watch = Gio.DBus.session.signal_subscribe(
@@ -82,7 +92,8 @@ class Player {
         Gio.DBusProxy.new(Gio.DBus.session, Gio.DBusProxyFlags.NONE, null, name, PATH, IFACE, null, (o, res) => {
             try {
                 const proxy = Gio.DBusProxy.new_finish(res);
-                if (!this._watch)
+                // closed, added twice, or the player left while the proxy was made
+                if (!this._watch || this._proxies.has(name) || !proxy.g_name_owner)
                     return;
                 proxy._ids = [
                     proxy.connect('g-properties-changed', () => this._changed()),
@@ -150,6 +161,7 @@ class Player {
         this._position.at = GLib.get_monotonic_time();
     }
 
+    // one Get at a time; changes that come in meanwhile ask once more afterwards
     _readPosition() {
         const proxy = this.current;
         if (!proxy)
@@ -159,16 +171,26 @@ class Player {
         const now = this._position.key === key ? this.position(key) : 0;
         this._position.key = key;
         this._setPosition(now * 1e6);
+        if (this._position.reading) {
+            this._position.again = true;
+            return;
+        }
+        this._position.reading = true;
         Gio.DBus.session.call(proxy.g_name, PATH, 'org.freedesktop.DBus.Properties', 'Get',
             new GLib.Variant('(ss)', [IFACE, 'Position']), null, Gio.DBusCallFlags.NONE, 2000, null,
             (bus, res) => {
+                this._position.reading = false;
                 try {
                     const [value] = bus.call_finish(res).deep_unpack();
-                    if (this._position.key === key) {
+                    if (this._watch && this._position.key === key) {
                         this._setPosition(unpack(value));
                         this._listeners.forEach(fn => fn());
                     }
                 } catch {}
+                if (this._position.again && this._watch) {
+                    this._position.again = false;
+                    this._readPosition();
+                }
             });
     }
 
@@ -180,14 +202,27 @@ class Player {
         return p.base + (playing ? (GLib.get_monotonic_time() - p.at) / 1e6 : 0);
     }
 
+    // clicks that come while the player is still answering the same request are dropped,
+    // so a spammed button never queues up calls
     call(method) {
-        this.current?.call(method, null, Gio.DBusCallFlags.NONE, -1, null, null);
+        const proxy = this.current;
+        const id = `${proxy?.g_name}|${method}`;
+        if (!proxy || this._calls.has(id))
+            return;
+        this._calls.add(id);
+        proxy.call(method, null, Gio.DBusCallFlags.NONE, 3000, null, (p, res) => {
+            this._calls.delete(id);
+            try {
+                p.call_finish(res);
+            } catch {}
+        });
     }
 
     // ---- album art: a file uri St can draw ----
 
-    // the art right now (null while a web image downloads), then onReady once it is local
-    art(url, onReady) {
+    // the art as a file uri St can draw; null while a web image downloads (the listeners hear
+    // when it is ready) or when there is none
+    art(url) {
         if (!url)
             return null;
         if (url.startsWith('file://'))
@@ -197,40 +232,45 @@ class Player {
         const known = this._art.get(url);
         if (typeof known === 'string')
             return known;
-        if (!known) {
-            const path = GLib.build_filenamev([CACHE, GLib.compute_checksum_for_string(GLib.ChecksumType.SHA256, url, -1)]);
-            const job = GLib.file_test(path, GLib.FileTest.EXISTS)
-                ? Promise.resolve()
-                : fetchBytes(url).then(bytes => {
-                    GLib.mkdir_with_parents(CACHE, 0o700);
-                    GLib.file_set_contents(path, bytes.get_data());
-                });
-            this._art.set(url, job.then(() => {
-                const uri = GLib.filename_to_uri(path, null);
-                this._art.set(url, uri);
-                return uri;
-            }, () => {
-                this._art.delete(url);
-                return null;
-            }));
+        if (known)
+            return null;   // downloading
+        const path = GLib.build_filenamev([CACHE, GLib.compute_checksum_for_string(GLib.ChecksumType.SHA256, url, -1)]);
+        if (GLib.file_test(path, GLib.FileTest.EXISTS)) {
+            const uri = GLib.filename_to_uri(path, null);
+            remember(this._art, url, uri);
+            return uri;
         }
-        this._art.get(url).then(uri => uri && onReady(uri));
+        remember(this._art, url, fetchBytes(url).then(bytes => {
+            GLib.mkdir_with_parents(CACHE, 0o700);
+            GLib.file_set_contents(path, bytes.get_data());
+            remember(this._art, url, GLib.filename_to_uri(path, null));
+            this._listeners.forEach(fn => fn());
+        }, () => this._art.delete(url)));
         return null;
     }
 
     // ---- synced lyrics: a .lrc next to a local file, else lrclib.net ----
 
+    // the lines or null if already known, else undefined (nothing is asked)
+    knownLyrics(key) {
+        const known = this._lyrics.get(key);
+        return known instanceof Promise ? undefined : known;
+    }
+
+    // the lines, null if there are none, or undefined while they are looked up (onReady then)
     lyrics(state, onReady) {
-        const known = this._lyrics.get(state.key);
+        let known = this._lyrics.get(state.key);
         if (known !== undefined && !(known instanceof Promise))
             return known;
         if (!known) {
-            this._lyrics.set(state.key, findLyrics(state).catch(() => null).then(lines => {
-                this._lyrics.set(state.key, lines);
+            known = findLyrics(state).catch(() => null).then(lines => {
+                if (this._watch)
+                    remember(this._lyrics, state.key, lines);
                 return lines;
-            }));
+            });
+            remember(this._lyrics, state.key, known);
         }
-        this._lyrics.get(state.key).then(lines => onReady(lines));
+        known.then(lines => this._watch && onReady(lines));
         return undefined;
     }
 
