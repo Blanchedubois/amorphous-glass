@@ -153,6 +153,9 @@ it isn't one of these four.
 
 ### Privacy rules (Phase 4 proposal)
 
+The full risk assessment, with fault-injection results, is in
+[lockscreen/widget-risks.md](lockscreen/widget-risks.md).
+
 | Widget | While locked |
 |---|---|
 | Clocks, Glass Text clock | shown |
