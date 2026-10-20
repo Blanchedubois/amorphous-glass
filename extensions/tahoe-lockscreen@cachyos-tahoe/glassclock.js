@@ -28,7 +28,7 @@ import St from 'gi://St';
 export const MATERIAL = {
     timeFont: 'SF Pro Display Heavy',
     dateFont: 'SF Pro Display Semibold',
-    round: 2.5,         // logical px: corners softened by growing the glyphs with round joins
+    round: 0,           // logical px: corners softened by growing the glyphs with round joins (off: the user wants SF Pro's own corners)
     edge: 10,           // logical px of bevel inside the time's strokes
     bend: 22,           // logical px the backdrop is pushed at the very edge of the time
     dateScale: 0.3,     // the date's bevel, bend and rim, as a fraction of the time's
@@ -42,9 +42,11 @@ export const MATERIAL = {
     rimBase: 0.14,      // rim light all round
     shade: 0.10,        // darkening of the edge facing away from the light
     split: 0.10,        // colour split, as a fraction of the bend
-    // dark mode (GNOME's dark style): the glass a little darker, as the user asked
-    darkTint: 0.16,     // how far the glass is pulled toward black
-    darkBrightness: -0.02,
+    // dark mode (GNOME's dark style): a light tint, so the clock stays easy to read on the
+    // darker wallpaper (the user first asked for a darker tint, then found it hard to see)
+    darkTint: 0,        // how far the glass is pulled toward black
+    darkMilk: 0.24,     // white over the glass in dark mode, in place of milk
+    darkBrightness: 0.07,
 };
 
 const SHADER_DECLARATIONS = `
@@ -96,7 +98,7 @@ const SHADER = `
     // the date (blue < 1) is thin: a little frosted rather than clear
     float is_date = clamp((1.0 - m.b) / max(1.0 - date_scale, 0.01), 0.0, 1.0);
     c = mix(c, vec3(1.0), milk + date_milk * is_date);
-    // dark mode: a slightly darker glass (the rim below stays bright)
+    // optional darker glass (dark_tint 0 by default; the rim below stays bright)
     c = mix(c, vec3(0.0), dark_tint);
     // the rim: lit from the top left, a little shade on the far side
     float facing = dot(-n, normalize(vec2(-1.0, -1.0)));
@@ -128,7 +130,7 @@ class TahoeLockGlyphGlassEffect extends Clutter.OffscreenEffect {
             bend_px: M.bend * scale, blur_px: M.blur * scale,
             contrast: M.contrast, saturation: M.saturation,
             brightness: dark ? M.darkBrightness : M.brightness, dark_tint: dark ? M.darkTint : 0,
-            milk: M.milk, rim: M.rim, rim_base: M.rimBase, shade: M.shade, split: M.split,
+            milk: dark ? M.darkMilk : M.milk, rim: M.rim, rim_base: M.rimBase, shade: M.shade, split: M.split,
             date_milk: M.dateMilk, date_scale: M.dateScale,
         };
         this.queue_repaint();
@@ -202,6 +204,8 @@ export function measure(spec) {
 // blue = how strongly this glyph bends (1 for the time, dateScale for the date, whose strokes are
 // much thinner)
 export function buildMask(width, height, spec, scale) {
+    if (MATERIAL._failForTest)   // set only by tools/lockscreen (TAHOE_LOCK_MATERIAL)
+        throw new Error('test: mask failed');
     const surface = new Cairo.ImageSurface(Cairo.Format.RGB24, width, height);
     const cr = new Cairo.Context(surface);
     cr.setSourceRGB(0, 0, 0);
