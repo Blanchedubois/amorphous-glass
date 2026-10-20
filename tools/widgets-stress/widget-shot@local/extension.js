@@ -131,6 +131,14 @@ export default class Shot extends Extension {
             await sleep(2500);
             await shot(mode);
             log(`shot ${mode}`);
+            // SHOT_BURST=count,ms: that many shots that far apart (to see a transition)
+            if (GLib.getenv('SHOT_BURST')) {
+                const [count, ms] = GLib.getenv('SHOT_BURST').split(',').map(Number);
+                for (let i = 0; i < count; i++) {
+                    await sleep(ms);
+                    await shot(`${mode}-burst-${String(i).padStart(3, '0')}`);
+                }
+            }
             // SHOT_MOTION=ms: a second shot that much later, to see what moved
             if (GLib.getenv('SHOT_MOTION')) {
                 await sleep(Number(GLib.getenv('SHOT_MOTION')));

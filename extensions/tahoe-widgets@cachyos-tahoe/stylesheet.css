@@ -111,11 +111,11 @@
 .tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.18); }
 .tahoe-widget-light .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.06); }
 .tahoe-widget-light .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.10); }
-/* lyrics: one size for every line (the sung one is brighter by opacity, music.js), so the
-   column never reflows while it glides */
+/* lyrics: one size for every line in the layout; the lines not being sung are scaled to 0.84
+   and dimmed (music.js), so the column never reflows while it drifts. The glass is a shader. */
 .tahoe-music-lyrics { margin-top: 14px; }   /* margin: a fixed layout ignores padding */
-.tahoe-music-lyrics-column { spacing: 10px; }
-.tahoe-music-lyric { font-family: "SF Pro Display", sans-serif; font-size: 20px; font-weight: 700; color: #ffffff; }
+.tahoe-music-lyrics-column { spacing: 6px; }
+.tahoe-music-lyric { font-family: "SF Pro Display", sans-serif; font-size: 23px; font-weight: 700; color: #ffffff; }
 .tahoe-widget-light .tahoe-music-lyric { color: #1c1c1e; }
 
 /* the music text over the album swirl: its ink follows the cover's colours, not the glass mode
