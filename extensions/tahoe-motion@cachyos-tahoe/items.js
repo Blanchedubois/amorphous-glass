@@ -90,6 +90,8 @@ export function pieceItems(target) {
     return items.sort((a, b) => a.rect.x - b.rect.x);
 }
 
+// leaving: quicker than effects fast (the rows go before the glass folds)
+const LEAVE = { damping: 1, stiffness: 6000 };
 // how far a row rises into place, and how small it starts
 const ROW_RISE_PX = 16;
 const ROW_SCALE = 0.85;
@@ -146,7 +148,7 @@ export class Item {
     /// leaving: it fades (and only fades: the glass carries it away)
     leave() {
         this.started = true;
-        this.fade.setToken(EXPRESSIVE.effects.fast);
+        this.fade.setToken(LEAVE);
         this.fade.retarget(0, 1);
     }
 
