@@ -115,6 +115,7 @@ keyfile() {
     echo
     echo "[org/gnome/shell]"
     echo "enabled-extensions=['tahoe-gdm@cachyos-tahoe']"
+    echo "disable-user-extensions=false"
   fi
   if [ "${GDM_WEATHER:-}" = 1 ]; then
     echo
@@ -122,6 +123,13 @@ keyfile() {
     echo "automatic-location=false"
     echo "locations=$(gsettings get org.gnome.shell.weather locations)"
   fi
+}
+
+# the login screen account (GDM's dynamic gdm-greeter user) has its own settings, read before the
+# system ones (the profile's user-db): a value there hid ours, so the extension never loaded on the
+# real login screen (2026-10-20). Every key we set is locked, so ours always wins.
+locks() {
+  keyfile | awk '/^\[/{dir=substr($0,2,length($0)-2)} /=/{split($0,kv,"="); print "/" dir "/" kv[1]}'
 }
 
 commands() {
@@ -157,6 +165,10 @@ sudo mkdir -p /etc/dconf/db/gdm.d
 sudo tee $DCONF_KEYS >/dev/null <<'KEYS'
 $(keyfile)
 KEYS
+sudo mkdir -p /etc/dconf/db/gdm.d/locks
+sudo tee /etc/dconf/db/gdm.d/locks/90-tahoe-gdm >/dev/null <<'LOCKS'
+$(locks)
+LOCKS
 sudo dconf update
 # shows at the next logout or boot; the lock screen uses the new file from its next lock
 
