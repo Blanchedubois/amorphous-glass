@@ -193,3 +193,19 @@ export function wantsDarkInk(palette, mode = 'dark') {
     const glass = GLASS_LIGHTNESS[mode] ?? GLASS_LIGHTNESS.dark;
     return (1 - SWIRL_PULL) * glass + SWIRL_PULL * swirl > INK_THRESHOLD;
 }
+
+// The text's colour, tinted by the cover (user, 2026-10-20): its most colourful colour, very light
+// for white text and deep for dark text, with only a little of its chroma so the text stays
+// text-coloured. A cover with no real colour gives plain white or near-black. sRGB 0..1.
+export function inkColour(colours, dark) {
+    if (!colours?.length)
+        return null;
+    const chroma = c => Math.hypot(c[1], c[2]);
+    const pick = colours.reduce((best, c) => chroma(c) > chroma(best) ? c : best);
+    const C = chroma(pick);
+    const [L, maxC] = dark ? [0.27, 0.06] : [0.96, 0.035];
+    if (C < 0.03)
+        return labToRgb([L, 0, 0]);
+    const f = Math.min(C, maxC) / C;
+    return labToRgb([L, pick[1] * f, pick[2] * f]);
+}
