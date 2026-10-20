@@ -13,6 +13,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import { runStress } from './stress.js';
 import { runWidgetMenu } from './widgetmenu.js';
 import { runSurvey } from './survey.js';
+import { runWindowMenuShots } from './windowmenu.js';
 
 const OUT = GLib.getenv('TAHOE_TEST_OUT');
 const RUNS = Number(GLib.getenv('TAHOE_TEST_RUNS') ?? 5);
@@ -157,6 +158,11 @@ export default class Driver extends Extension {
         }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'widgetmenu') {
             await runWidgetMenu(obj => write('log.jsonl', obj));
+            write('log.jsonl', { done: true });
+            return;
+        }
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'windowmenu') {
+            await runWindowMenuShots(obj => write('log.jsonl', obj));
             write('log.jsonl', { done: true });
             return;
         }
