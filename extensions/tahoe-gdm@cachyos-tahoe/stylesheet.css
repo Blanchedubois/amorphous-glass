@@ -31,3 +31,13 @@
 }
 
 .login-dialog.tahoe-gdm-glass .tahoe-gdm-row-content { padding: 9px 22px 9px 9px; }
+
+/* the account list is a scroll view, which clips to its box and fades its top and bottom edges
+   (GNOME's -st-vfade-offset): with the glass reaching 13 px past each row (glass.js PAD: room for
+   the bend and the rim), that cut the rows' rounded ends. Room inside the list for the glass, and
+   no fade over it. */
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view { -st-vfade-offset: 0; }
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list {
+  margin: 0;
+  padding: 14px;
+}

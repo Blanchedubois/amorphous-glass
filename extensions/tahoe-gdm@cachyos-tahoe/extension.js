@@ -78,6 +78,12 @@ export default class TahoeLoginScreen extends Extension {
         dialog.add_style_class_name(STYLE_CLASS);
         this._undo.push(() => dialog.remove_style_class_name(STYLE_CLASS));
 
+        // GDM's banner (an administrator's login message) is empty here, but GNOME still lays it
+        // out between the panel and the prompt; with the prompt low that space is negative
+        // (Clutter warned "allocate a size of 8 x -172" on every frame of the login animation).
+        // While it has no text it stays hidden, so LoginDialog leaves it out of its layout.
+        this._hideEmptyBanner(dialog);
+
         // the clock, the prompt and the rows in the Tahoe proportions for this monitor
         buildLayout(this, dialog);
 
@@ -96,6 +102,42 @@ export default class TahoeLoginScreen extends Extension {
             }
         });
         this._undo.push(() => userList.disconnect(id));
+    }
+
+    _hideEmptyBanner(dialog) {
+        const banner = dialog._bannerView;
+        const label = dialog._bannerLabel;
+        if (!banner || !label)
+            return;
+        let wanted = banner.visible;   // what GNOME last asked for, put back on undo
+        let ours = false;
+        const sync = () => {
+            if (ours)
+                return;
+            if (!label.text && banner.visible) {
+                wanted = true;
+                ours = true;
+                banner.hide();
+                ours = false;
+            } else if (!ours) {
+                wanted = banner.visible;
+            }
+        };
+        const ids = [
+            banner.connect('notify::visible', sync),
+            label.connect('notify::text', () => {
+                if (label.text && wanted && !banner.visible)
+                    banner.show();
+                sync();
+            }),
+        ];
+        sync();
+        this._undo.push(() => {
+            banner.disconnect(ids[0]);
+            label.disconnect(ids[1]);
+            if (wanted && !banner.visible)
+                banner.show();
+        });
     }
 
     _addPane(parent, index, background, radius) {
