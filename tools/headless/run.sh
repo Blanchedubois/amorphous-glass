@@ -47,6 +47,11 @@ css = re.sub(r"\n*/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n?", "\n", 
 open(p, "w").write(css.rstrip() + "\n\n" + ov + "\n")' "$theme/gnome-shell/gnome-shell.css"
   export TAHOE_TEST_KEYS="${TAHOE_TEST_KEYS:-} org/gnome/shell/extensions/user-theme:name='MacTahoe-Dark-test'"
 fi
+# TAHOE_TEST_ICONS=1: the user's own icon theme (their icons dir, their icon-theme setting)
+if [ -n "${TAHOE_TEST_ICONS:-}" ]; then
+  [ -e "$XDG_DATA_HOME/icons" ] || ln -s "$HOME/.local/share/icons" "$XDG_DATA_HOME/icons"
+  export TAHOE_TEST_ICON_THEME=$(env -u GSETTINGS_BACKEND XDG_CONFIG_HOME=$HOME/.config gsettings get org.gnome.desktop.interface icon-theme)
+fi
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 - "$kf" <<'PY'
 import os, subprocess, sys
@@ -76,6 +81,8 @@ out += ['[org/gnome/shell]',
         'welcome-dialog-last-shown-version=\'999\'',
         '[org/gnome/shell/extensions/user-theme]', "name='MacTahoe-Dark'",
         '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", 'enable-animations=true']
+if os.environ.get('TAHOE_TEST_ICON_THEME'):
+    out.append('icon-theme=' + os.environ['TAHOE_TEST_ICON_THEME'])
 # TAHOE_TEST_KEYS="path:key=value ...": settings changed for this run (after the user's)
 for item in os.environ.get('TAHOE_TEST_KEYS', '').split():
     path, kv = item.split(':', 1)
