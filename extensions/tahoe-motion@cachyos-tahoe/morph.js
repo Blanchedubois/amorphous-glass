@@ -780,7 +780,9 @@ export class Morph {
             this.root.opacity = Math.round(255 * smoothstep(0, 1, reach));
         if (this.elastic) {
             const { spring } = this.elastic;
-            if (this.opening && !this.elastic.started && (spreading || this.pieces.length === 0)) {
+            // (a popup whose glass is still to come waits for it)
+            const waiting = this.lazy && now < LAZY_MS;
+            if (this.opening && !this.elastic.started && (spreading || (this.pieces.length === 0 && !waiting))) {
                 this.elastic.started = true;
                 this.pivotAtOrigin();
                 spring.retarget(1, 1 - spring.value || 0.14);
