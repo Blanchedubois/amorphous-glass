@@ -142,6 +142,77 @@ export default class Driver extends Extension {
         }
     }
 
+    /// Wi-Fi's morph (iconmorph.js), played through the test hook only: the real toggle is never
+    /// clicked (this shell talks to the machine's own NetworkManager)
+    async iconMorph(qs) {
+        const icons = Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj?._icons;
+        const wifi = qs._grid.get_children().find(c => c.constructor.name === 'NMWirelessToggle');
+        if (!icons || !wifi?.visible) {
+            write('log.jsonl', { morph: 'skipped', icons: Boolean(icons), wifi: Boolean(wifi?.visible) });
+            return;
+        }
+        icons.track(qs);
+        const find = a => { if (a instanceof St.Icon) return a; for (const c of a.get_children()) { const f = find(c); if (f) return f; } return null; };
+        const icon = find(wifi);
+        const iconBox = () => { const [x, y] = icon.get_transformed_position(); const [w, h] = icon.get_transformed_size(); return [Math.floor(x - 6), Math.floor(y - 6), Math.ceil(w + 12), Math.ceil(h + 12)]; };
+        write('log.jsonl', { morph: 'start', icon: icon.icon_name, size: icon.get_transformed_size(), scale: St.ThemeContext.get_for_stage(global.stage).scale_factor });
+        const stills = async tag => {
+            let m = icons.preview(wifi, true, { hold: 1e9 });
+            for (const [i, slash] of [0, 0.25, 0.5, 0.75, 1].entries()) {
+                m.pose({ slash });
+                await sleep(120);
+                if (i === 0)
+                    write('log.jsonl', { tag, children: icon.get_children().map(c => [c.constructor.name, c.opacity, c.x, c.y, c.width, c.height, c.visible]), copy: [m.copy.x, m.copy.y, m.copy.width, m.copy.height, m.copy.opacity], ink: (c => [c.red, c.green, c.blue, c.alpha])(m.copy.get_theme_node().get_foreground_color()), real: (c => [c.red, c.green, c.blue, c.alpha])(icon.get_theme_node().get_foreground_color()) });
+                await shotRect(`morph-off-${i}${tag}`, iconBox());
+            }
+            await shot(`morph-off-toggle${tag}`, wifi);
+            m.finish();
+            m = icons.preview(wifi, false, { hold: 1e9 });
+            const on = [{ slash: 1 }, { slash: 0.5, dim: 0.64 }, { slash: 0, dim: 0.28, front: 0.15 },
+                { dim: 0.28, front: 0.4 }, { dim: 0.28, front: 0.65 }, { dim: 0.28, front: 0.9 }];
+            for (const [i, pose] of on.entries()) {
+                m.pose({ front: 0, ...pose });
+                await sleep(120);
+                await shotRect(`morph-on-${i}${tag}`, iconBox());
+            }
+            m.finish();
+            await sleep(200);
+            await shotRect(`morph-rest${tag}`, iconBox());
+        };
+        await stills('');
+        // real time: frame intervals and the time each stage update took
+        for (let i = 0; i < 3; i++) {
+            await this.measure('morph-off', 'morph', () => icons.preview(wifi, true, { hold: 0 }), 900);
+            await this.measure('morph-on', 'morph', () => icons.preview(wifi, false, { hold: 0 }), 1100);
+        }
+        await this.measure('morph-idle', 'idle', () => {}, 600);
+        // slowed 10x: the springs' values every 50 ms of real time (500 ms slowed)
+        St.Settings.get().slow_down_factor = 10;
+        for (const off of [true, false]) {
+            const m = icons.preview(wifi, off, { hold: 0 });
+            const samples = [];
+            for (let i = 0; i < 24 && m.timeline; i++) {
+                samples.push(`${m.slash.value.toFixed(2)}/${m.front.value.toFixed(2)}/${m.dim.value.toFixed(2)}/${m.copy.opacity}`);
+                await sleep(250);
+            }
+            write('log.jsonl', { morph: off ? 'off' : 'on', 'slash/front/dim/copy': samples.join(' ') });
+            m.finish();
+        }
+        St.Settings.get().slow_down_factor = 1;
+        // light: the same stills in the light shell theme and colour scheme
+        try {
+            const src = Gio.SettingsSchemaSource.get_default();
+            if (src.lookup('org.gnome.shell.extensions.user-theme', true))
+                new Gio.Settings({ schema_id: 'org.gnome.shell.extensions.user-theme' }).set_string('name', 'MacTahoe-Light');
+            new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' }).set_string('color-scheme', 'prefer-light');
+            await sleep(2500);
+            await stills('-light');
+        } catch (e) {
+            write('log.jsonl', { light_error: `${e}` });
+        }
+        write('log.jsonl', { morph: 'done', errors: icons.morphs.size });
+    }
+
     async run() {
         await sleep(8000);
         write('log.jsonl', { start: true, animations: St_animations() });
@@ -337,7 +408,9 @@ export default class Driver extends Extension {
             }
             write('log.jsonl', { samples: samples.join(' '), pressedProp: Boolean(toggle.constructor.find_property?.('pressed') ?? ('pressed' in toggle)) });
             St.Settings.get().slow_down_factor = 1;
-            write('log.jsonl', { checked: toggle.checked, done: true });
+            write('log.jsonl', { checked: toggle.checked });
+            await this.iconMorph(qs);
+            write('log.jsonl', { done: true });
             return;
         }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'scales') {
