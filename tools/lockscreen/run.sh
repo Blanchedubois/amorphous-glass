@@ -4,6 +4,7 @@
 # lock screen picture, and the lock-test driver, which locks this shell (never the real session),
 # opens the password prompt and takes screenshots.
 # TAHOE_TEST_EXT_DIRS="/path/uuid ...": extensions from a checkout, enabled too (e.g. tahoe-lockscreen).
+# TAHOE_LOCK_PICTURE=uri: another lock picture; TAHOE_LOCK_MATERIAL=json: glass material overrides.
 set -eu
 out=$1; mode=${2:-dark}
 H=$(cd "$(dirname "$0")" && pwd)
@@ -28,7 +29,7 @@ for dir in ${TAHOE_TEST_EXT_DIRS:-}; do
   extra="$extra, '$(basename "$dir")'"
 done
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
-TAHOE_TEST_EXTRA="$extra" MODE=$mode python3 -I - "$kf" <<'PY'
+TAHOE_TEST_EXTRA="$extra" MODE=$mode TAHOE_LOCK_PICTURE="${TAHOE_LOCK_PICTURE:-}" python3 -I - "$kf" <<'PY'
 import os, subprocess, sys
 out = []
 def dump(path):
@@ -46,6 +47,11 @@ dump('/org/gnome/shell/extensions/blur-my-shell/')
 dump('/org/gnome/desktop/background/')
 dump('/org/gnome/desktop/screensaver/')
 dark = os.environ['MODE'] == 'dark'
+# TAHOE_LOCK_PICTURE=uri: a different lock picture (and wallpaper) for this run
+pic = os.environ.get('TAHOE_LOCK_PICTURE')
+if pic:
+    out += ['[org/gnome/desktop/screensaver]', f"picture-uri='{pic}'",
+            '[org/gnome/desktop/background]', f"picture-uri='{pic}'", f"picture-uri-dark='{pic}'"]
 out += ['[org/gnome/shell]',
         "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'lock-test@local'" + os.environ['TAHOE_TEST_EXTRA'] + "]",
         'disable-extension-version-validation=true',

@@ -6,6 +6,7 @@
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import { Frame, versionSupported } from './frame.js';
+import { buildLayout } from './layout.js';
 
 export default class TahoeLockScreen extends Extension {
     enable() {
@@ -17,6 +18,7 @@ export default class TahoeLockScreen extends Extension {
         // transactional: whatever start() did before an error is undone, so a failed enable
         // leaves GNOME's lock screen exactly as it was
         const frame = new Frame(this.dir.get_child('lockscreen.css'));
+        frame.onDialog(buildLayout);
         try {
             frame.start();
             if (this._failAfterStartForTest)

@@ -142,8 +142,9 @@ async function runOurs(kind) {
     write({ label: 'ours-before', kind, ...before, frameAfterTyping: frameState().frame });
     try {
         switch (kind) {
-        case 'cover': {
-            const w = new St.Widget({ reactive: true, x: 1000, y: 780, width: 560, height: 160, style: 'background-color: rgba(255,0,0,0.5);' });
+        case 'cover': {          // over the password field, wherever the layout put it
+            const [ex, ey] = dialog._authPrompt._entry.get_transformed_position();
+            const w = new St.Widget({ reactive: true, x: ex - 40, y: ey - 40, width: 320, height: 130, style: 'background-color: rgba(255,0,0,0.5);' });
             frame.addActor(dialog, w);
             break;
         }
@@ -160,6 +161,13 @@ async function runOurs(kind) {
             frame.addActor(dialog, new St.Widget({ name: 'leftover', width: 10, height: 10 }));
             frame.guard(() => { throw new Error('test: exception in our code'); });
             break;
+        case 'clock-broken': {   // our clock laid out too narrow: the clock check must catch it
+            const area = dialog.get_children().find(c => c.name === 'tahoe-lock:clock-area');
+            const time = area.get_first_child().get_last_child();
+            time.width = 10;
+            frame.scheduleCheck();
+            break;
+        }
         case 'check-fails':
             frame.addCheck('test clock', () => 'our clock is not shown');
             frame.scheduleCheck();
@@ -179,7 +187,8 @@ async function runOurs(kind) {
     await sleep(5500);
     const after = { ...frameState(), ...(await usable(dialog)) };
     write({ label: 'ours-after', kind, ...after, stackTranslation: dialog._stack.translation_y, stackOpacity: dialog._stack.opacity,
-        promptTranslation: dialog._promptBox.translation_y, promptOpacity: dialog._promptBox.opacity });
+        promptTranslation: dialog._promptBox.translation_y, promptOpacity: dialog._promptBox.opacity,
+        gnomeClockLabels: ['_time', '_date', '_hint'].map(n => dialog._clock[n].visible).join(',') });
     await shotRect('ours', [0, 0, global.screen_width, global.screen_height]);
 }
 
@@ -187,15 +196,23 @@ async function runOurs(kind) {
 async function runChurn() {
     await sleep(3000);
     const N = Number(GLib.getenv('TAHOE_LOCK_CYCLES') ?? 50);
+    const unlockTimes = [];
     for (let i = 1; i <= N; i++) {
         const dialog = await lockAndPrompt();
         const locked = frameState();
-        const u = [1, 10, 25, N].includes(i) ? await usable(dialog) : null;
+        const u = (i === 1 || i % 25 === 0 || i === N) ? await usable(dialog) : null;
+        const t0 = GLib.get_monotonic_time();
         Main.screenShield.deactivate(false);
-        await sleep(1200);
-        if ([1, 10, 25, N].includes(i) || locked.frame !== 'running' && locked.extState !== null) {
+        // how long the unlock takes: until the session is back in user mode (10 s at most)
+        while (Main.sessionMode.isLocked && GLib.get_monotonic_time() - t0 < 10e6)
+            await sleep(25);
+        const unlockMs = Math.round((GLib.get_monotonic_time() - t0) / 1000);
+        unlockTimes.push(unlockMs);
+        await sleep(400);
+        if ((i === 1 || i % 25 === 0 || i === N) || locked.frame !== 'running' && locked.extState !== null) {
             write({ label: 'cycle', i, locked, usable: u, unlocked: frameState(), mode: Main.sessionMode.currentMode,
-                actors: countActors(), rssKb: rssKb() });
+                actors: countActors(), rssKb: rssKb(), unlockMs,
+                unlockMsMax: Math.max(...unlockTimes), unlockMsMedian: unlockTimes.slice().sort((a, b) => a - b)[unlockTimes.length >> 1] });
         }
     }
 }
@@ -274,8 +291,21 @@ function state(label) {
         themeCustom: theme?.get_custom_stylesheets?.().map(f => f.get_path()) ?? null });
 }
 
+// TAHOE_LOCK_MATERIAL='{"milk":0.6,...}': try a glass material without editing the extension
+// (the extension's glassclock.js module is shared, so this changes what its next mask uses)
+async function applyMaterial() {
+    const json = GLib.getenv('TAHOE_LOCK_MATERIAL');
+    const ext = lockExt();
+    if (!json || !ext)
+        return;
+    const mod = await import(`${ext.dir.get_uri()}/glassclock.js`);
+    Object.assign(mod.MATERIAL, JSON.parse(json));
+    write({ label: 'material', material: mod.MATERIAL });
+}
+
 async function run() {
     await sleep(3000);
+    await applyMaterial();
     state('unlocked');
     await shotRect('unlocked', [0, 0, global.screen_width, global.screen_height]);
     Main.screenShield.lock(false);
@@ -319,6 +349,23 @@ async function run() {
     const [sw, sh] = [global.screen_width, global.screen_height];
     await sleep(800);   // past the watchdog's settle delay
     write({ label: 'frame', ...frameState() });
+    const ours = [];
+    const walk = (a, depth) => {
+        if (a.name?.startsWith('tahoe-lock') || depth > 0) {
+            ours.push({ depth, type: a.constructor.name, name: a.name, style_class: a.style_class, box: box(a) ?? 'unmapped', opacity: a.opacity, effects: a.get_effects().map(e => e.constructor.name).join(',') || undefined, text: a.text ?? undefined, style: a.style ?? undefined,
+                font: a instanceof St.Widget ? a.get_theme_node().get_font().to_string() : undefined });
+            for (const c of a.get_children()) walk(c, depth + 1);
+        } else {
+            for (const c of a.get_children()) walk(c, 0);
+        }
+    };
+    walk(global.stage, 0);
+    write({ label: 'our-actors', ours });
+    write({ label: 'background', effects: [...dialog._backgroundGroup].map(b => ({ x: b.x, name: b.name,
+        effects: b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`) })) });
+    const nameLabel = prompt._userWell?.get_child?.()?._label ?? null;
+    write({ label: 'fonts', userName: nameLabel?.get_theme_node().get_font().to_string() ?? null,
+        entry: entry.get_theme_node().get_font().to_string() });
     await shotRect('full', [0, 0, sw, sh]);
     const a = box(prompt._entryArea);
     if (a) await shotRect('entry', [a[0] - 40, a[1] - 40, a[2] + 80, a[3] + 80]);
