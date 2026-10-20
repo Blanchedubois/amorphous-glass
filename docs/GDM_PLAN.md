@@ -203,3 +203,36 @@ tahoe-widgets' WeatherSmall, CalendarDay and CalendarMonth on the glass panes ab
 - Music on the login screen: not possible in a useful way: nobody is logged in, so no player runs,
   and the greeter (user gdm) cannot see a user session's players.
 - Shots: `docs/gdm/widgets-workshop.png`.
+
+### Lock screen music mode (workshop, test only)
+
+The idea (user, 2026-10-20): while music plays, the whole lock screen background becomes the Music
+widget's album-colour swirl, the cover sits large in the centre, and the widgets stack on the left
+as on the iPad.
+
+What Apple does (checked 2026-10-20):
+- **iPad, landscape** (iPadOS 17+): the clock and date sit at the top left with a column of
+  widgets (sidebar) under them on the left; portrait has up to four widgets under the clock and
+  one above. Portrait and landscape keep separate widget sets. iPadOS 26 can stretch the clock.
+- **iPhone, iOS 26** (iPad coverage is thin): while media plays the lock screen shows the artwork
+  full screen, animated (Apple Music's animated art; MPMediaItemAnimatedArtwork for other apps),
+  in sync with the playback controls.
+- **Mac**: nothing like it; Now Playing stays a small card.
+So the swirl background + big centre cover is iOS 26's music lock screen, and the left column is
+iPad landscape; together they are a blend, not a copy of one Apple screen.
+
+Prototype: `tools/gdm/lockmusic-test.sh OUTDIR [dark|light]` (`LOCKMUSIC_LAYOUT=centre|ipad`,
+`tools/gdm/lockmusic-test@local`), over main's installed tahoe-lockscreen with a fake player:
+- the swirl is an effect on GNOME's lock background actor (the wave field from swirl.js, the
+  cover's colours from palette.js, 14 % deeper for white text, cross-faded in over 1.2 s, 25 fps),
+  so the glass clock and the glass widgets, which copy that actor, bend the swirl too;
+- the cover (30 % of the height, 38 % in the iPad layout) with title, artist and transport
+  buttons in the centre; the Now Playing card steps aside;
+- widgets (weather, today, month) on the glass panes, in a column at 4.5 % from the left;
+  in the iPad layout the clock moves to the top left over the column.
+Findings: works headless (`docs/gdm/music-mode-workshop.png`). For a real build: the date should
+be left-aligned with the time in the iPad layout; the glass clock must be re-aimed when moved (the
+prototype only translates it); the cover's rounded corners need a mask (St draws picture corners
+without anti-aliasing); the swirl must stop when idle or dimmed and with animations off, as Now
+Playing's does, and its cost (a full-screen shader at 25 fps plus the glass re-rendering) measured.
+This belongs in tahoe-lockscreen (another session's extension), not in the GDM work.
