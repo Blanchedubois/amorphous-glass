@@ -311,3 +311,9 @@ lock screen is unchanged until merged and installed with scripts/tahoe-lockscree
 - The harness: tools/lockscreen/run.sh now runs the shell behind tools/gdm/sysbus.sh (no real
   GDM or PAM) and takes TAHOE_LOCK_MONITOR; lock-test's fault record also checks the background
   effects, the prompt glass and the dialog's style classes.
+- After merging the lock-screen branch (a8bca55, d5fafa1), all with its PAM guard and the bus
+  filter (every run logs "pam-isolated", 0 gdm-password/pam_faillock journal lines): check-shared
+  in sync; G1 light and dark, with music and without: frame running, peek and arrow hit; dim gate
+  keeps the frame running; ours-* (7) and outside faults (3) restore GNOME's lock screen with the
+  swirl, prompt glass and style class gone; churn 10 cycles clean, actors 2654 -> 2654, unlock
+  median 95 ms. The swirl effect is now off (enabled = false) while it shows nothing.

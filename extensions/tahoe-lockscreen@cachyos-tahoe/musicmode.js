@@ -119,9 +119,14 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
     frame.addUndo(() => releasePlayer());
 
     // ---- the background swirl, on every lock background actor ----
+    let amount = 0;          // 0 the picture, 1 the swirl
+    let target = 0;
+    let colours = swirlPalette(null);
     const effects = new Set();
     const addSwirl = actor => {
         const effect = new BackgroundSwirl();
+        // off while it shows nothing (no offscreen pass over the picture when nothing plays)
+        effect.enabled = amount > 0;
         actor.add_effect_with_name('tahoe-lock-music-swirl', effect);
         effects.add(effect);
         frame.addUndo(() => {
@@ -134,11 +139,9 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
         addSwirl(actor);
     frame.connect(dialog._backgroundGroup, 'child-added', (_g, actor) => addSwirl(actor));
 
-    let amount = 0;          // 0 the picture, 1 the swirl
-    let target = 0;
-    let colours = swirlPalette(null);
     const paint = () => {
         for (const e of effects) {
+            e.enabled = amount > 0;
             e.floats.lm_amount = amount;
             e.colours = colours;
             e.queue_repaint();
