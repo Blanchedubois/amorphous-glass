@@ -12,8 +12,8 @@ Apple's macOS Tahoe press image the user picked (see "The target" below).
 |---|---|---|
 | 0 | Research, possibility report, risk assessment | done (d225f3a, 24db9fe) |
 | 1 | The unlock arrow covered the password eye | done (7b28b83), not installed |
-| 2 | Safety frame: guards and tests, nothing visible changes | next |
-| 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | |
+| 2 | Safety frame: guards and tests, nothing visible changes | done, not installed |
+| 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | next |
 | 4 | The Liquid Glass clock | |
 | 5 | Now Playing: GNOME's own media card as a Tahoe glass card | |
 | 6 | Motion: lock, page change and unlock animations | |
@@ -253,6 +253,38 @@ The extension gets its JavaScript side, but draws nothing new yet:
 
 Exit: G1 to G4 pass, and the screenshots are identical to Phase 1's.
 
+**Result (2026-10-20).** `frame.js` holds the frame; `extension.js` pins the version and enables
+transactionally; the stylesheet is now `lockscreen.css`, loaded by the frame, so the shell never
+loads it on an untested version. Design points that came out of building it:
+- The frame undoes changes through destroy-signal watches, so undo never touches an actor GNOME
+  already destroyed at unlock.
+- **GNOME animates some properties itself.** It sets the prompt box's and the clock's opacity,
+  scale and `translation_y`, and the bottom buttons' opacity and scale, on every crossfade frame.
+  The frame refuses changes to those: such a change would be overwritten and undone to a stale
+  value. Asking for one counts as a failure.
+- **The watchdog** runs 450 ms after each page change, dialog allocation, or change of ours. While
+  a fade is still running it waits, up to about 3.6 s.
+
+Gates, all headless (`tools/lockscreen/run.sh`; `TAHOE_LOCK_GATE=ours-<fault>|churn`):
+
+| Gate | Result |
+|---|---|
+| G1 | Light and dark: frame running, the eye and the arrow each hit themselves, password field crops pixel-identical to Phase 1's. |
+| G2, our own code | All seven pass: a cover over the capsule, the prompt off screen, the prompt hidden, a GNOME-animated property, an exception, a failed check, a failed `enable()`. Each time the frame failed safe, with one journal line naming the cause. Stylesheet unloaded, none of our actors left, translations and opacity back. Then every typed key reached the field, which was visible and what a click hits, still locked. |
+| G2, foreign faults | The seven faults from the risk assessment, with the frame present: still locked, every key arrives. Where foreign code broke the prompt, the frame noticed and stood down. It cannot repair someone else's code. |
+| G3 | Covered by G2: after a failure nothing of ours is left (stylesheet, actors, translations, opacity). |
+| G4 | 50 lock and unlock cycles: frame running at every lock; after every unlock the extension is off, its stylesheet unloaded and none of its actors left. Actors flat (about 2,560). Memory grew 6.5 MB, against 8.2 MB in the same run without the extension, so the growth is GNOME's own. No JS errors. |
+
+The only JS error in the logs is GNOME's own "incorrect pop", raised when the harness ends a shell
+that is still locked; it appears without the extension too.
+
+**Harness fix:** the test shells now get their own runtime directory. They no longer share
+`/run/user/1000` with the real session (GNOME's crash-guard file lives there), and the test
+session's document portal mount is unmounted at the end.
+
+Not tested: the version pin and the shape check are in place but untested. Faking a different
+GNOME version or a reshaped dialog needs a VM image or a GNOME 52 build, so it waits for Phase 7.
+
 ### Phase 3: Tahoe layout with a plain clock
 
 - **Clock always on top:**
@@ -264,8 +296,9 @@ Exit: G1 to G4 pass, and the screenshots are identical to Phase 1's.
 - **Time and date format:** the time comes from GNOME's `WallClock`, so it follows the 12h/24h
   setting, without AM/PM as in the image. The date is short, "Tue Oct 20", in the locale's order.
 - **Prompt at the bottom:**
-  - The prompt is shifted down with `translation_y` so that the avatar sits at about 83 % of the
-    height.
+  - The prompt is shifted down with `translation_y` on GNOME's `_stack` so that the avatar sits at
+    about 83 % of the height. Not on `_promptBox`: GNOME animates that box's opacity, scale and
+    `translation_y` on every crossfade frame, so the frame refuses changes there (Phase 2).
   - The shift is recomputed when GNOME re-allocates, for example when notifications appear.
 - **Prompt styling, in CSS:**
   - avatar 64 px;

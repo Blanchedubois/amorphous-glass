@@ -13,6 +13,8 @@ import GObject from 'gi://GObject';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const FAULT = GLib.getenv('TAHOE_LOCK_FAULT');
+const GATE = GLib.getenv('TAHOE_LOCK_GATE');   // ours-<fault> | churn
+const LOCK_UUID = 'tahoe-lockscreen@cachyos-tahoe';
 
 // Fault injection: what a broken lock screen widget extension could do to GNOME's unlock dialog.
 const ThrowingWidget = GObject.registerClass(class ThrowingWidget extends St.Widget {
@@ -61,6 +63,140 @@ async function typeKeys(text) {
         kb.notify_keyval(t, keyval, Clutter.KeyState.PRESSED);
         kb.notify_keyval(t + 1000, keyval, Clutter.KeyState.RELEASED);
         await sleep(60);
+    }
+}
+
+function lockExt() {
+    return Main.extensionManager.lookup(LOCK_UUID);
+}
+
+function frameState() {
+    const ext = lockExt();
+    const frame = ext?.stateObj?._frame ?? null;
+    const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
+    const sheets = theme.get_custom_stylesheets().map(f => f.get_path()).filter(p => p.endsWith('/lockscreen.css'));
+    let ours = 0;
+    const walk = a => { if (a.name?.startsWith('tahoe-lock')) ours++; for (const c of a.get_children()) walk(c); };
+    walk(global.stage);
+    return { extState: ext?.state ?? null, frame: frame ? (frame.failed ? `failed: ${frame.reason}` : 'running') : null,
+        stylesheetLoaded: sheets.length, ourActors: ours };
+}
+
+function countActors(a = global.stage) {
+    let n = 1;
+    for (const c of a.get_children()) n += countActors(c);
+    return n;
+}
+
+function rssKb() {
+    const [, bytes] = GLib.file_get_contents('/proc/self/status');
+    const m = new TextDecoder().decode(bytes).match(/VmRSS:\s+(\d+)/);
+    return m ? Number(m[1]) : null;
+}
+
+// G1: is the password field usable? Clears it, types the fake string, checks it all arrived, is
+// visible, on screen and what a click at its centre hits.
+async function usable(dialog) {
+    const prompt = dialog._authPrompt;
+    if (prompt && !prompt._entryArea.visible) { prompt.setQuestion('Enter Password'); await sleep(600); }
+    const entry = prompt?._entry;
+    if (!entry) return { entry: 'none' };
+    entry.text = '';
+    entry.grab_key_focus();
+    const typed = 'fakepass';
+    await typeKeys(typed);
+    await sleep(500);
+    const b = box(entry);
+    const at = b ? global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, b[0] + b[2] / 2, b[1] + b[3] / 2) : null;
+    let chainOpacity = 255;
+    for (let a = entry; a; a = a.get_parent()) chainOpacity = Math.min(chainOpacity, a.opacity);
+    const onScreen = b && b.every(Number.isFinite) && b[0] >= 0 && b[1] >= 0 && b[0] + b[2] <= global.screen_width && b[1] + b[3] <= global.screen_height;
+    return { keys: entry.text === typed ? 'all arrived' : `${entry.text.length} of ${typed.length}`,
+        visible: entry.mapped && chainOpacity === 255, onScreen: !!onScreen,
+        clickHits: at === entry || entry.contains(at) ? 'entry' : `${at?.constructor?.name}`,
+        stillLocked: Main.sessionMode.isLocked };
+}
+
+async function lockAndPrompt() {
+    Main.screenShield.lock(false);
+    await sleep(2000);
+    Main.screenShield._wakeUpScreen();
+    await sleep(600);
+    const dialog = Main.screenShield._dialog;
+    const f0 = global.stage.key_focus;
+    let inside = false;
+    for (let a = f0; a; a = a.get_parent()) if (a === dialog) inside = true;
+    if (!inside) dialog.grab_key_focus();
+    await typeKeys('x');       // the first key opens the prompt, as for a person
+    await sleep(1500);
+    return dialog;
+}
+
+// G2 for our own code: a broken later phase, injected through the frame's own API
+async function runOurs(kind) {
+    await sleep(3000);
+    const dialog = await lockAndPrompt();
+    const before = { ...frameState(), ...(await usable(dialog)) };
+    await sleep(800);
+    const frame = lockExt()?.stateObj?._frame;
+    write({ label: 'ours-before', kind, ...before, frameAfterTyping: frameState().frame });
+    try {
+        switch (kind) {
+        case 'cover': {
+            const w = new St.Widget({ reactive: true, x: 1000, y: 780, width: 560, height: 160, style: 'background-color: rgba(255,0,0,0.5);' });
+            frame.addActor(dialog, w);
+            break;
+        }
+        case 'offscreen':
+            frame.setTranslationY(dialog._stack, 3000);
+            break;
+        case 'hide-prompt':
+            frame.hide(dialog._stack);
+            break;
+        case 'animated-prop':   // a design mistake: a property GNOME animates
+            frame.setTranslationY(dialog._promptBox, 40);
+            break;
+        case 'throw':
+            frame.addActor(dialog, new St.Widget({ name: 'leftover', width: 10, height: 10 }));
+            frame.guard(() => { throw new Error('test: exception in our code'); });
+            break;
+        case 'check-fails':
+            frame.addCheck('test clock', () => 'our clock is not shown');
+            frame.scheduleCheck();
+            break;
+        case 'enable-fails': {
+            const ext = lockExt().stateObj;
+            ext.disable();
+            ext._failAfterStartForTest = true;
+            ext.enable();
+            delete ext._failAfterStartForTest;
+            break;
+        }
+        }
+    } catch (e) {
+        write({ label: 'inject-threw', error: String(e) });
+    }
+    await sleep(5500);
+    const after = { ...frameState(), ...(await usable(dialog)) };
+    write({ label: 'ours-after', kind, ...after, stackTranslation: dialog._stack.translation_y, stackOpacity: dialog._stack.opacity,
+        promptTranslation: dialog._promptBox.translation_y, promptOpacity: dialog._promptBox.opacity });
+    await shotRect('ours', [0, 0, global.screen_width, global.screen_height]);
+}
+
+// G4: lock and unlock cycles; our extension is enabled at each lock and disabled at each unlock
+async function runChurn() {
+    await sleep(3000);
+    const N = Number(GLib.getenv('TAHOE_LOCK_CYCLES') ?? 50);
+    for (let i = 1; i <= N; i++) {
+        const dialog = await lockAndPrompt();
+        const locked = frameState();
+        const u = [1, 10, 25, N].includes(i) ? await usable(dialog) : null;
+        Main.screenShield.deactivate(false);
+        await sleep(1200);
+        if ([1, 10, 25, N].includes(i) || locked.frame !== 'running' && locked.extState !== null) {
+            write({ label: 'cycle', i, locked, usable: u, unlocked: frameState(), mode: Main.sessionMode.currentMode,
+                actors: countActors(), rssKb: rssKb() });
+        }
     }
 }
 
@@ -181,6 +317,8 @@ async function run() {
     };
     write({ label: 'hit', atPeek: hit(box(peek)), atNext: hit(box(prompt._nextButton)) });
     const [sw, sh] = [global.screen_width, global.screen_height];
+    await sleep(800);   // past the watchdog's settle delay
+    write({ label: 'frame', ...frameState() });
     await shotRect('full', [0, 0, sw, sh]);
     const a = box(prompt._entryArea);
     if (a) await shotRect('entry', [a[0] - 40, a[1] - 40, a[2] + 80, a[3] + 80]);
@@ -196,7 +334,7 @@ export default class Driver extends Extension {
     enable() {
         if (this._started) return;
         this._started = true;
-        (FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
