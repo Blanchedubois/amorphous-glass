@@ -78,3 +78,31 @@
   background-gradient-start: #64d2ff;
   background-gradient-end: #ffd60a;
 }
+
+/* music: art rounded concentric with the card (24 - 16) */
+.tahoe-music-row { spacing: 14px; }
+.tahoe-music-art { border-radius: 8px; background-color: rgba(255, 255, 255, 0.12); }
+.tahoe-widget-light .tahoe-music-art { background-color: rgba(0, 0, 0, 0.06); }
+.tahoe-music-art-image { background-color: transparent; background-size: cover; }
+.tahoe-widget-light .tahoe-music-art-image { background-color: transparent; }
+.tahoe-music-title { font-size: 14px; font-weight: 700; }
+.tahoe-music-title-large { font-size: 17px; padding-top: 8px; }
+.tahoe-music-artist { font-size: 13px; }
+.tahoe-music-progress { spacing: 4px; padding-top: 10px; }
+.tahoe-music-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.20); }
+.tahoe-widget-light .tahoe-music-track { background-color: rgba(0, 0, 0, 0.12); }
+.tahoe-music-fill { border-radius: 2px; background-color: rgba(255, 255, 255, 0.85); }
+.tahoe-widget-light .tahoe-music-fill { background-color: rgba(28, 28, 30, 0.75); }
+.tahoe-music-time { font-size: 11px; font-weight: 600; }
+.tahoe-music-transport { spacing: 4px; }
+.tahoe-music-transport-large { spacing: 28px; padding-top: 6px; }
+.tahoe-music-button { border-radius: 999px; padding: 6px; color: inherit; }
+.tahoe-music-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+.tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.18); }
+.tahoe-widget-light .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.06); }
+.tahoe-widget-light .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-music-lyrics { spacing: 6px; padding-top: 12px; }
+.tahoe-music-lyric { font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, 0.40); }
+.tahoe-widget-light .tahoe-music-lyric { color: rgba(28, 28, 30, 0.35); }
+.tahoe-music-lyric-current { font-size: 19px; color: #ffffff; }
+.tahoe-widget-light .tahoe-music-lyric-current { color: #1c1c1e; }
