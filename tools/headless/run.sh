@@ -116,5 +116,7 @@ PYS
 fi
 timeout ${TAHOE_TEST_TIMEOUT:-90} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
   --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
-cp "$kf" "$out/keyfile.after" 2>/dev/null; rm -rf "$root"
+cp "$kf" "$out/keyfile.after" 2>/dev/null
+# gvfs's metadata daemon can still be writing into the folder: a second try, never a failed run
+rm -rf "$root" 2>/dev/null || { sleep 1; rm -rf "$root" 2>/dev/null || true; }
 echo "done: $(grep -c . "$out/log.jsonl" 2>/dev/null || echo 0) records"

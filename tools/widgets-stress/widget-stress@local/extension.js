@@ -108,9 +108,11 @@ function find(actor, test, out = []) {
     return out;
 }
 const musicWidgets = () => widgets().filter(w => [...(w.get_style_class_name() ?? '').split(' ')].some(c => c.startsWith('tahoe-widget-music')));
-const buttons = (w, icon) => find(w, a => a instanceof St.Button && a.child?.icon_name?.startsWith(icon));
+// a button's icon name, from a theme name or the widgets' own icon files (same names)
+const iconName = a => a.child?.icon_name ?? a.child?.gicon?.get_file?.()?.get_basename().replace(/\.svg$/, '') ?? '';
+const buttons = (w, icon) => find(w, a => a instanceof St.Button && iconName(a).startsWith(icon));
 const titles = () => musicWidgets().map(w => find(w, a => a.has_style_class_name?.('tahoe-music-title'))[0]?.text);
-const playIcons = () => musicWidgets().map(w => find(w, a => a instanceof St.Button && /media-playback/.test(a.child?.icon_name ?? ''))[0]?.child.icon_name);
+const playIcons = () => musicWidgets().map(w => iconName(find(w, a => a instanceof St.Button && /media-playback/.test(iconName(a)))[0] ?? {}));
 
 // ---- fake MPRIS players with a slow reply, counting what they are asked ----
 const XML = `<node>

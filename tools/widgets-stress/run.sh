@@ -25,6 +25,9 @@ cp "$layout" "$XDG_CONFIG_HOME/tahoe-glass/widgets.json"
 echo "widgets=on" > "$XDG_CONFIG_HOME/tahoe-glass/state"; echo "mode=dark" >> "$XDG_CONFIG_HOME/tahoe-glass/state"
 # fonts the user has (SF Pro) are in ~/.local/share/fonts: keep them visible
 mkdir -p "$XDG_DATA_HOME"; ln -s "$HOME/.local/share/fonts" "$XDG_DATA_HOME/fonts"
+# and the user's icon themes, with the user's icon theme set below (as on the desktop)
+[ -d "$HOME/.local/share/icons" ] && ln -s "$HOME/.local/share/icons" "$XDG_DATA_HOME/icons"
+export ICON_THEME=$(env -u GSETTINGS_BACKEND XDG_CONFIG_HOME="$HOME/.config" gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo "'Adwaita'")
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 -I - "$kf" <<'PY'
 import os, subprocess, sys
@@ -45,7 +48,8 @@ for p in ('/org/gnome/shell/extensions/blur-my-shell/', '/org/gnome/desktop/back
 out += ['[org/gnome/shell]',
         "enabled-extensions=['blur-my-shell@aunetx', 'tahoe-widgets@cachyos-tahoe', '" + os.environ.get('DRIVER', 'widget-shot@local') + "']",
         'disable-extension-version-validation=true', "welcome-dialog-last-shown-version='999'",
-        '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", "clock-format='12h'"]
+        '[org/gnome/desktop/interface]', "color-scheme='prefer-dark'", "font-name='SF Pro Text 10'", "clock-format='12h'",
+        'icon-theme=' + os.environ.get('ICON_THEME', "'Adwaita'")]
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 timeout ${SHOT_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "wshot-$$" \
