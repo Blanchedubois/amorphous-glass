@@ -41,3 +41,12 @@
   margin: 0;
   padding: 14px;
 }
+
+/* the widget column's cards (widgets.js): the shader draws the glass and its edge, no CSS rim or
+   fill over it, as on the lock screen (lockscreen.css .tahoe-lock-pane) */
+.tahoe-widget.tahoe-gdm-pane { background-color: transparent; border-radius: 24px; }
+.tahoe-widget.tahoe-gdm-pane .tahoe-widget-content {
+  border-width: 0;
+  background-color: transparent;
+  box-shadow: none;
+}

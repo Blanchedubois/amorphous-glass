@@ -22,10 +22,11 @@ function soup() {
     return session;
 }
 
-// the only network call (web covers, lyrics); never while the screen is locked (the lock screen's
-// Music widget shows local covers only and asks nothing of the web)
-async function fetchBytes(url) {
-    if (Main.sessionMode.isLocked)
+// the only network call (web covers, lyrics). While the screen is locked only a cover may be
+// fetched, from the player's own cover URL (the user's choice, 2026-10-20: a song that starts while
+// locked got no album colours for the swirl); lyrics never.
+async function fetchBytes(url, {whileLocked = false} = {}) {
+    if (Main.sessionMode.isLocked && !whileLocked)
         throw new Error('no network while the screen is locked');
     const message = Soup.Message.new('GET', url);
     const bytes = await new Promise((resolve, reject) => soup().send_and_read_async(
@@ -291,7 +292,7 @@ class Player {
             remember(this._art, url, uri);
             return uri;
         }
-        remember(this._art, url, fetchBytes(url).then(bytes => {
+        remember(this._art, url, fetchBytes(url, {whileLocked: true}).then(bytes => {
             GLib.mkdir_with_parents(CACHE, 0o700);
             GLib.file_set_contents(path, bytes.get_data());
             remember(this._art, url, GLib.filename_to_uri(path, null));
