@@ -26,6 +26,26 @@ for dir in ${TAHOE_TEST_EXT_DIRS:-}; do
   extra="$extra, '$(basename "$dir")'"
 done
 export TAHOE_TEST_EXTRA="$extra"
+# TAHOE_TEST_USERLOOK=1: GTK apps look as on the desktop: the user's icons (linked, read only),
+# their GTK 3 and 4 CSS with the glass layers (copied) and their interface settings
+if [ "${TAHOE_TEST_USERLOOK:-}" = 1 ]; then
+  [ -d "$HOME/.local/share/icons" ] && ln -s "$HOME/.local/share/icons" "$XDG_DATA_HOME/icons"
+  for d in gtk-3.0 gtk-4.0; do [ -d "$HOME/.config/$d" ] && cp -r "$HOME/.config/$d" "$XDG_CONFIG_HOME/"; done
+fi
+# TAHOE_TEST_OVERRIDES=FILE: the shell overrides template FILE (config/gnome-shell-overrides.css),
+# rendered for dark mode into a copy of the MacTahoe Dark shell theme that the test shell uses;
+# the user's own theme folder is not touched
+if [ -n "${TAHOE_TEST_OVERRIDES:-}" ]; then
+  theme="$XDG_DATA_HOME/themes/MacTahoe-Dark-test"
+  mkdir -p "$XDG_DATA_HOME/themes"; cp -r "$HOME/.themes/MacTahoe-Dark" "$theme"
+  repo=$(cd "$(dirname "$TAHOE_TEST_OVERRIDES")/.." && pwd)
+  python3 "$repo/scripts/glass-tokens.py" render "$TAHOE_TEST_OVERRIDES" dark | python3 -c '
+import re, sys
+p = sys.argv[1]; ov = sys.stdin.read().strip(); css = open(p).read()
+css = re.sub(r"\n*/\* tahoe-overrides:.*?/\* end tahoe-overrides \*/\n?", "\n", css, flags=re.S)
+open(p, "w").write(css.rstrip() + "\n\n" + ov + "\n")' "$theme/gnome-shell/gnome-shell.css"
+  export TAHOE_TEST_KEYS="${TAHOE_TEST_KEYS:-} org/gnome/shell/extensions/user-theme:name='MacTahoe-Dark-test'"
+fi
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 - "$kf" <<'PY'
 import os, subprocess, sys
@@ -46,6 +66,8 @@ def dump(path):
             out.append(line)
 dump('/org/gnome/shell/extensions/')
 dump('/org/gnome/desktop/background/')
+if os.environ.get('TAHOE_TEST_USERLOOK') == '1':
+    dump('/org/gnome/desktop/interface/')
 out += ['[org/gnome/shell]',
         "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local'" + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
         'disable-extension-version-validation=true',

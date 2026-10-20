@@ -19,6 +19,10 @@ The three goal documents:
    and how they go into the floating capsule.
 3. [apps.md](apps.md): Files, Settings and the other system apps.
 
+Next: [glass-everywhere-workshop.md](glass-everywhere-workshop.md), every other surface Liquid Glass
+could go on (app folders, search, window headers, sidebars, the folder picker, dialogs, OSDs),
+with phases.
+
 ## Findings in one page
 
 **GNOME-Tahoe is an assembly, not a theme engine.** It ships no shader of its own. The glass comes
