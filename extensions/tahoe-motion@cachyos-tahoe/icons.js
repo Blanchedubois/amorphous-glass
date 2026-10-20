@@ -11,10 +11,13 @@
 //   and springs back past its size when released.
 // - Pop, when an icon changes by itself (a volume level, a Wi-Fi strength): a gentle nudge, at
 //   most every POP_EVERY_MS, so dragging a slider does not strobe.
+// - Morph (iconmorph.js, a workshop prototype): Wi-Fi draws its slash in or out instead of the
+//   Replace.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
+import { GlyphMorph, morphSpecFor } from './iconmorph.js';
 import { EXPRESSIVE, Spring } from './spring.js';
 
 const BOUNCE_PUSH = -7;
@@ -169,6 +172,24 @@ export class IconEffects {
         this.tracked = new Set();
         this.icons = new Set();
         this.squishes = new Map();
+        this.morphs = new Map();
+    }
+
+    /// the icon draws itself into its new state (off: the slash goes in); preview: for stills,
+    /// the toggle itself is left alone
+    morph(icon, spec, off, preview = null) {
+        this.morphs.get(icon)?.finish();
+        const morph = new GlyphMorph(icon, spec, off, { preview });
+        morph.onDone = () => this.morphs.get(icon) === morph && this.morphs.delete(icon);
+        this.morphs.set(icon, morph);
+        return morph;
+    }
+
+    /// the test driver's way in: plays a toggle's morph without switching it
+    preview(button, off, preview = { hold: 0 }) {
+        const icon = findIcon(button);
+        const spec = morphSpecFor(button);
+        return icon && spec ? this.morph(icon, spec, off, preview) : null;
     }
 
     /// watches the buttons of a quick settings panel (new ones too, each time it opens)
@@ -211,6 +232,7 @@ export class IconEffects {
                     this.icons.delete(icon);
                     this.motions.get(icon)?.stop();
                     this.motions.delete(icon);
+                    this.morphs.get(icon)?.finish();
                 },
                 this);
             button.connectObject('notify::pressed', () => {
@@ -223,12 +245,23 @@ export class IconEffects {
                 }
                 squish.press(button.pressed);
             }, this);
-            if ('checked' in button)
-                button.connectObject('notify::checked', () => !this.isBusy() && motion().replace(), this);
-            icon.connectObject(
-                'notify::gicon', () => !this.isBusy() && motion().pop(),
-                'notify::icon-name', () => !this.isBusy() && motion().pop(),
-                this);
+            const spec = morphSpecFor(button);
+            if ('checked' in button) {
+                button.connectObject('notify::checked', () => {
+                    if (this.isBusy())
+                        return;
+                    // (an icon off screen just changes: its clock does not run)
+                    if (spec && icon.mapped)
+                        this.morph(icon, spec, !button.checked);
+                    else if (spec)
+                        this.morphs.get(icon)?.finish();
+                    else
+                        motion().replace();
+                }, this);
+            }
+            // a morphing icon changes under its copy: no pop
+            const pop = () => !this.isBusy() && !this.morphs.has(icon) && motion().pop();
+            icon.connectObject('notify::gicon', pop, 'notify::icon-name', pop, this);
         }
     }
 
@@ -241,6 +274,9 @@ export class IconEffects {
             motion.stop();
         for (const squish of this.squishes.values())
             squish.stop();
+        for (const morph of [...this.morphs.values()])
+            morph.finish();
+        this.morphs.clear();
         this.squishes.clear();
         this.icons.clear();
         this.tracked.clear();
