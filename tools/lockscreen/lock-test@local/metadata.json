@@ -1,0 +1,1 @@
+{ "uuid": "lock-test@local", "name": "lock screen test", "description": "headless lock screen test driver", "shell-version": ["51"], "session-modes": ["user", "unlock-dialog"] }

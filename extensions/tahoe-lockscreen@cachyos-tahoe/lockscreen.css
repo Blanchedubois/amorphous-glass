@@ -1,0 +1,179 @@
+/* Tahoe Lock Screen. Loaded by frame.js only while the screen is locked and only on a GNOME version
+   the extension was tested on (it is not named stylesheet.css, so the shell never loads it by
+   itself). The user theme is switched off on the lock screen, so these rules sit on the system
+   shell theme (/usr/share/gnome-shell/gnome-shell-theme.gresource, currently MacTahoe's GDM build).
+
+   Password capsule. GNOME overlays the unlock arrow (.login-dialog-default-button-well) on the
+   right end of the entry and reserves room for it with padding-right: 2.5em on the entry; the
+   MacTahoe build drops that rule, so the peek (eye) icon, which St draws at the entry's right
+   edge, ended up under the arrow. Here the capsule is 48 px tall (radius 24), the arrow is a
+   32 px circle (radius 16) 8 px in from the end, so the two curves are concentric
+   (24 = 16 + 8, docs/STANDARD.md), and the entry's text stops 4 px before the arrow, which puts
+   the eye just left of it. */
+.unlock-dialog .login-dialog-prompt-entry {
+  height: 48px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-radius: 9999px;
+}
+
+.unlock-dialog .login-dialog-prompt-entry:ltr {
+  padding-left: 18px !important;
+  padding-right: 44px !important;
+}
+
+.unlock-dialog .login-dialog-prompt-entry:rtl {
+  padding-right: 18px !important;
+  padding-left: 44px !important;
+}
+
+.unlock-dialog .login-dialog-default-button-well:ltr { margin-right: 8px; }
+.unlock-dialog .login-dialog-default-button-well:rtl { margin-left: 8px; }
+
+.unlock-dialog .login-dialog-button.next-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff;
+  box-shadow: none !important;
+}
+
+.unlock-dialog .login-dialog-button.next-button:hover { background-color: rgba(255, 255, 255, 0.28) !important; }
+.unlock-dialog .login-dialog-button.next-button:active { background-color: rgba(255, 255, 255, 0.36) !important; }
+.unlock-dialog .login-dialog-button.next-button:insensitive { background-color: rgba(255, 255, 255, 0.08) !important; color: rgba(255, 255, 255, 0.45); }
+
+.unlock-dialog .login-dialog-button.next-button StIcon { icon-size: 16px; }
+
+.unlock-dialog .login-dialog-prompt-entry StIcon.peek-password {
+  icon-size: 16px;
+  padding: 0 4px !important;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.unlock-dialog .login-dialog-prompt-entry StIcon.peek-password:hover { color: #ffffff; }
+
+/* ---- Phase 3: the Tahoe layout ----
+   The lock screen is always white on the wallpaper, so it takes the dark-mode glass values from
+   tokens/glass.json in both modes: edge 1 px white 0.16, hover white 0.12, pressed white 0.18. */
+
+/* our clock (layout.js sets the font sizes from the monitor height): the plain fallback under the
+   glass (glassclock.js draws the glass in the same faces) */
+.tahoe-lock-clock-date {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.tahoe-lock-clock-time {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.16);
+}
+
+/* the user: a small avatar and the name, as on the Mac */
+.unlock-dialog .user-widget.vertical { spacing: 10px; }
+.unlock-dialog .user-widget.vertical .user-icon { icon-size: 64px; }
+.unlock-dialog .user-widget.vertical .user-icon StIcon { padding: 15px; }
+.unlock-dialog .user-widget.vertical .user-widget-label {
+  font-family: "SF Pro Text", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding-top: 0;
+}
+
+/* the password capsule: a white glass fill with the capsule edge, no blue focus ring */
+.unlock-dialog .login-dialog-prompt-entry,
+.unlock-dialog .login-dialog-prompt-entry:hover,
+.unlock-dialog .login-dialog-prompt-entry:focus {
+  background-color: rgba(255, 255, 255, 0.14);
+  border: none !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff;
+}
+
+.unlock-dialog .login-dialog-prompt-entry:focus { background-color: rgba(255, 255, 255, 0.18); }
+
+.unlock-dialog .login-dialog-prompt-entry StLabel.hint-text { color: rgba(255, 255, 255, 0.6); }
+
+/* Switch User… at the bottom right: a glass capsule */
+.unlock-dialog .login-dialog-button.switch-user-button {
+  border-radius: 9999px;
+  padding: 6px 16px !important;
+  width: auto !important;
+  height: auto !important;
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.unlock-dialog .login-dialog-button.switch-user-button:hover,
+.unlock-dialog .login-dialog-button.switch-user-button:focus { background-color: rgba(255, 255, 255, 0.24); }
+.unlock-dialog .login-dialog-button.switch-user-button:active { background-color: rgba(255, 255, 255, 0.32); }
+
+/* ---- Phase 5: Now Playing ----
+   The desktop's wide Music widget (nowplaying.js) brings its own styles (widgets/widgets.css, a
+   copy of tahoe-widgets' stylesheet); GNOME's own media card is hidden while it shows. */
+
+/* without Blur My Shell there is no glass under the pieces: a plain translucent fill instead */
+.quick-settings.tahoe-lock-menu-plain .quick-toggle,
+.quick-settings.tahoe-lock-menu-plain .quick-slider,
+.quick-settings.tahoe-lock-menu-plain .quick-settings-system-item .icon-button { background-color: rgba(255, 255, 255, 0.14); }
+
+/* ---- The top-right menu (quick settings) while locked ----
+   Each piece has glass of its own under it (menuglass.js), so the pieces' own fill is all but
+   cleared; a checked toggle keeps the theme's fill. Submenus: tokens/radius.json submenu (32). */
+.quick-settings .quick-toggle,
+.quick-settings .quick-slider,
+.quick-settings .quick-settings-system-item .icon-button {
+  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+
+.quick-settings .quick-toggle:hover,
+.quick-settings .quick-settings-system-item .icon-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+
+.quick-settings .quick-toggle:active,
+.quick-settings .quick-settings-system-item .icon-button:active { background-color: rgba(255, 255, 255, 0.18); }
+
+/* a submenu opens in the menu's overlay, outside .quick-settings. Sized as on the desktop
+   (config/gnome-shell-overrides.css, tokens/radius.json submenu 32/16/16): the full width of the
+   grid of pills, so its edges line up with the Wi-Fi and Power Mode pills above it (the system
+   theme insets it 18 px each side), 16 px padding, rows 6 x 8 px rounded at 16. */
+.quick-toggle-menu-container .quick-toggle-menu {
+  background-color: transparent;
+  border-radius: 32px;
+  box-shadow: none;
+  margin: 12px 0 0;
+  padding: 16px;
+}
+
+.quick-toggle-menu-container .quick-toggle-menu .header { padding: 6px 8px; }
+.quick-toggle-menu-container .quick-toggle-menu .popup-menu-item {
+  padding: 6px 8px;
+  border-radius: 16px;
+}
+
+/* a checked toggle keeps the theme's own fill (the rules above would otherwise win over it) */
+.quick-settings .quick-toggle:checked {
+  color: -st-accent-fg-color;
+  background-color: -st-accent-color;
+}
+
+
+/* ---- Now Playing drawn 1.5x (nowplaying.js style wide-big) ----
+   The cover and buttons are sized in code (music.js scale); here the text, spacing and track.
+   The card's padding stays 16, so the cover's 8 px corner stays concentric with the card's 24. */
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-row { spacing: 24px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-title { font-family: "SF Pro Display", sans-serif; font-size: 26px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-artist { font-size: 21px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-progress { padding-top: 15px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-track { height: 6px; border-radius: 3px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-fill { border-radius: 3px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-button { padding: 9px; }
