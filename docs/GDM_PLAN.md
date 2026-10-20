@@ -326,5 +326,5 @@ lock screen is unchanged until merged and installed with scripts/tahoe-lockscree
   - scripts/tahoe-lockscreen.sh on, run from this commit in a sandbox (temporary HOME, memory
     settings): check-shared in sync (tahoe-gdm present), installed copy identical. Local main is
     contained in this branch, so merging is a fast-forward;
-  - open, the user's call: today's event titles on the lock screen (WIDGET_STACK.kinds has
-    'calendar-day'; docs/lockscreen/widget-risks.md hides titles by default).
+  - the user's call (2026-10-20): no event titles on the lock screen; the widget column is the
+    weather and the month calendar only (WIDGET_STACK.kinds).
