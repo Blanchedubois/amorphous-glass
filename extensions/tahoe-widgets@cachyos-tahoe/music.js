@@ -4,6 +4,7 @@
 // .lrc next to a local file, else lrclib.net, fetched once per track and only for the lyrics widget.
 
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Graphene from 'gi://Graphene';
@@ -109,6 +110,11 @@ class Progress {
     }
 }
 
+// The controls' own icons (filled, SF-like): some icon themes draw these with a stroke the shell
+// does not recolour (Tahoe-Material: a light outline that vanishes on dark text)
+const ICONS = GLib.build_filenamev([GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]), 'icons']);
+const icon = name => Gio.FileIcon.new(Gio.File.new_for_path(GLib.build_filenamev([ICONS, `${name}.svg`])));
+
 // previous, play/pause, next
 class Transport {
     constructor(player, size, withSkip = true) {
@@ -117,7 +123,7 @@ class Transport {
             const b = new St.Button({
                 style_class: 'tahoe-music-button',
                 can_focus: false,
-                child: new St.Icon({icon_name: iconName, icon_size: size}),
+                child: new St.Icon({gicon: icon(iconName), icon_size: size}),
             });
             b.connect('clicked', () => player.call(method));
             this.actor.add_child(b);
@@ -131,7 +137,7 @@ class Transport {
     }
 
     update(state) {
-        this._play.child.icon_name = state?.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
+        this._play.child.gicon = icon(state?.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic');
         this._play.reactive = Boolean(state);
         if (this._prev) {
             this._prev.reactive = Boolean(state?.canPrev);
@@ -172,7 +178,7 @@ class LyricsView {
         });
         this.actor.add_child(this._column);
         // on the viewport, not the column: the glass is rendered only for the part on screen
-        this.actor.add_effect_with_name('tahoe-lyrics-glass', new GlassInkEffect(0.45));
+        this.actor.add_effect_with_name('tahoe-lyrics-glass', new GlassInkEffect(0.62));
         // the column is as wide as the view; its height follows the wrapped lines
         this.actor.connect('notify::width', () => (this._column.width = this.actor.width));
         // once laid out (or reflowed), every line is placed again without animation

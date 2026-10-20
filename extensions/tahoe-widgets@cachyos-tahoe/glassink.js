@@ -24,22 +24,22 @@ const SHADER = `
     }
     vec3 ink = t.rgb / t.a;
     // the coverage slope: points into the stroke, long at the edge, ~0 inside
-    vec2 dx = vec2(gi_px_x, 0.0), dy = vec2(0.0, gi_px_y);
+    vec2 dx = vec2(0.6 * gi_px_x, 0.0), dy = vec2(0.0, 0.6 * gi_px_y);   // a thin rim
     vec2 g = vec2(texture2D(cogl_sampler0, uv + dx).a - texture2D(cogl_sampler0, uv - dx).a,
                   texture2D(cogl_sampler0, uv + dy).a - texture2D(cogl_sampler0, uv - dy).a);
     float gl = length(g);
     vec2 n = gl > 0.001 ? g / gl : vec2(0.0);
-    float edge = clamp(gl * 1.5, 0.0, 1.0);
+    float edge = clamp(gl * 1.1, 0.0, 1.0);
     vec2 light = normalize(vec2(-0.55, -1.0));          // from the top left
     float lit = max(dot(-n, light), 0.0);
     float shade = max(dot(n, light), 0.0);
     // the all-round rim glow is for light ink; dark ink keeps only the lit side, for contrast
-    float glow = 0.06 + 0.24 * dot(ink, vec3(0.2126, 0.7152, 0.0722));
-    vec3 c = mix(ink, vec3(1.0), edge * (glow + 0.70 * lit));
-    c *= 1.0 - 0.30 * edge * shade;
+    float glow = 0.03 + 0.10 * dot(ink, vec3(0.2126, 0.7152, 0.0722));
+    vec3 c = mix(ink, vec3(1.0), edge * (glow + 0.38 * lit));
+    c *= 1.0 - 0.12 * edge * shade;
     // dark glass needs a fuller body than light glass to read on a mid-tone swirl
-    float fill = mix(min(gi_fill + 0.32, 1.0), gi_fill, smoothstep(0.2, 0.7, dot(ink, vec3(0.2126, 0.7152, 0.0722))));
-    float a = t.a * mix(fill, 1.0, edge * (0.45 + 0.55 * lit));
+    float fill = mix(min(gi_fill + 0.25, 1.0), gi_fill, smoothstep(0.2, 0.7, dot(ink, vec3(0.2126, 0.7152, 0.0722))));
+    float a = t.a * mix(fill, 1.0, edge * (0.20 + 0.30 * lit));
     cogl_color_out = vec4(c * a, a) * cogl_color_in.a;
 `;
 
