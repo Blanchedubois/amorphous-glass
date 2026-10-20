@@ -17,9 +17,9 @@ import {Swirl} from './swirl.js';
 // lyrics motion
 const DIM = 125;          // opacity of the lines not being sung (of 255)
 const LINE_SCALE = 0.84;  // size of the lines not being sung
-const DRIFT_MS = 900;     // a line drifting up to its new place
-const GROW_MS = 650;      // a line growing (the new one) or shrinking (the old one)
-const STAGGER_MS = 55;    // each line below starts this much after the one above it
+const DRIFT_MS = 480;     // a line drifting up to its new place
+const GROW_MS = 340;      // a line growing (the new one) or shrinking (the old one)
+const STAGGER_MS = 28;    // each line below starts this much after the one above it
 const STAGGER_LINES = 6;
 const NEAR = 10;          // lines further than this from the sung one are not drawn
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up
@@ -257,10 +257,10 @@ class LyricsView {
             }
             // the lines from the one above the sung one downwards start one after another
             const delay = Math.min(STAGGER_LINES, Math.max(0, away + 1)) * STAGGER_MS;
-            l.ease({translation_y: y, duration: DRIFT_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+            l.ease({translation_y: y, duration: DRIFT_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_QUART});
             l.ease({
                 scale_x: scale, scale_y: scale, opacity,
-                duration: GROW_MS, delay: current ? delay + 60 : delay,
+                duration: GROW_MS, delay: current ? delay + 30 : delay,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         });
