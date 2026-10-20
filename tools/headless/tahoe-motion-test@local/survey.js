@@ -74,6 +74,26 @@ export async function runSurvey(write) {
 
     await sleep(1500);
     await step('01-desktop', () => null);
+    // the dock's app name: the pointer over the first dock icon
+    await step('01b-dock-label', async () => {
+        const icon = (() => {
+            const stack = [Main.uiGroup];
+            while (stack.length) {
+                const a = stack.pop();
+                if (a.constructor?.name?.includes('AppIcon') && a.mapped && a.reactive)
+                    return a;
+                stack.push(...a.get_children());
+            }
+            return null;
+        })();
+        if (!icon)
+            return 'no dock icon';
+        const [x, y] = icon.get_transformed_position();
+        const [w, h] = icon.get_transformed_size();
+        mouse.notify_absolute_motion(t(), x + w / 2, y + h / 2);
+        return null;
+    }, 1600);
+    mouse.notify_absolute_motion(t(), 1200, 700);
     await step('02-overview', () => Main.overview.show(), 1200);
     await step('04-app-grid', () => {
         Main.overview.dash?.showAppsButton?.set_checked(true);
@@ -144,8 +164,22 @@ export async function runSurvey(write) {
         Main.osdWindowManager.showAll(Gio.ThemedIcon.new('audio-volume-medium-symbolic'), 'Volume', 0.6);
     }, 400);
     await step('13-run-dialog', () => Main.openRunDialog(), 900);
+    try {
+        const find = (a, test) => { const st = [a]; while (st.length) { const x = st.pop(); if (test(x)) return x; st.push(...x.get_children()); } return null; };
+        const entry = find(Main.layoutManager.modalDialogGroup, a => a.has_style_class_name?.('run-dialog-entry'));
+        const chain = [];
+        for (let a = entry; a && chain.length < 6; a = a.get_parent()) chain.push(`${a.constructor.name}.${a.get_style_class_name?.() ?? ''}:${a.get_style_pseudo_class?.() ?? ''}`);
+        const node = entry?.get_theme_node();
+        const c = node?.get_background_color();
+        write({ survey: 'run-entry', chain, bg: c ? [c.red, c.green, c.blue, c.alpha] : null, border: node ? [node.get_border_width(0), node.get_border_width(1)] : null, radius: node?.get_border_radius(0), style: entry?.get_style() });
+    } catch (e) { write({ survey: 'run-entry', error: `${e}` }); }
     await key(Clutter.KEY_Escape);
     await step('14-screenshot-ui', () => Main.screenshotUI?.open(), 1500);
+    try {
+        const st = [Main.screenshotUI]; const out = [];
+        while (st.length) { const a = st.pop(); const c = a.get_style_class_name?.() ?? ''; if (/shot-cast/.test(c)) { const n = a.get_theme_node(); const b = n.get_background_color(); out.push(`${a.constructor.name}.${c}:${a.get_style_pseudo_class?.() ?? ''} bg ${[b.red, b.green, b.blue, b.alpha]}`); } st.push(...a.get_children()); }
+        write({ survey: 'shot-cast', out });
+    } catch (e) { write({ survey: 'shot-cast', error: `${e}` }); }
     await key(Clutter.KEY_Escape);
     await sleep(600);
     await step('15-banner', () => Main.notify('Liquid Glass survey', 'A notification banner over the desktop'), 900);

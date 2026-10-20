@@ -1099,7 +1099,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..a18dd65 100644
+index 0dce45a..6dcf49b 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1108,8 +1108,15 @@ index 0dce45a..a18dd65 100644
  
  import { has_any_style_class, is_internal_actor } from './actors.js';
  
-@@ -9,6 +10,17 @@ const POPUP_TARGET_STYLE_CLASSES = [
+@@ -6,9 +7,24 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
+ const POPUP_TARGET_STYLE_CLASSES = [
+     'popup-menu-content', 'quick-settings', 'quick-toggle-menu', 'notification-banner',
+     'candidate-popup-content', 'screenshot-ui-panel', 'bms-keyboard-surface',
++    // tahoe glass: the dock's app name on hover, a glass capsule
++    'dash-label',
  ];
++// tahoe glass: capsules whatever their height
++const CAPSULE_STYLE_CLASSES = ['dash-label'];
  const POPUP_CHILD_STYLE_CLASSES = ['osd-window', 'resize-popup', 'switcher-list', 'workspace-switcher', 'modal-dialog', 'run-dialog', 'clipboard-dialog'];
  const POPUP_DESCENDANT_TARGET_STYLE_CLASSES = ['switcher-list'];
 +// Quick settings without a card: each toggle, slider, system button and opened
@@ -1126,7 +1133,7 @@ index 0dce45a..a18dd65 100644
  
  export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
  export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
-@@ -95,6 +107,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -95,6 +111,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
  
          const box = actor._delegate?.box;
@@ -1142,7 +1149,7 @@ index 0dce45a..a18dd65 100644
          if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
              targets.add(box);
  
-@@ -143,6 +164,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -143,6 +168,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
                  }
              }
  
@@ -1154,7 +1161,7 @@ index 0dce45a..a18dd65 100644
              if (this.is_blur_target_actor(child)) {
                  targets.add(child);
                  continue;
-@@ -152,6 +178,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -152,6 +182,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
      }
  
@@ -1180,13 +1187,15 @@ index 0dce45a..a18dd65 100644
      push_children(stack, children) {
          for (let index = children.length - 1; index >= 0; index--)
              stack.push({ actor: children[index], fallback_count: null });
-@@ -167,6 +212,10 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -167,6 +216,12 @@ export const PopupBlurTargets = class PopupBlurTargets {
      }
  
      get_corner_radius(target, root_actor) {
 +        if ((this.has_any_style_class(target, QUICK_SETTINGS_ROUND_STYLE_CLASSES)
 +            || target instanceof QuickMenuToggle)
 +            && !this.has_any_style_class(target, ['quick-toggle-menu']))
++            return ROUND_CORNER_RADIUS;
++        if (this.has_any_style_class(target, CAPSULE_STYLE_CLASSES))
 +            return ROUND_CORNER_RADIUS;
          return POPUP_CORNER_RADII.find(radius =>
              has_any_style_class(target, radius.style_classes)
@@ -2022,6 +2031,66 @@ index 43e8d18..8b260ad 100644
              { type: Type.I, name: "corner-radius" },
              { type: Type.I, name: "rounded-corners" },
              { type: Type.I, name: "menu-corner-radius" },
+diff --git a/src/styles/popup/dark.css b/src/styles/popup/dark.css
+index 74ca270..0e1a86e 100644
+--- a/src/styles/popup/dark.css
++++ b/src/styles/popup/dark.css
+@@ -416,3 +416,15 @@
+ .bms-popup-background-dark StEntry StLabel.hint-text {
+     color: rgba(255, 255, 255, 0.5) !important;
+ }
++
++/* tahoe glass: the run dialog's field, Spotlight's glass bar: a light tint and the 1 px glass
++   edge, brighter when focused; no accent ring (docs/gnome-tahoe/glass-everywhere-workshop.md) */
++.bms-popup-background-dark .run-dialog-entry {
++    background-color: rgba(255, 255, 255, 0.06) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
++}
++
++.bms-popup-background-dark .run-dialog-entry:focus {
++    background-color: rgba(255, 255, 255, 0.12) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 0 rgba(255, 255, 255, 0.22) !important;
++}
+diff --git a/src/styles/popup/light.css b/src/styles/popup/light.css
+index 51d8147..6856bb3 100644
+--- a/src/styles/popup/light.css
++++ b/src/styles/popup/light.css
+@@ -417,3 +417,15 @@
+ .bms-popup-background-light StEntry StLabel.hint-text {
+     color: rgba(0, 0, 0, 0.4) !important;
+ }
++
++/* tahoe glass: the run dialog's field, Spotlight's glass bar: a light tint and the 1 px glass
++   edge, brighter when focused; no accent ring (docs/gnome-tahoe/glass-everywhere-workshop.md) */
++.bms-popup-background-light .run-dialog-entry {
++    background-color: rgba(255, 255, 255, 0.30) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25) !important;
++}
++
++.bms-popup-background-light .run-dialog-entry:focus {
++    background-color: rgba(255, 255, 255, 0.45) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.22) !important;
++}
+diff --git a/src/styles/popup/transparent.css b/src/styles/popup/transparent.css
+index b2deac0..938aad3 100644
+--- a/src/styles/popup/transparent.css
++++ b/src/styles/popup/transparent.css
+@@ -414,3 +414,15 @@
+ .bms-popup-background-transparent StEntry StLabel.hint-text {
+     color: rgba(255, 255, 255, 0.5) !important;
+ }
++
++/* tahoe glass: the run dialog's field, Spotlight's glass bar: a light tint and the 1 px glass
++   edge, brighter when focused; no accent ring (docs/gnome-tahoe/glass-everywhere-workshop.md) */
++.bms-popup-background-transparent .run-dialog-entry {
++    background-color: rgba(255, 255, 255, 0.06) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
++}
++
++.bms-popup-background-transparent .run-dialog-entry:focus {
++    background-color: rgba(255, 255, 255, 0.12) !important;
++    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 0 rgba(255, 255, 255, 0.22) !important;
++}
 diff --git a/src/styles/tahoe-glass.css b/src/styles/tahoe-glass.css
 new file mode 100644
 index 0000000..1a37135
