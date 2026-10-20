@@ -1,6 +1,8 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phase 0 (plan and mockups), waiting for your picks.** Two new widgets, "Calendar:
+**Status: Phase 1 done (link and fetch); Phase 2 (parsing) next.** Your picks: small layout A,
+Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
+week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
 way, which fits most of the iOS Calendars widget). Both show what is left of today from your Google Calendar's
 private ICS address. The existing Calendar widgets (Evolution Data Server) stay as they are.
@@ -155,7 +157,7 @@ Event rules in the helper:
 **Fetching (`icsfeed.js`, one client for all Schedule widgets, made once per shell session like
 the weather client, timers stopped when the last widget goes):**
 - Soup 3 `send_and_read_async` on its own `Soup.Session` (timeout 20 s, a user agent, at most
-  5 MB), with `If-None-Match` and `If-Modified-Since`; 304 keeps the cache. `webcal://` becomes
+  16 MB), with `If-None-Match` and `If-Modified-Since`; 304 keeps the cache. `webcal://` becomes
   `https://`; plain `http://` is allowed for localhost only (the tests).
 - Every 15 min (with up to 60 s jitter), at start, on resume from suspend (logind
   `PrepareForSleep`, through the shell's `LoginManager`) and when the network comes back
@@ -170,6 +172,29 @@ no seconds). It filters the in-memory list for today, picks up to 3 rows and bui
 from them; the labels change only when the key changes. No file reads, no network, no parsing on
 the tick. Under a fullscreen window the extension does not tick at all, as for the other widgets.
 Midnight is a key change (new day), so the list rolls over on the first tick after 00:00.
+
+## Phase 1: what was built (2026-10-20)
+
+- `scripts/tahoe-widgets.sh calendar-url`: hidden prompt (or a pipe), checks for an `https://` or
+  `webcal://` address, stores it with `secret-tool` through stdin (never an argument), else in
+  `calendar-url` (0600), clears the other store and the old calendar's cache, and writes
+  `calendar-source` (`store=keyring|file|none`, 0600), which the widgets watch. `--file` forces the
+  file, `--clear` forgets the link and the cache; `status` says where the link is.
+- `icsfeed.js`: one feed per shell session (`acquireFeed()`, `release()`); signals
+  `status-changed` and `data-changed`; `status` (none, locked, loading, ok, offline, invalid),
+  `updated` (last good answer), `hasCopy`, `cacheFile`. The keyring is searched with
+  `LOAD_SECRETS` and without `UNLOCK`, so a locked keyring gives `locked`, never a prompt; the
+  libsecret proxy is dropped after each lookup. A whole request has a 20 s deadline of its own
+  (Soup's timeout is per read). `message.status_code`, not `get_status()`, which throws on codes
+  Soup has no name for (429). Cache writes are `GLib.Bytes` through `write_bytes_async` (a plain
+  array given to `write_all_async` is not kept alive by GJS).
+- Test: `bash tools/widgets-stress/ics-feed-test.sh OUT` (headless shell, `widget-ics@local`,
+  `ics-server.py` on 127.0.0.1, a throwaway keyring with `TEST_KEYRING=1` in `run.sh`). 25 checks:
+  no link, file link, private cache (0600 files, 0700 folder), validators sent and 304, 500 with
+  backoff, recovery on network change, resume from suspend, at most one try a minute, 429 with
+  Retry-After, a dropped connection, a sign-in page with 200, 404, over 16 MB, a server that never
+  answers (gives up at 20 s), a new link drops the old validators, release and re-acquire,
+  keyring link, locked keyring with no prompt. It fails if the link's test marker shows in a log.
 
 ## Phases (one commit each, on this branch)
 

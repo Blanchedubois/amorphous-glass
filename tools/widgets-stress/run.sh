@@ -52,7 +52,12 @@ out += ['[org/gnome/shell]',
         'icon-theme=' + os.environ.get('ICON_THEME', "'Adwaita'")]
 open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
-timeout ${SHOT_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "wshot-$$" \
+# TEST_KEYRING=1: a throwaway keyring for this test session, unlocked with a test password, in
+# the test's own data folder and D-Bus session (never PAM, never the real keyring). It is started
+# before the shell so nothing in the session starts an empty one first.
+pre=()
+[ "${TEST_KEYRING:-0}" = 1 ] && pre=(sh -c 'printf test-only-pw | gnome-keyring-daemon --unlock --components=secrets >/dev/null; gnome-keyring-daemon --start --components=secrets >/dev/null; exec "$@"' sh)
+timeout ${SHOT_TIMEOUT:-60} dbus-run-session -- "${pre[@]}" gnome-shell --headless --wayland --no-x11 --wayland-display "wshot-$$" \
   --virtual-monitor 2560x1440@60 > "$out/shell.log" 2>&1 || true
 # the test session's document portal mounts a FUSE file system in its runtime dir
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
