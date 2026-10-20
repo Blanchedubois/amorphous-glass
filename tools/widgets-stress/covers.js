@@ -47,15 +47,15 @@ for (const [name, draw] of Object.entries(covers)) {
     cr.$dispose();
 }
 if (flag === '--palettes') {
-    const ext = GLib.build_filenamev([GLib.path_get_dirname(System.programPath), '..', '..', 'extensions', 'tahoe-widgets@cachyos-tahoe', 'swirl.js']);
-    const {coverPalette, modePalette, labToRgb} = await import(`file://${ext}`);
+    const ext = GLib.build_filenamev([GLib.path_get_dirname(System.programPath), '..', '..', 'extensions', 'tahoe-widgets@cachyos-tahoe', 'palette.js']);
+    const {coverPalette, swirlPalette, wantsDarkInk, labToRgb} = await import(`file://${ext}`);
     const hex = c => `#${c.map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
     for (const name of [...Object.keys(covers), 'missing']) {
         const t = GLib.get_monotonic_time();
         const lab = await coverPalette(name === 'missing' ? null : `file://${out}/${name}.png`);
         const ms = (GLib.get_monotonic_time() - t) / 1000;
         print(`${name.padEnd(8)} ${ms.toFixed(1).padStart(5)} ms  cover: ${(lab ?? []).map(c => hex(labToRgb(c))).join(' ') || '-'}`);
-        for (const mode of ['dark', 'milky', 'light'])
-            print(`         ${mode.padEnd(6)} ${modePalette(lab, mode).map(hex).join(' ')}`);
+        const pal = swirlPalette(lab);
+        print(`         swirl  ${pal.map(hex).join(' ')}  ink ${wantsDarkInk(pal) ? 'dark' : 'white'}`);
     }
 }

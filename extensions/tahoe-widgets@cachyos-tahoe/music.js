@@ -201,6 +201,13 @@ class MusicWidget {
         });
         this._player = acquirePlayer();
         this._swirl = new Swirl();
+        // the text follows the swirl's colours (light covers: dark text), not the glass mode
+        this._swirl.onInk = dark => {
+            this.actor.remove_style_class_name('tahoe-music-ink-dark');
+            this.actor.remove_style_class_name('tahoe-music-ink-white');
+            if (dark !== null)
+                this.actor.add_style_class_name(dark ? 'tahoe-music-ink-dark' : 'tahoe-music-ink-white');
+        };
         this._title = ellipsized('tahoe-music-title');
         this._artist = ellipsized('tahoe-widget-secondary tahoe-music-artist');
         this._build();
