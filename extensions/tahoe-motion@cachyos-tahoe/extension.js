@@ -418,7 +418,6 @@ export default class TahoeMotion extends Extension {
         this.patchSubmenus();
         if (this.isQuickSettings(boxPointer))
             this._icons?.track(Main.panel.statusArea.quickSettings.menu);
-        const closing = this._morphs.get(boxPointer)?.opening === false;
         // where it opens from is read after GNOME has laid the menu out (frame two): reading an
         // actor's place on screen now would make Clutter lay the stage out early and place the
         // menu at its previous source (found in the right-click test: one click behind)
@@ -426,26 +425,27 @@ export default class TahoeMotion extends Extension {
         const origin = () => stageRect(source);
         const previous = this.takeOver(boxPointer, originKey(source));
         boxPointer.remove_all_transitions();
-        // a menu reopened while its close still played counts as closed (user: "setting the drop
-        // down closed while the animation is fading out"): hidden first, so GNOME places it at its
-        // new source (a right-click elsewhere) instead of laying it out where it still was
-        if (closing && previous.size === 0 && boxPointer.visible) {
-            boxPointer.hide();
-            boxPointer._sourceActor?.get_parent()?.queue_relayout();
-        }
+        // (never hide it here to reset it: GNOME has just grabbed input on it, and hiding it drops
+        // the grab, after which no click outside closes it: a menu stuck open)
         boxPointer.set({ opacity: 255, translation_x: 0, translation_y: 0, scale_x: 1, scale_y: 1 });
         boxPointer._muteKeys.enabled = false;
+        // it takes clicks at once: GNOME mutes a popup until its (150 ms) animation is over, and
+        // with a longer one a click outside it or a right-click elsewhere was swallowed (the menu
+        // looked stuck; reproduced with real clicks in the headless shell)
+        boxPointer._muteInput.enabled = false;
         boxPointer.show();
         const morph = new Morph(boxPointer, true, {
             origin,
             originKey: originKey(source),
             pieces: this.piecesOf(boxPointer, previous),
             quickSettings: this.isQuickSettings(boxPointer),
-            // sliding in from another menu: the pour only partly plays (it starts half poured)
+            // sliding in from another menu: the pour only partly plays (it starts half poured), and
+            // its glass is frozen only once the menu left behind has gone: frozen at once, it kept
+            // that menu printed in its backdrop
             partial: quick,
+            hold: quick ? 'late' : true,
             onDone: () => {
                 this._morphs.delete(boxPointer);
-                boxPointer._muteInput.enabled = false;
                 onComplete?.();
             },
         });
