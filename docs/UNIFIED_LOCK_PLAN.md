@@ -204,3 +204,13 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
     of it now; measured: full semicircles with the rim all round;
   - tests: live pid (card and swirl), dead pid (plain picture, no card), the glass fault (GNOME's
     login screen back, no warnings), 1280x720, 2560x1440, 3440x1440.
+- 2026-10-20, the login screen showed no glass on the real machine (the user): the extension never
+  loaded there, silently (no tahoe-gdm line in the greeter's journal; GNOME's empty-banner
+  warning, which the extension removes, still logged). The installed files and the system
+  settings were right: a login shell with the real `gdm` profile and the /usr/share copy loads it
+  (state ACTIVE). The difference is GDM's dynamic gdm-greeter account, whose own settings
+  (/var/lib/gdm/seat0/config, root only; migrated 2026-10-18) come before the system ones.
+  Reproduced: `disable-user-extensions=true` in the account's settings gives exactly that silent
+  no-load (state INITIALIZED, enabled false). Fix: every key the install sets is locked
+  (/etc/dconf/db/gdm.d/locks), so the account's settings cannot override them; with the locks the
+  same planted value is refused and the extension is ACTIVE.
