@@ -186,6 +186,7 @@ async function runQs() {
     write({ label: 'qs-pieces', glass: pieceDump, toggles, pointer: menu._boxPointer ? { tx: menu._boxPointer.translation_x, ty: menu._boxPointer.translation_y, o: menu._boxPointer.opacity } : null });
     write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
     { const t = []; const w = (a, d) => { if (d > 4) return; t.push(`${'  '.repeat(d)}${a.constructor.name}${a.name ? '#' + a.name : ''}.${a.style_class ?? ''} ${box(a)} bin=${!!a.bin}`); a.get_children().forEach(c => w(c, d + 1)); }; w(menu.actor, 0); write({ label: 'qs-tree', t }); }
+    { const t = []; const w = (a, d) => { t.push(`${'  '.repeat(d)}${a.constructor.name}.${a.style_class ?? ''} ${box(a)} vis=${a.visible} op=${a.opacity}`); a.get_children().forEach(c => w(c, d + 1)); }; const first = (a => { let f = null; const s = x => { if (!f && x.has_style_class_name?.('quick-toggle-has-menu')) f = x; x.get_children().forEach(s); }; s(a); return f; })(menu.box); if (first) w(first, 0); write({ label: 'qs-split', t }); }
     await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);
     qs.menu.close(false);
     await sleep(500);

@@ -116,8 +116,8 @@
 }
 
 /* GNOME's menus on frosted glass (menus.js): no fill, border or shadow of their own */
-.tahoe-gdm-glass-menus .popup-menu-content,
-.tahoe-gdm-glass-menus .candidate-popup-content {
+#uiGroup.tahoe-gdm-glass-menus .popup-menu-content,
+#uiGroup.tahoe-gdm-glass-menus .candidate-popup-content {
   background-color: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -125,46 +125,97 @@
 /* inside a glass menu, GNOME's dark grey fills read as holes in the glass: clear for the calendar's
    days, headings and month label, a light translucent fill for buttons and off toggles; today and
    the on toggles keep the accent colour */
-.tahoe-gdm-glass-menus .calendar .calendar-day,
-.tahoe-gdm-glass-menus .calendar .calendar-day-heading,
-.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label {
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-day,
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-day-heading,
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label {
   background-color: transparent;
 }
-.tahoe-gdm-glass-menus .calendar .calendar-day:hover,
-.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label:hover,
-.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button:hover {
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-day:hover,
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-month-header .calendar-month-label:hover,
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button:hover {
   background-color: rgba(255, 255, 255, 0.14);
 }
-.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button,
-.tahoe-gdm-glass-menus .quick-toggle-menu .header .icon {
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-month-header .pager-button,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-menu .header .icon {
   background-color: rgba(255, 255, 255, 0.12);
 }
-/* the system menu's pieces are each their own glass (menus.js): no fill of their own, a light one
-   on hover; their capsule shape matches the glass */
-.tahoe-gdm-glass-menus .quick-settings .icon-button,
-.tahoe-gdm-glass-menus .quick-toggle,
-.tahoe-gdm-glass-menus .quick-slider,
-.tahoe-gdm-glass-menus .quick-toggle-menu {
-  background-color: transparent;
-  box-shadow: none;
-}
-.tahoe-gdm-glass-menus .quick-toggle-menu { border-radius: 32px; }
-.tahoe-gdm-glass-menus .quick-toggle:hover,
-.tahoe-gdm-glass-menus .quick-settings .icon-button:hover {
-  background-color: rgba(255, 255, 255, 0.12);
-}
-.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today {
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today {
   background-color: -st-accent-color;
 }
-.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today:hover {
+#uiGroup.tahoe-gdm-glass-menus .calendar .calendar-day.calendar-today:hover {
   background-color: st-lighten(-st-accent-color, 6%);
 }
-/* an on toggle: the accent colour, white text (dark mode on both screens; the desktop's shell
-   theme draws it white on the lock screen, overridden there too) */
-.tahoe-gdm-glass-menus .quick-toggle:checked {
-  background-color: -st-accent-color;
-  color: #ffffff;
+/* The system menu (and the accessibility menu) as the desktop's own (config/gnome-shell-
+   overrides.css, dark mode; the user, 2026-10-20: "closer to the OS version"): no card, each
+   toggle, slider and round button its own capsule of glass (menus.js) with no fill of its own.
+   A split toggle (Wi-Fi, Power Mode) stays clear glass when on, its round icon shows the state
+   (white when on), no line between it and its arrow; a plain toggle that is on is a white pill
+   with the accent colour for its text. Hover and pressed: a light fill. !important: the lock
+   screen's theme (MacTahoe) and GNOME's default both set these. */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu,
+#uiGroup.tahoe-gdm-glass-menus .quick-slider,
+#uiGroup.tahoe-gdm-glass-menus .quick-settings-system-item .icon-button,
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .icon-button,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle-menu-button {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 9999px !important;
+  color: #ffffff !important;
 }
-.tahoe-gdm-glass-menus .quick-toggle:checked:hover {
-  background-color: st-lighten(-st-accent-color, 6%);
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle:hover,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu:hover,
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .icon-button:hover { background-color: rgba(255, 255, 255, 0.12) !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle:active,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu:active,
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .icon-button:active { background-color: rgba(255, 255, 255, 0.18) !important; }
+/* a plain toggle that is on: a white pill, the accent colour for its text and icon */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle:checked {
+  background-color: #ffffff !important;
+  color: -st-accent-color !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle:checked:hover { background-color: #ebebeb !important; }
+/* a split toggle that is on: the pill stays clear glass; its round icon carries the state */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu:checked,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle:checked {
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle .quick-toggle-icon,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-menu .header .icon {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle:hover .quick-toggle-icon,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle-menu-button:hover { background-color: rgba(255, 255, 255, 0.14) !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon {
+  background-color: #ffffff !important;
+  color: -st-accent-color !important;
+}
+/* submenus: glass at 32 (a capsule toggle's end), 16 in, no fill or outline */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-menu {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 32px !important;
+  padding: 16px !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-menu .header { padding: 6px 8px !important; }
+/* a little wider than GNOME's, as the desktop's: the titles beside the round icons fit */
+#uiGroup.tahoe-gdm-glass-menus .popup-menu-content.quick-settings { min-width: 420px !important; }
+/* no divider between a split toggle and its arrow (the desktop has none) */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-separator {
+  background-color: transparent !important;
+  width: 0 !important;
+  border: none !important;
+}
+/* a split toggle's icon in a round circle, as on the desktop */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle .quick-toggle-icon {
+  width: 32px !important;
+  height: 32px !important;
+  icon-size: 18px !important;
+  padding: 0 !important;
 }
