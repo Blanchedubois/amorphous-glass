@@ -61,8 +61,17 @@
 .message:lower-in-stack { background-color: transparent !important; box-shadow: none !important; }
 .datemenu-today-button:hover, .datemenu-today-button:focus { background-color: {{mode.hover}} !important; }
 .datemenu-today-button:active { background-color: {{mode.pressed}} !important; }
-/* The notification list's Clear button: a soft lift, no outline (dropdowns have none). */
-.message-list-clear-button { border: none !important; box-shadow: none !important; background-color: {{mode.card}} !important; }
+/* The notification list's Clear button: a soft lift, no outline (dropdowns have none). A capsule
+   {{calendar.button}} px tall in the card's bottom-left corner, concentric with it: half its height
+   plus the {{calendar.gap}} px gap is the {{calendar.radius}} px corner. The theme puts 7 px round
+   the controls row, so its own padding is the gap less 7 on the left and at the bottom. */
+.message-list-controls { padding-left: 5px !important; padding-bottom: 5px !important; }
+.message-list-clear-button {
+  border: none !important; box-shadow: none !important; background-color: {{mode.card}} !important;
+  border-radius: {{capsule.radius}}px !important;
+  min-height: {{calendar.button}}px !important; height: {{calendar.button}}px !important;
+  padding: 0 18px !important;
+}
 .message-list-clear-button:hover, .message-list-clear-button:focus { background-color: {{mode.hover}} !important; }
 
 /* Quick settings (the Control Center): no card behind the panel, so the
