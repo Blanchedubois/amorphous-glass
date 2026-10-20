@@ -1,0 +1,7 @@
+# files of extensions/tahoe-widgets@cachyos-tahoe that the login screen extension carries as exact
+# copies in its widgets/ folder (installed system-wide, it cannot read anything else): source dest
+weather.js weather.js
+calendar.js calendar.js
+clocks.js clocks.js
+glass.js glass.js
+stylesheet.css widgets.css

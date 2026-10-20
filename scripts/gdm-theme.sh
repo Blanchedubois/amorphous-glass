@@ -99,13 +99,32 @@ PY
   echo "built $OUT/gnome-shell-theme.gresource (base $base, $(stat -c %s "$OUT/gnome-shell-theme.gresource") bytes)"
 }
 
+# the login screen's settings (a dconf keyfile): its clock and colour scheme, no logo, the
+# extension, the weather's location (GDM_WEATHER=1, the default: the user's own location, which
+# anyone at the login screen then sees)
+keyfile() {
+  echo "[org/gnome/desktop/interface]"
+  echo "clock-show-date=false"
+  echo "clock-show-weekday=false"
+  [ -n "${GDM_CLOCK_FORMAT:-}" ] && echo "clock-format='${GDM_CLOCK_FORMAT}'"
+  [ "$(scheme)" = prefer-dark ] && echo "color-scheme='prefer-dark'"
+  echo
+  echo "[org/gnome/login-screen]"
+  echo "logo=''"
+  if [ "${GDM_EXTENSION:-}" = 1 ]; then
+    echo
+    echo "[org/gnome/shell]"
+    echo "enabled-extensions=['tahoe-gdm@cachyos-tahoe']"
+  fi
+  if [ "${GDM_WEATHER:-}" = 1 ]; then
+    echo
+    echo "[org/gnome/shell/weather]"
+    echo "automatic-location=false"
+    echo "locations=$(gsettings get org.gnome.shell.weather locations)"
+  fi
+}
+
 commands() {
-  local fmt="" ext="" cs=""
-  # the login screen in the user's colour scheme (its theme's variant and the glass follow it)
-  [ "$(scheme)" = prefer-dark ] && cs="color-scheme='prefer-dark'\\n"
-  # the login screen's clock format (GNOME's default there is 24 h): as given, else the user's
-  [ -n "${GDM_CLOCK_FORMAT:-}" ] && fmt="clock-format='${GDM_CLOCK_FORMAT}'\\n"
-  [ "${GDM_EXTENSION:-}" = 1 ] && ext="\\n[org/gnome/shell]\\nenabled-extensions=['tahoe-gdm@cachyos-tahoe']\\n"
   if [ "${GDM_FONTS:-}" = 1 ]; then cat <<EOF
 # Space Grotesk for the login screen's clock (SIL Open Font License, so it may be copied)
 sudo install -Dm644 $HOME/.local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf /usr/local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf
@@ -128,7 +147,9 @@ sudo install -m 644 $OUT/gnome-shell-theme.gresource $SYS
 # the time only, and no distribution logo under the prompt (as on the Mac; it sat behind the field)
 printf 'user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n' | sudo tee $DCONF_PROFILE
 sudo mkdir -p /etc/dconf/db/gdm.d
-printf "[org/gnome/desktop/interface]\nclock-show-date=false\nclock-show-weekday=false\n${fmt}${cs}\n[org/gnome/login-screen]\nlogo=''\n${ext}" | sudo tee $DCONF_KEYS
+sudo tee $DCONF_KEYS >/dev/null <<'KEYS'
+$(keyfile)
+KEYS
 sudo dconf update
 # shows at the next logout or boot; the lock screen uses the new file from its next lock
 
@@ -147,7 +168,7 @@ run_part() {
   # the user's choices: the clock as the user's own (12 h shows without AM/PM, as the lock screen),
   # Space Grotesk, the extension
   export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}
-  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1}
+  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1}
   local text part
   text=$(commands)
   case $1 in
@@ -165,6 +186,8 @@ case ${1:-} in
   build) build ;;
   commands) commands ;;
   install)
+    # the extension carries copies of the desktop widgets: refuse to install stale ones
+    bash "$R/tools/gdm/check-shared.sh"
     build   # always from the current checkout: never an older build left in build/gdm
     run_part install
     echo "Installed. The new login screen shows at the next logout or boot." ;;

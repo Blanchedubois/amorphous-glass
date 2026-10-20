@@ -6,8 +6,8 @@
 // - it shows only when GNOME would show its own lock screen media card (the player app's
 //   "Show on lock screen" switch in Settings > Notifications), and GNOME's card is hidden while
 //   it does; on undo GNOME's card is put back by GNOME's own policy check;
-// - nothing goes on the network (widgets/mpris.js refuses while locked): local covers only, no
-//   lyrics; only the previous, play/pause and next buttons react, none takes key focus;
+// - nothing goes on the network but the cover (widgets/mpris.js: the player's own cover URL, the
+//   user's choice), no lyrics; only the previous, play/pause and next buttons react, none takes key focus;
 // - the swirl (and the 1 s progress tick) run only while playing, with animations on, the screen
 //   not dimming and input in the last 30 s (Mutter 51 has no readable monitor power state, and a
 //   screen gone dark is an idle one).
