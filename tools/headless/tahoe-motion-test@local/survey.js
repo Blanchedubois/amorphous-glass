@@ -73,6 +73,16 @@ export async function runSurvey(write) {
     };
 
     await sleep(1500);
+    // TAHOE_SURVEY_GRID=1: only the app grid (GNOME's own dash: run without dash-to-dock)
+    if (GLib.getenv('TAHOE_SURVEY_GRID') === '1') {
+        await step('grid', () => Main.overview.showApps(), 2500);
+        await step('grid-folder', () => {
+            const folder = Main.overview._overview?.controls?._appDisplay?._folderIcons?.[0];
+            folder?.open();
+            return folder ? null : 'no folder';
+        }, 1500);
+        return;
+    }
     await step('01-desktop', () => null);
     // the dock's app name: the pointer over the first dock icon
     await step('01b-dock-label', async () => {
