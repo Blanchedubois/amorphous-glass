@@ -11,6 +11,16 @@
 # without it counted as failed logins and pam_faillock locked the user's account).
 set -eu
 out=$1; mode=${2:-dark}
+# Never pile failures onto the user's real account: the test shell's driver blocks every GDM/PAM
+# conversation, but if a PAM failure was counted in the last 15 minutes anyway, stop here (three
+# within 15 minutes lock the account with pam_faillock).
+if command -v faillock >/dev/null; then
+  recent=$(faillock --user "$USER" 2>/dev/null | awk -v now="$(date +%s)" 'NR>2 { cmd="date -d \""$1" "$2"\" +%s"; cmd | getline t; close(cmd); if (now - t < 900) n++ } END { print n+0 }')
+  if [ "${recent:-0}" -gt 0 ]; then
+    echo "run.sh: $recent PAM failure(s) for $USER in the last 15 min (faillock); not starting a test shell" >&2
+    exit 3
+  fi
+fi
 H=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d -p "${TMPDIR:-/tmp}" lockroot.XXXX)
 mkdir -p "$out"
@@ -79,3 +89,5 @@ sysbus_stop
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
 rm -rf "$root" "$XDG_RUNTIME_DIR"
 echo "done: $(grep -c . "$out/log-$TAHOE_LOCK_TAG.jsonl" 2>/dev/null || echo 0) records"
+# the driver must have cut the shell off from GDM before it locked
+grep -q '"pam-isolated"' "$out/log-$TAHOE_LOCK_TAG.jsonl" 2>/dev/null || { echo "run.sh: the driver did not isolate the test shell from GDM" >&2; exit 4; }
