@@ -1,3 +1,57 @@
+# Music widgets: album-colour swirl (plan, 2026-10-20)
+
+The Music widgets (small, wide, large, lyrics) tint their glass with a slow swirl made from the
+album cover's main colours, the way Apple Music's full-screen lyrics background moves. The glass
+stays glass: blur, rim light, edge shadow and the 1 px edge from `docs/STANDARD.md` still read.
+
+## Phase 0: how Apple Music does it, and the source
+
+Apple Music (and every open clone) does the same few things: take 4 or 5 dominant colours (or the
+cover itself), blur them into a soft field with no hard edges, and let it turn and drift very
+slowly; a new track cross-fades over about a second. A light dither hides banding.
+
+Compared:
+
+| Source | Licence | What it does | Verdict |
+|---|---|---|---|
+| [Steve-xmh/applemusic-like-lyrics](https://github.com/Steve-xmh/applemusic-like-lyrics) (AMLL), `packages/core/src/bg-render` | **AGPL-3.0-only** (all packages, checked at df0d8d8) | Mesh renderer: the cover downscaled to 32 px, on a Bezier patch mesh whose control points drift, rotated, dithered, vignetted. Older Pixi renderer: four rotating copies of the cover, huge blur, 1 s cross-fade. Palette: k-means vs octree in Lab, picked by spread | Best reference, but not GPL-3.0 as assumed: porting its code would put AGPL terms into this repo. Used as the reference for the technique only, no code copied |
+| [Adaptive Palette](https://pub.dev/documentation/adaptive_palette/latest/) (Flutter) | MIT | Layered blurred image shaders on orbital paths, weighted k-means, cross-fade | Same idea; confirms the recipe |
+| [HypnoticCanvas](https://klibs.io/project/mikepenz/HypnoticCanvas) (Compose) | MIT, shaders per their own licences | Mesh gradient shader | Licence per shader unclear: not used |
+| Shadertoy "fluid gradients" | mostly CC BY-NC-SA | | Not GPL compatible |
+
+**Pick:** an original GLSL shader written for this repo (GPL-3.0), after AMLL's technique: four
+colour fields whose centres orbit at different slow rates, a slow overall turn and a light domain
+warp, mixed with Gaussian weights (that is the "heavily blurred mesh"), plus a dither. A
+fragment-only shader with no texture reads beyond the glass. Credits for AMLL (AGPL-3.0,
+technique) and Adaptive Palette (MIT, technique) go in the README.
+
+## Plan
+
+1. **Colour extraction** (`swirl.js`): the cover loaded once per track at 40x40 with GdkPixbuf
+   (async), k-means (k = 5, a fixed seed so a track always gives the same palette) over the
+   opaque pixels; clusters ranked by size and colourfulness, the top 4 kept. Cached per cover.
+   Never per frame. No cover: a neutral grey palette at a lower strength.
+2. **Swirl shader on a still card**: a `Clutter.OffscreenEffect` on the card's glass backdrop
+   (like the glass text clock), so the glass is rendered once into the effect's texture and each
+   swirl frame only re-runs the shader over it (`queue_repaint` on the effect, not the actor).
+3. **Inside the glass**: the swirl colours the glass in a "colour" blend (the glass keeps its
+   own light and dark, so the rim light and the edge shadow stay), plus a smaller pull towards
+   the swirl's lightness, faded out across the refraction band at the edge. The palette is mapped
+   per mode (dark and milky: deep colours under white text; light: pale ones under dark text).
+   The 1 px edge is CSS on the content, over all of it.
+4. **Large**: the cover across the full width inside the 16 px padding (radius 24 - 16 = 8),
+   the widget taller to fit, title, artist, progress with times and controls under it.
+5. **Wide**: 16 px on every side; the cover as tall as the card less the two gaps; title and
+   artist at the top right of the cover; the controls right-aligned at the right of the column
+   with the progress bar under them, level with the cover's bottom edge.
+6. **Lyrics**: the same swirl.
+7. **Performance**: about 24 fps from a GLib timer (the motion is slow; 120 Hz buys nothing), and
+   no timer at all when paused or stopped, hidden or unmapped, under a fullscreen window, locked,
+   or with GNOME animations off (a still gradient then). A track change while paused or with
+   animations off cross-fades only when animations are on, then stops. Checked with
+   `tools/widgets-stress`.
+8. Docs and light/dark screenshots.
+
 # Desktop widgets: stress and impact check (2026-10-19)
 
 `extensions/tahoe-widgets@cachyos-tahoe`, tested in a throwaway headless gnome-shell
