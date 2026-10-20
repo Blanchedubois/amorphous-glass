@@ -1,0 +1,1 @@
+{ "uuid": "gdm-shot@local", "name": "gdm shot", "description": "test", "shell-version": ["51"], "session-modes": ["gdm"] }
