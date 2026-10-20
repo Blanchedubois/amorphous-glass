@@ -72,6 +72,10 @@ const PARTIAL_FROM = 0.97;
 const PARTIAL_ROW_MS = 12;
 const PARTIAL_ROW_SPREAD_MS = 60;
 const PARTIAL_BUTTON_DELAY = 0.3;
+// a late hold freezes the glass after this many frames
+const LATE_HOLD_FRAMES = 3;
+// no animation runs longer than this; one that does is finished and put at rest
+const WATCHDOG_MS = 1500;
 // how long a banner's or app menu's animation waits for its glass to appear
 const LAZY_MS = 150;
 const MORPHING_CLASS = 'tahoe-morphing';
@@ -583,7 +587,8 @@ export class Morph {
         this.step = step;
         this.fadeRoot = fadeRoot;
         this.onDone = onDone;
-        this.held = hold ? glassApi()?.hold(root) ?? false : false;
+        // 'late': after the frames a menu left behind stays up (extension.js, HANDOVER_FRAMES)
+        this.held = hold === true ? glassApi()?.hold(root) ?? false : false;
         this.wantHold = hold;
         this.pieces = [];
         this.last = 0;
@@ -688,7 +693,19 @@ export class Morph {
     }
 
     frame() {
-        this.render(this.timeline.get_elapsed_time() / slowDown());
+        const now = this.timeline.get_elapsed_time() / slowDown();
+        // never left half way, whatever happens: past this, it is at rest
+        if (now > WATCHDOG_MS) {
+            this.finish();
+            return;
+        }
+        try {
+            this.render(now);
+        } catch (e) {
+            // an error must not leave the glass half poured: put the popup at rest
+            console.error(`[tahoe-motion] ${e}\n${e.stack}`);
+            this.finish();
+        }
     }
 
     render(now) {
@@ -697,7 +714,7 @@ export class Morph {
         if (this.lazy && now < LAZY_MS) {
             for (const piece of this.lazy(this.pieces))
                 this.add(piece);
-            if (this.wantHold && !this.held)
+            if (this.wantHold === true && !this.held)
                 this.held = glassApi()?.hold(this.root) ?? false;
         }
         let done = this.pieces.length > 0 || !this.lazy || now >= LAZY_MS;
@@ -705,6 +722,8 @@ export class Morph {
         let ordered = false;
         let spreading = false;
         this.frames = (this.frames ?? 0) + 1;
+        if (this.wantHold === 'late' && !this.held && this.frames > LATE_HOLD_FRAMES)
+            this.held = glassApi()?.hold(this.root) ?? false;
         for (const piece of this.pieces) {
             if (!piece.ready || (piece.fresh && this.opening)) {
                 if (this.frames > 1 && this.prepare(piece)) {
@@ -761,20 +780,33 @@ export class Morph {
     }
 
     finish() {
+        if (this.finished)
+            return;
+        this.finished = true;
         this.stopTimeline();
+        const restore = () => this.pieces.forEach(piece => {
+            try {
+                piece.restore();
+            } catch (e) {
+                console.error(`[tahoe-motion] restore: ${e}`);
+            }
+        });
         if (this.elastic) {
             this.root.set_scale(1, 1);
             delete this.root._tahoe_elastic;
         }
         if (this.opening) {
-            this.pieces.forEach(piece => piece.restore());
+            restore();
             if (this.fadeRoot)
                 this.root.opacity = 255;
         }
-        this.onDone?.();
-        if (!this.opening)
-            this.pieces.forEach(piece => piece.restore());
-        this.release();
+        try {
+            this.onDone?.();
+        } finally {
+            if (!this.opening)
+                restore();
+            this.release();
+        }
     }
 
     /// the popup as it is at rest (an interrupted close that will not be continued)
