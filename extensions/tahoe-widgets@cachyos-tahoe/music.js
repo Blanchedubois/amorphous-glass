@@ -290,25 +290,27 @@ export class MusicSmall extends MusicWidget {
     }
 }
 
-// art at the left; the song and the controls beside it; the progress across the bottom
+// the cover inset 16 px from the top, left and bottom (as tall as the card less two gaps); the
+// song at its top right; the controls right-aligned (their hover circles end on the column's
+// edge, as the progress does), over the progress, which ends level with the cover's bottom edge
 export class MusicMedium extends MusicWidget {
     static size = 'medium';
 
     _build() {
         const top = new St.BoxLayout({style_class: 'tahoe-music-row', y_expand: true});
-        this._art = new Art(96);
+        this._art = new Art(138);   // 170 less 16 px top and bottom
         top.add_child(this._art.actor);
         const info = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
         info.add_child(this._title);
         info.add_child(this._artist);
         info.add_child(new St.Widget({y_expand: true}));
         this._transport = new Transport(this._player, 20);
-        this._transport.actor.x_align = Clutter.ActorAlign.START;
+        this._transport.actor.x_align = Clutter.ActorAlign.END;
         info.add_child(this._transport.actor);
+        this._progress = new Progress(false);
+        info.add_child(this._progress.actor);
         top.add_child(info);
         this.actor.add_child(top);
-        this._progress = new Progress(false);
-        this.actor.add_child(this._progress.actor);
     }
 }
 
