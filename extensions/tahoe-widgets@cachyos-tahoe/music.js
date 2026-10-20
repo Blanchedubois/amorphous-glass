@@ -226,14 +226,15 @@ class LyricsView {
 }
 
 class MusicWidget {
-    constructor() {
+    // options.swirl: passed to the Swirl ({lockScreen, gate}, for the lock screen's copy)
+    constructor(options = {}) {
         this.actor = new St.BoxLayout({
             style_class: 'tahoe-music',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true, y_expand: true,
         });
         this._player = acquirePlayer();
-        this._swirl = new Swirl();
+        this._swirl = new Swirl(options.swirl);
         // the text follows the swirl's colours (light covers: dark text), not the glass mode
         this._swirl.onInk = dark => {
             this.actor.remove_style_class_name('tahoe-music-ink-dark');

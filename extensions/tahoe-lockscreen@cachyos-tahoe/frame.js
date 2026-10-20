@@ -70,8 +70,8 @@ export function versionSupported() {
 }
 
 export class Frame {
-    constructor(stylesheet) {
-        this._stylesheet = stylesheet;  // Gio.File
+    constructor(stylesheets) {
+        this._stylesheets = [].concat(stylesheets);  // Gio.File(s), loaded while the frame runs
         this._undo = [];                // whole-session changes, undone last-in first-out
         this._dialogUndo = [];          // changes tied to the current dialog
         this._dialog = null;
@@ -301,13 +301,14 @@ export class Frame {
     }
 
     _loadStylesheet() {
-        const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
-        theme.load_stylesheet(this._stylesheet);
-        this._undo.push(() => {
-            // the shell carries custom stylesheets over when it reloads the theme, so unload
-            // from whichever theme is current
-            St.ThemeContext.get_for_stage(global.stage).get_theme().unload_stylesheet(this._stylesheet);
-        });
+        for (const sheet of this._stylesheets) {
+            St.ThemeContext.get_for_stage(global.stage).get_theme().load_stylesheet(sheet);
+            this._undo.push(() => {
+                // the shell carries custom stylesheets over when it reloads the theme, so unload
+                // from whichever theme is current
+                St.ThemeContext.get_for_stage(global.stage).get_theme().unload_stylesheet(sheet);
+            });
+        }
     }
 
     // ---- the watchdog ----

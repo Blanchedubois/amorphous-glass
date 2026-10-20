@@ -73,9 +73,10 @@ export function buildLayout(frame, dialog) {
     buildClock(frame, dialog);
     for (const name of GNOME_CLOCK_LABELS)
         frame.set(clock[name], 'visible', false);
-    placePrompt(frame, dialog);
-    buildNowPlaying(frame, dialog, () => primaryBackground(dialog));
-    buildMenuGlass(frame, dialog, (x, y) => backgroundAt(dialog, x, y));
+    let relayout = () => {};
+    const nowPlaying = buildNowPlaying(frame, dialog, () => relayout());
+    relayout = placePrompt(frame, dialog, nowPlaying);
+    buildMenuGlass(frame, dialog);
 }
 
 // ---- the wallpaper: sharp, as the user asked ----
@@ -103,13 +104,6 @@ function primaryBackground(dialog) {
     const monitor = Main.layoutManager.primaryMonitor;
     const backgrounds = [...dialog._backgroundGroup];
     return backgrounds.find(b => b.x === monitor.x && b.y === monitor.y) ?? backgrounds[0] ?? null;
-}
-
-// the background actor under a stage point (for glass on other monitors)
-function backgroundAt(dialog, x, y) {
-    const backgrounds = [...dialog._backgroundGroup];
-    return backgrounds.find(b => x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height) ??
-        primaryBackground(dialog);
 }
 
 // ---- the clock: our own actor over the primary monitor, above GNOME's dialog contents ----
@@ -293,7 +287,7 @@ function buildGlass(frame, dialog, labels) {
 
 // ---- the prompt: GNOME's own, moved down with a translation on its stack ----
 
-function placePrompt(frame, dialog) {
+function placePrompt(frame, dialog, nowPlaying = null) {
     const stack = dialog._stack;
     const mainBox = stack.get_parent();
     const notifications = dialog._notificationsBox;
@@ -304,12 +298,16 @@ function placePrompt(frame, dialog) {
         const height = mainBox.height;
         const avatarTop = Math.round(height * AVATAR_CENTRE - AVATAR_SIZE / 2);
 
-        // GNOME's notifications column (Now Playing is its first card): under the clock, as on the
+        // Now Playing under the clock, then GNOME's notifications column under it, as on the
         // iPhone, when it fits above the prompt; else where GNOME put it, with the prompt above it
+        const gap = Math.round(height * COLUMN_GAP);
+        const underClock = Math.round(height * CLOCK_BOTTOM) + gap;
+        nowPlaying?.place(Main.layoutManager.primaryMonitor, underClock);
+        const columnTop = underClock + (nowPlaying?.height ? nowPlaying.height + gap : 0);
         let moved = false;
         if (notifications?.visible && notifications.height > 0) {
             const box = notifications.get_allocation_box();
-            const top = Math.round(height * (CLOCK_BOTTOM + COLUMN_GAP));
+            const top = columnTop;
             moved = top + box.get_height() <= avatarTop - Math.round(height * COLUMN_GAP);
             frame.setTranslationY(notifications, moved ? top - box.y1 : 0);
         }
@@ -343,4 +341,5 @@ function placePrompt(frame, dialog) {
         frame.connect(notifications, 'notify::visible', place);
     }
     place();
+    return () => frame.guard(place);
 }

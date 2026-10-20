@@ -18,7 +18,8 @@ export default class TahoeLockScreen extends Extension {
         }
         // transactional: whatever start() did before an error is undone, so a failed enable
         // leaves GNOME's lock screen exactly as it was
-        const frame = new Frame(this.dir.get_child('lockscreen.css'));
+        // the desktop widgets' stylesheet first (the Music widget), then ours over it
+        const frame = new Frame([this.dir.get_child('widgets').get_child('widgets.css'), this.dir.get_child('lockscreen.css')]);
         frame.onDialog(buildLayout);
         frame.onDialog(buildMotion);
         try {

@@ -182,9 +182,14 @@ export function swirlFramesRunning() {
 
 // Frames run only while there is something to show moving: playing (or a cross-fade under way),
 // the card mapped, its monitor not under a fullscreen window and no window covering it, not
-// locked, and animations on. Anything else holds a still frame and runs no timer at all.
+// locked (unless built for the lock screen, where its gate decides), and animations on. Anything
+// else holds a still frame and runs no timer at all.
 export class Swirl {
-    constructor() {
+    // lockScreen: the swirl may run while the screen is locked (the lock screen's Music widget);
+    // there no window can cover it, and gate() (if given) decides instead
+    constructor({lockScreen = false, gate = null} = {}) {
+        this._lockScreen = lockScreen;
+        this._gate = gate;
         this._effect = new SwirlEffect();
         this._card = null;
         this._ink = null;
@@ -250,7 +255,11 @@ export class Swirl {
 
     _visible() {
         const actor = this._card?.actor;
-        if (!actor?.mapped || Main.sessionMode.isLocked)
+        if (!actor?.mapped)
+            return false;
+        if (this._lockScreen)
+            return this._gate?.() ?? true;
+        if (Main.sessionMode.isLocked)
             return false;
         const monitor = Main.layoutManager.monitors[this._card.monitorIndex];
         if (!monitor || monitor.inFullscreen)

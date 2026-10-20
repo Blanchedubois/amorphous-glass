@@ -525,51 +525,65 @@ Still to do in Phase 4 (superseded by the next request):
 
 Exit: G1 to G5, with a fake MPRIS player in the harness (the widgets port already has one).
 
-**Result (2026-10-20, overnight, at the user's request "if safe").** `nowplaying.js`:
-- **The card:** GNOME's own `MediaMessage` (from the unlock dialog's notifications box) is
-  restyled in `lockscreen.css`: clear, radius 24, a bigger cover, round glass buttons. Its
-  behaviour stays GNOME's: no click-through to the player, and the per-app "Show on lock screen"
-  switch.
-- **The glass:** under it sits a clone of the lock picture, in our own layer just above the lock
-  background and below GNOME's dialog contents, so it can never cover or take a click. It follows
-  the card's position, its box's translation and the scroll.
-- **The swirl:** the desktop Music widgets' album-colour swirl
-  (`tahoe-widgets/swirl.js`, merged into main as d8a7f2e), with the same shader idea and the same
-  `palette.js`. The lock screen extension carries an exact copy of `palette.js`;
-  `tools/lockscreen/check-shared.sh` fails if the two drift apart, and `tahoe-lockscreen.sh on`
-  refuses a stale copy.
-  - Colours come from local `file://` covers only: nothing is fetched while locked.
-  - Dark text on light covers, as the widgets.
-- **When it animates:** at 25 fps only while playing, with animations on, the screen not dimming,
-  and input within the last 30 s. Mutter 51 has no readable monitor power state (no property and
-  no getter, only a change signal), so idleness stands in: a screen gone dark is an idle one.
-  Measured: 50 paints in 2 s while active, 0 after 35 s idle, 50 again after a key.
-- **Placement:** the notifications column (Now Playing first) moves under the clock, as on the
-  iPhone, when it fits above the prompt. Otherwise it stays where GNOME puts it, with the prompt
-  above it.
-- **Found on the way:** Blur My Shell's stylesheet stays loaded while locked and colours message
-  titles through `.bms-popup-background-*` on the UI group, so the dark-text rules use the same
-  long selectors.
+**Result (2026-10-20).** At the user's choice (the morning after the overnight version, which
+restyled GNOME's own card), Now Playing is **the desktop's wide Music widget**, `nowplaying.js`.
+It is tahoe-widgets' `MusicMedium` in its `GlassCard`:
+- **The glass:** Blur My Shell's Liquid Glass, the same pipeline as on the desktop.
+- **The swirl:** the album-colour swirl.
+- **Placement:** under the clock, centred.
+- **Copies:** the modules it needs (`glass.js`, `mpris.js`, `swirl.js`, `music.js`, `palette.js`)
+  and the widgets' stylesheet are exact copies in the extension's `widgets/` folder.
+  `tools/lockscreen/shared.list` lists them, `sync-shared.sh` copies them, and `check-shared.sh`
+  fails on any drift; `tahoe-lockscreen.sh on` refuses a stale copy.
 
-**Top-right menu (quick settings) glass**, which the user asked for (`menuglass.js`):
-- **Why it was missing:** Blur My Shell's popup glass is off in the lock screen's session mode.
-- **What it does now:** each piece (toggle pills, sliders, round buttons, an open submenu) gets
-  glass of its own, as on the desktop: the lock picture under it, slightly softened, 10 % white,
-  rounded to the piece (capsule, or 32 for a submenu), and the 1 px edge line lit from above. It
-  lives in our own layer just below the menu and follows the menu's open animation.
-- **CSS:** the pills' own fill is all but cleared in `lockscreen.css`; checked toggles keep the
-  theme's fill.
+Rules while locked:
+- **Privacy:** it shows only when GNOME would show its own lock screen media card (the player
+  app's "Show on lock screen" switch). GNOME's card is hidden while it does, and on undo GNOME's
+  own `_applyPolicy()` decides again.
+- **No network:** `mpris.js` now refuses any network call while the screen is locked (a two-line
+  change in tahoe-widgets that does nothing on the desktop). So the lock screen shows local covers
+  only and asks for no lyrics.
+- **Input:** only previous, play/pause and next react. None takes key focus. The widgets manager's
+  drag and right-click menu are not part of it.
+- **Animation:**
+  - `swirl.js` gains an opt-in `{lockScreen, gate}` (off by default; the desktop is unchanged).
+    On the lock screen it runs only while playing, with animations on, the screen not dimming and
+    input in the last 30 s.
+  - Mutter 51 has no readable monitor power state: no property and no getter, only a change
+    signal. So idleness stands in: a screen gone dark is an idle one.
+  - The 1 s progress tick follows the same gate.
+  - Measured: 1 swirl running while active, 0 after 35 s idle, 1 again after a key.
+- **Placement:** the remaining notifications move under Now Playing when they fit above the
+  prompt.
 
-Gates (headless, with a fake MPRIS player, `TAHOE_LOCK_PLAYER=1`):
-- **G1:** the eye and the arrow each hit themselves.
-- **G2:** the own-code faults fail safe with the card shown.
-- **G4:** 30 cycles clean, no JS errors, none of our warnings. Without the extension the same run
-  shows actors 2,579 to 2,619 and memory +24 MB; with it, 2,579 to 2,603 and +28 MB (the font
-  cache warm-up). No leak of ours.
-- **Frame cost while swirling:** stage update p95 1.1 to 1.3 ms, worst 2.6 to 3.8 ms.
-- **Screenshots:** [phase5-lockscreen.png](lockscreen/shots/phase5-lockscreen.png),
-  [phase5-details.png](lockscreen/shots/phase5-details.png).
-- **Visuals:** light and dark, dark text on a light cover, and the menu glass.
+**Top-right menu (quick settings)**, which the user asked for (`menuglass.js`). Blur My Shell's
+popup glass is off in the lock screen's session mode, so each piece gets that same glass here:
+- **What it is:** a wallpaper copy through the desktop dropdowns' own pipeline (`popup/pipeline`,
+  `pipeline_glassbar_menus`), rounded with Blur My Shell's `RoundedPipeline`, as the widgets'
+  `GlassCard` does.
+- **The pieces:** toggle pills, round buttons, sliders, and the submenus that open from the
+  Wi-Fi and Power Mode arrows (radius 32, in the menu's overlay).
+- **The user's corner report, fixed:**
+  - **Cause:** a pill with an arrow is one shape drawn by the outer `QuickMenuToggle`
+    (`quick-toggle-has-menu`), but the first version gave glass to the inner button and arrow
+    separately. That made two capsules and doubled corners.
+  - **Second cause:** the rounding only reads its radius on `update()`, so the first glass came
+    out square.
+  - **Now:** one glass per visible shape, re-rounded when its size changes. Checked at 4×.
+- **Fallback:** without Blur My Shell, the pieces keep a plain translucent fill.
+
+Gates (headless, fake MPRIS player `TAHOE_LOCK_PLAYER=1`):
+- **G1** in light and dark;
+- **G2:** the own-code faults fail safe with the widget shown;
+- **G4:** churn clean;
+- **frame cost;**
+- **visuals:** light and dark, the menu and both submenus.
+
+The numbers are in the latest commit message.
+
+Known and harmless: when a test shell is killed while still locked, Blur My Shell's pipeline
+destroy handlers log "No signal connection" as everything tears down at once. A normal unlock
+logs nothing (checked over 5 and 30 cycles).
 
 ### Phase 6: motion
 

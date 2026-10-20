@@ -1,0 +1,8 @@
+# files of extensions/tahoe-widgets@cachyos-tahoe that the lock screen extension carries as exact
+# copies in its widgets/ folder (an installed extension must be self-contained): source dest
+glass.js glass.js
+mpris.js mpris.js
+swirl.js swirl.js
+music.js music.js
+palette.js palette.js
+stylesheet.css widgets.css
