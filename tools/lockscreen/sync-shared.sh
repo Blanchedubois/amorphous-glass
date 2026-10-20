@@ -5,6 +5,8 @@ set -eu
 R=$(cd "$(dirname "$0")/../.." && pwd)
 mkdir -p "$R/extensions/tahoe-lockscreen@cachyos-tahoe/widgets"
 grep -v '^#' "$(dirname "$0")/shared.list" | while read -r src dest; do
-  [ -n "$src" ] && cp "$R/extensions/tahoe-widgets@cachyos-tahoe/$src" "$R/extensions/tahoe-lockscreen@cachyos-tahoe/widgets/$dest"
+  [ -z "$src" ] && continue
+  from="$R/extensions/tahoe-widgets@cachyos-tahoe/$src"; to="$R/extensions/tahoe-lockscreen@cachyos-tahoe/widgets/$dest"
+  if [ -d "$from" ]; then rm -rf "$to"; cp -r "$from" "$to"; else cp "$from" "$to"; fi
 done
 echo "synced"
