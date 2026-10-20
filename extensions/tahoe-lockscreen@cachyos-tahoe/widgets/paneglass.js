@@ -13,8 +13,10 @@
 // The edge (the user's pick, docs/UNIFIED_LOCK_PLAN.md: C): a crisp 2 px line with a soft 5 px
 // glow inside it, lit from the top left; the shader's rim is the only edge (docs/STANDARD.md).
 //
-// The material follows GNOME's colour scheme: in dark mode a dark tint, as the desktop's dark
-// glass (tokens/glass.json dark chip, #222226), in light mode a little milk.
+// The material: light (a little milk) or dark (a tint as the desktop's dark glass, tokens/glass.json
+// dark chip, #222226). GLASS_LOOK decides: 'light' on both screens, whatever the desktop's mode
+// (the user, 2026-10-20: light and dark glass together looked wrong; the wallpaper stays dark),
+// 'scheme' to follow GNOME's colour scheme, or 'dark'.
 //
 // Behind each pane is the background it sits on (the greeter's picture, or a clone of the lock
 // screen's background actor), placed so its pixels line up with the real one.
@@ -49,7 +51,11 @@ export const MATERIAL = {
     dark: {brightness: -0.02, milk: 0, tint: [34 / 255, 34 / 255, 38 / 255], tintAmount: 0.42},
 };
 
+export const GLASS_LOOK = 'light';
+
 export function darkScheme() {
+    if (GLASS_LOOK !== 'scheme')
+        return GLASS_LOOK === 'dark';
     return St.Settings.get().color_scheme === St.SystemColorScheme.PREFER_DARK;
 }
 
@@ -398,6 +404,27 @@ export const GlassPane = GObject.registerClass({
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const w = Math.round(box.get_width() * scale), h = Math.round(box.get_height() * scale);
         const key = `${w}x${h}`;
+        // a rounded shape has no mask to draw: set at once, so the glass is there on the first
+        // frame (it popped in a frame late on Super+L); a glyph mask is drawn just after the layout
+        if (w > 0 && h > 0 && key !== this._shapeKey && typeof this._radius !== 'object') {
+            try {
+                if (MATERIAL._failForTest)   // set only by tools/gdm (GDM_FAIL_MASK)
+                    throw new Error('test: mask failed');
+                const pad = this._pad * scale;
+                const radius = this._radius === 'capsule' ? h / 2 : Math.min(this._radius * scale, h / 2, w / 2);
+                this._effect.setShape({sdf: true, pad, radius}, w + 2 * pad, h + 2 * pad, scale, darkScheme(), this._material);
+                this._shapeKey = key;
+            } catch (e) {
+                this.failed = `${e}`;
+                // not from inside the layout pass: the owner removes the pane
+                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    this.emit('mask-failed');
+                    return GLib.SOURCE_REMOVE;
+                });
+                this._shapeKey = key;
+            }
+            return;
+        }
         if (w > 0 && h > 0 && key !== this._shapeKey && !this._maskId) {
             // after the layout pass: a mask is drawn with cairo, and the effect's uniforms change
             this._maskId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {

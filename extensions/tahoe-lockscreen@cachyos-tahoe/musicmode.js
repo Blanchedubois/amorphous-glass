@@ -270,6 +270,32 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
     let active = false;
     let coverUri;
     let serial = 0;
+    // At lock, with music already playing, the swirl is there from the start: no fade in from the
+    // picture (that read as a glitch on Super+L, user 2026-10-20). It shows as soon as the cover's
+    // colours are read (a moment: a cached file), or after SETTLE_WAIT without them.
+    const builtAt = GLib.get_monotonic_time() / 1e6;
+    const SETTLE = 2.5;        // s after the lock screen is built: still "at lock"
+    const SETTLE_WAIT = 0.4;   // s: the longest the swirl waits for the colours at lock
+    let jumpTimer = 0;       // the SETTLE_WAIT timeout
+    let jumpPending = false; // waiting for the colours at lock
+    let colorsKnown = false;
+    const jump = () => {
+        jumpPending = false;
+        if (jumpTimer)
+            GLib.source_remove(jumpTimer);
+        jumpTimer = 0;
+        if (!active)
+            return;
+        amount = target = 1;
+        paint();
+        syncFrames();
+    };
+    frame.addUndo(() => {
+        if (jumpTimer)
+            GLib.source_remove(jumpTimer);
+        jumpTimer = 0;
+    });
+
     const update = () => {
         const state = player.state;
         const want = MUSIC_MODE.enabled && nowPlaying.wanted && Boolean(state?.playing);
@@ -277,17 +303,34 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
         const art = state ? player.art(state.artUrl) : null;
         if (art !== coverUri) {
             coverUri = art;
+            colorsKnown = false;
             const mine = ++serial;
             coverPalette(art).then(lab => frame.guard(() => {
                 if (mine !== serial)
                     return;
                 colours = swirlPalette(lab);
+                colorsKnown = true;
                 paint();
+                if (jumpPending)
+                    jump();
             })).catch(() => {});
         }
         if (want !== active) {
             active = want;
             target = active ? 1 : 0;
+            // at lock: straight to the swirl (when the colours are known, or shortly)
+            if (active && GLib.get_monotonic_time() / 1e6 - builtAt < SETTLE) {
+                if (colorsKnown) {
+                    jump();
+                } else if (!jumpPending) {
+                    jumpPending = true;
+                    jumpTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.round(SETTLE_WAIT * 1000), () => {
+                        jumpTimer = 0;
+                        frame.guard(jump);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+            }
             nowPlaying.setSuppressed(active);
             if (!active)
                 dropCard();

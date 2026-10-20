@@ -19,6 +19,7 @@ import { buildNowPlaying } from './nowplaying.js';
 import { buildMusicMode } from './musicmode.js';
 import { buildWidgetStack } from './widgetstack.js';
 import { buildPromptGlass } from './promptglass.js';
+import { darkScheme } from './widgets/paneglass.js';
 import { buildMenuGlass } from './menuglass.js';
 
 const DIGITS_EM = 0.730;      // Space Grotesk's digit height
@@ -260,14 +261,35 @@ function buildGlass(frame, dialog, labels) {
             glass.actor.set_position(x, y);
             glass.actor.set_size(boxWidth, boxHeight);
             glass.setBackdrop(backgroundOf(), x, y);
-            const dark = interfaceSettings.get_string('color-scheme') === 'prefer-dark';
+            // the clock's glass as every glass surface (paneglass.js GLASS_LOOK: light on both screens)
+            const dark = darkScheme();
             glass.setMask(buildMask(boxWidth * scale, boxHeight * scale, spec, scale),
                 boxWidth * scale, boxHeight * scale, scale, dark, spec.timeSize / (MATERIAL.refSize * scale));
         } catch (e) {
             giveUp(`${e}`);
             return;
         }
-        // hide the plain labels once the glass has really painted; else keep them
+        // hide the plain labels as soon as the glass has painted (until then both showed, the date
+        // and time doubled for about half a second on Super+L, 2026-10-20); not from inside the paint
+        if (labels.opacity !== 0) {
+            glass.effect.onPaint = () => {
+                glass.effect.onPaint = null;
+                let id = GLib.idle_add(GLib.PRIORITY_HIGH_IDLE, () => {
+                    id = 0;
+                    frame.guard(() => {
+                        if (glass && !failed)
+                            labels.opacity = 0;
+                    });
+                    return GLib.SOURCE_REMOVE;
+                });
+                frame.addUndo(() => {
+                    if (id)
+                        GLib.source_remove(id);
+                    id = 0;
+                });
+            };
+        }
+        // and the check that it did: else the plain labels stay (or come back)
         if (verifyId)
             GLib.source_remove(verifyId);
         const before = glass.effect.paints;

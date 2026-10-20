@@ -24,6 +24,7 @@ const GAP = 16;            // between widgets, as on the desktop grid
 const RADIUS = 24;         // tokens/radius.json widget
 const LEFT = 0.045;        // the column's left edge, share of the monitor's width
 const MARGIN = 0.04;       // clear of the monitor's top and bottom, share of its height
+const WEATHER_WAIT = 4000; // ms: the weather shows by then, forecast or not
 
 // backdrop: () => the primary monitor's lock background actor; gate: nowplaying.js' (not idle or dimming)
 export function buildWidgetStack(frame, dialog, backdrop, gate) {
@@ -51,6 +52,34 @@ export function buildWidgetStack(frame, dialog, backdrop, gate) {
         content.add_child(widget.actor);
         actor.add_child(content);
         layer.add_child(actor);
+        // the weather shows once it has its forecast, not "Loading…" first (a flash on Super+L,
+        // 2026-10-20): faded in then, or after WEATHER_WAIT whatever it has
+        const client = widget._client;
+        if (client) {
+            actor.opacity = 0;
+            const show = () => {
+                if (actor.opacity === 0)
+                    actor.ease({opacity: 255, duration: 250, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            };
+            if (client.hasLocation && client.info?.is_valid?.()) {
+                actor.opacity = 255;
+            } else {
+                frame.connect(client, 'changed', () => {
+                    if (client.info?.is_valid?.())
+                        show();
+                });
+                let id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, WEATHER_WAIT, () => {
+                    id = 0;
+                    frame.guard(show);
+                    return GLib.SOURCE_REMOVE;
+                });
+                frame.addUndo(() => {
+                    if (id)
+                        GLib.source_remove(id);
+                    id = 0;
+                });
+            }
+        }
         return {kind, actor, widget};
     });
     frame.addUndo(() => items.forEach(({widget}) => widget.destroy()));

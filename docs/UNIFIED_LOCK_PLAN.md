@@ -171,3 +171,17 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
   side by side the two screens' clocks match (docs/unified/...). The login harness read the
   user's colour scheme after replacing its settings (always light): fixed.
 - Next: the widget column on the login screen, after the user's choices on weather and covers.
+- 2026-10-20 evening, from the user's real Super+L (and a frame-by-frame recording of locking,
+  tools/lockscreen gate `lockvideo`):
+  - music playing at lock: the swirl from the first frame (it faded in over 1.2 s from the
+    picture); covers are fetched while locked (only covers), so new songs get their colours;
+  - the weather card no longer flashes "Loading…": it fades in once the forecast is there;
+  - glass shapes are set during layout, there on the first frame (they came a frame late);
+  - the plain clock labels hid 600 ms after the glass painted, so the date and time were drawn
+    twice at first: now hidden on the glass's first paint (the 600 ms check stays for failures);
+  - all glass light on both screens (paneglass GLASS_LOOK), the wallpaper stays dark (the user:
+    light and dark glass together looked wrong);
+  - the login screen: the widget column (weather from the login screen's own location
+    setting, month), the glass clock.
+  The user's session ran the lock screen installed at 15:25 (started 15:46): today's later fixes
+  load at the next login.
