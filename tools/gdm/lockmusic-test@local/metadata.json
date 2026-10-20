@@ -1,0 +1,1 @@
+{ "uuid": "lockmusic-test@local", "name": "lock screen music mode (test)", "description": "workshop only: while music plays, the lock background becomes the album-colour swirl, the cover sits in the centre and the widgets stack on the left", "shell-version": ["51"], "session-modes": ["unlock-dialog"] }
