@@ -302,14 +302,19 @@
 }
 /* every hover a capsule: result rows, the provider's label, the app results' tiles; the keyboard
    selection the same */
-.list-search-result, .search-provider-icon { border-radius: {{capsule.radius}}px !important; padding: 8px 14px !important; }
+/* the provider's label (icon, name, "13 more") sits in the panel's corner: {{search.provider}} px tall,
+   {{search.gap}} px from the top and the side, so its capsule is concentric with the corner */
+.list-search-result { border-radius: {{capsule.radius}}px !important; padding: 8px 14px !important; }
+.search-provider-icon { border-radius: {{capsule.radius}}px !important; padding: 6px 14px !important; min-height: {{search.provider}}px !important; }
 .list-search-result:hover, .list-search-result:focus, .list-search-result:selected,
 .search-provider-icon:hover, .search-provider-icon:focus, .search-provider-icon:selected { background-color: {{mode.hover}} !important; }
 .list-search-result:active, .list-search-result:checked,
 .search-provider-icon:active, .search-provider-icon:checked { background-color: {{mode.pressed}} !important; }
-/* the app results row: GNOME 51's AppIcon tiles (.overview-tile) in .grid-search-results */
+/* the app results row: GNOME 51's AppIcon tiles (.overview-tile) in .grid-search-results. Hovered or
+   selected, a real glass capsule (the patch's 'tahoe-search-tile', shown only in those states):
+   no fill of their own, the dark edge; pressed a light lift on the glass */
 .grid-search-results .overview-tile { border-radius: {{capsule.radius}}px !important; }
 .grid-search-results .overview-tile:hover, .grid-search-results .overview-tile:focus,
-.grid-search-results .overview-tile:selected { background-color: {{mode.hover}} !important; }
-.grid-search-results .overview-tile:active, .grid-search-results .overview-tile:checked { background-color: {{mode.pressed}} !important; }
+.grid-search-results .overview-tile:selected { background-color: transparent !important; box-shadow: {{mode.dropdown_edge}} !important; }
+.grid-search-results .overview-tile:active, .grid-search-results .overview-tile:checked { background-color: {{mode.hover}} !important; }
 /* end tahoe-overrides */
