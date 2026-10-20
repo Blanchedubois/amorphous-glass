@@ -308,7 +308,12 @@ async function runOurs(kind) {
     const after = { ...frameState(), ...(await usable(dialog)) };
     write({ label: 'ours-after', kind, ...after, stackTranslation: dialog._stack.translation_y, stackOpacity: dialog._stack.opacity,
         promptTranslation: dialog._promptBox.translation_y, promptOpacity: dialog._promptBox.opacity,
-        gnomeClockLabels: ['_time', '_date', '_hint'].map(n => dialog._clock[n].visible).join(',') });
+        gnomeClockLabels: ['_time', '_date', '_hint'].map(n => dialog._clock[n].visible).join(','),
+        // music mode and the glass panes are undone too: no swirl on the backgrounds, no glass
+        // under the password field, no glass style class on the dialog
+        backgroundEffects: [...dialog._backgroundGroup].map(b => b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`).join(',')).join(' | '),
+        promptGlass: dialog._authPrompt?._entryArea?.get_children().filter(c => c.name === 'tahoe-gdm-glass').length ?? null,
+        dialogClasses: dialog.style_class });
     await shotRect('ours', [0, 0, global.screen_width, global.screen_height]);
 }
 

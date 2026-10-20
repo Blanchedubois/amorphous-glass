@@ -193,8 +193,10 @@ export function buildMask(width, height, radius, scale, pad = 0) {
 }
 
 // A pane of glass that fills its parent's slot (in a BinLayout). radius: logical px, or
-// 'capsule' for half the height. backdrop: a Gio.File (the picture, drawn at monitor size) or a
-// Clutter.Actor covering the monitor (cloned, e.g. the lock screen's own background).
+// 'capsule' for half the height. backdrop: a Gio.File (the picture, drawn at monitor size), a
+// Clutter.Actor covering the monitor (cloned, e.g. the lock screen's own background), or a
+// function returning that actor (looked up again at each layout: GNOME rebuilds the lock
+// backgrounds when monitors change, and a clone of the old one would be empty).
 export const GlassPane = GObject.registerClass({
     Signals: {'mask-failed': {}},
 }, class TahoeGdmGlassPane extends St.Widget {
@@ -210,8 +212,10 @@ export const GlassPane = GObject.registerClass({
         // holding the backdrop and running the effect over its own allocation
         this._glass = new St.Widget({reactive: false, clip_to_allocation: true});
         this.add_child(this._glass);
-        this._backdrop = backdrop instanceof Clutter.Actor
-            ? new Clutter.Clone({source: backdrop})
+        this._sourceOf = typeof backdrop === 'function' ? backdrop : null;
+        const actor = this._sourceOf ? this._sourceOf() : backdrop;
+        this._backdrop = this._sourceOf || actor instanceof Clutter.Actor
+            ? new Clutter.Clone({source: actor ?? null})
             : new St.Widget({style: `background-image: url("${backdrop.get_uri()}"); background-size: cover;`});
         this._glass.add_child(this._backdrop);
         this._effect = new GlassEffect();
@@ -288,6 +292,11 @@ export const GlassPane = GObject.registerClass({
         g.set_origin(-PAD, -PAD);
         g.set_size(box.get_width() + 2 * PAD, box.get_height() + 2 * PAD);
         this._glass.allocate(g);
+        if (this._sourceOf) {
+            const current = this._sourceOf();
+            if (current !== this._backdrop.source)
+                this._backdrop.source = current ?? null;
+        }
         // the backdrop lies exactly over the real background, wherever this pane is: a cloned
         // actor at that actor's own place and size (one monitor's lock background); the picture
         // over the whole of the login screen's group, as the theme draws it (any monitor layout)

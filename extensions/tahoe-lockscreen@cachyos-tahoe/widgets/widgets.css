@@ -83,7 +83,15 @@
 .tahoe-widget-music-small .tahoe-widget-content,
 .tahoe-widget-music-medium .tahoe-widget-content,
 .tahoe-widget-music-large .tahoe-widget-content,
-.tahoe-widget-music-lyrics .tahoe-widget-content { padding: 16px; }
+.tahoe-widget-music-lyrics .tahoe-widget-content,
+.tahoe-widget-music-xl-wide .tahoe-widget-content,
+.tahoe-widget-music-xl-tall .tahoe-widget-content { padding: 16px; }
+/* Extra Large: 16 px between the player and the lyrics, bigger lyrics */
+.tahoe-music-xl { spacing: 16px; }
+.tahoe-music-lyrics-xl-wide { margin-top: 0; }
+.tahoe-music-lyrics-xl-wide .tahoe-music-lyric { font-size: 26px; }
+.tahoe-music-lyrics-xl-tall { margin-top: 4px; }
+.tahoe-music-lyrics-xl-tall .tahoe-music-lyric { font-size: 24px; }
 .tahoe-music-row { spacing: 16px; }
 .tahoe-music-art { border-radius: 8px; background-color: rgba(255, 255, 255, 0.12); }
 .tahoe-widget-light .tahoe-music-art { background-color: rgba(0, 0, 0, 0.06); }
@@ -94,7 +102,9 @@
 .tahoe-music-title { font-family: "SF Pro Text", sans-serif; font-size: 16px; font-weight: 700; }
 .tahoe-widget-music-small .tahoe-music-title { font-size: 15px; }
 .tahoe-widget-music-medium .tahoe-music-title { font-size: 17px; }
-.tahoe-music-title-large { font-family: "SF Pro Display", sans-serif; font-size: 22px; padding-top: 12px; }
+.tahoe-music-title-large { font-family: "SF Pro Display", sans-serif; font-size: 22px; }
+.tahoe-music-title-row { spacing: 10px; }
+.tahoe-music-title-row-large { padding-top: 12px; }
 .tahoe-music-artist { font-family: "SF Pro Text", sans-serif; font-size: 14px; font-weight: 500; }
 .tahoe-widget-music-small .tahoe-music-artist { font-size: 13px; }
 .tahoe-music-artist-large { font-size: 16px; }
@@ -111,6 +121,10 @@
 .tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.18); }
 .tahoe-widget-light .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.06); }
 .tahoe-widget-light .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.10); }
+/* the player's app: a plain button, or a badge on the cover's corner (music.js withBadge) */
+.tahoe-music-app { padding: 0; border-radius: 6px; }
+.tahoe-music-app:hover { background-color: transparent; }
+
 /* lyrics: one size for every line in the layout; the lines not being sung are scaled to 0.84
    and dimmed (music.js), so the column never reflows while it drifts. */
 .tahoe-music-lyrics { margin-top: 14px; }   /* margin: a fixed layout ignores padding */

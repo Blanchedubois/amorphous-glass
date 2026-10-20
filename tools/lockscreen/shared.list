@@ -7,3 +7,8 @@ music.js music.js
 palette.js palette.js
 stylesheet.css widgets.css
 icons icons
+weather.js weather.js
+calendar.js calendar.js
+clocks.js clocks.js
+# the Liquid Glass pane (a shader over a shape, no Blur My Shell): the login screen's, shared
+../tahoe-gdm@cachyos-tahoe/glass.js paneglass.js
