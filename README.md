@@ -20,7 +20,7 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `scripts/tahoe-repair.sh` | Runs at login and puts drifted settings back |
 | `scripts/glass-app-ids.py` | Which apps get window glass |
 | `scripts/gnome-setup.sh`, `scripts/sf-fonts.sh` | Base GNOME setup and SF Pro from the user's own Apple download |
-| `extensions/tahoe-widgets@cachyos-tahoe` | Desktop widgets in glass (live) |
+| `extensions/tahoe-widgets@cachyos-tahoe` | Desktop widgets in glass (live): clocks, calendar, weather, music; see Widgets below |
 | `extensions/tahoe-control-center@cachyos-tahoe` | Tahoe Control Center panel (built, switched off) |
 | `extensions/tahoe-menu-bar@cachyos-tahoe` | Tahoe menu bar contents (built, not applied) |
 | `tokens/` | Radius, glass colour and palette tokens (`scripts/glass-tokens.py` reads them) |
@@ -30,6 +30,27 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `docs/GLASS_MENUS_PLAN.md` | Plan for glass menus in GTK apps |
 | `docs/HANDOVER.md` | Where things stand and what to standardise next |
 | `tools/` | Frame probe extension and A/B script used to measure menu smoothness |
+
+## Widgets
+
+Right-click the desktop for Add Widget; drag to move, it snaps to an 8 px grid. Sizes are Tahoe's:
+small 170, medium 356 x 170, large 356 x 356 (logical px), all on the 24 px glass card of
+`docs/STANDARD.md`, in light, dark and milky. Sheet: `docs/shots/widgets-light.png`, `widgets-dark.png`.
+
+| Widget | Sizes | Module | Data |
+|---|---|---|---|
+| Analog Clock (numerals), Marks (Clock II), Quarters (Clock III) | small | `clocks.js` | local time |
+| Digital Clock, Date & Time | small, medium | `clocks.js` | local time |
+| Glass Text Clock (the digits are the glass) | medium | `glasstext.js` | local time; a shader cuts Blur My Shell's glass to the glyphs |
+| Calendar: Today, Month, Today and Month | small, small, medium | `calendar.js` | Evolution Data Server events |
+| Weather, Next Hours, Week | small, medium, large | `weather.js` | the shell's WeatherClient (libgweather), location from GNOME Weather, refreshed every 30 min |
+| Music, Wide, Large, Lyrics | small, medium, large, large | `music.js`, `mpris.js` | MPRIS; synced lyrics from a `.lrc` next to a local file, else lrclib.net (Lyrics widget only, once per track) |
+
+Clock II and III, Glass Text, Weather and Music follow the designs of
+[liquidglass-kde-widgets](https://github.com/jaxparrow07/liquidglass-kde-widgets) by jaxparrow07
+(GPL-3.0), redrawn for GNOME Shell; no code, fonts or icons are taken from it (its fonts and icons
+are Apple's). Where the KDE look differs from the glass standard (weather-coloured cards, own glass
+shader), the standard wins.
 
 ## Where this came from
 
