@@ -65,7 +65,7 @@ export async function runStress(write) {
     };
     const escape = async () => {
         Main.panel.menuManager.activeMenu?.close({ animate: false });
-        bg?.close({ animate: false });
+        desktopMenu()?.close({ animate: false });
         dockMenu()?.close({ animate: false });
         await sleep(300);
     };
@@ -74,7 +74,9 @@ export async function runStress(write) {
     const motion = () => Main.extensionManager.lookup('tahoe-motion@cachyos-tahoe')?.stateObj?.debug?.() ?? {};
     const qs = Main.panel.statusArea.quickSettings;
     const date = Main.panel.statusArea.dateMenu;
-    const bg = Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
+    // looked up each time: the shell rebuilds the background and its menu when the wallpaper
+    // changes (Dark Style switches it)
+    const desktopMenu = () => Main.layoutManager._backgroundGroup.get_children().find(a => a._backgroundMenu)?._backgroundMenu;
     const dockIcon = () => findActor(Main.uiGroup, a => a.constructor?.name?.includes('AppIcon') && a.mapped && a.reactive);
     const dockMenu = () => dockIcon()?._menu ?? null;
 
@@ -178,7 +180,7 @@ export async function runStress(write) {
             Main.panel.menuManager.activeMenu ? 'panel menu open' : null,
             qs.menu._boxPointer.visible ? 'quick settings visible' : null,
             date.menu._boxPointer.visible ? 'calendar visible' : null,
-            bg?._boxPointer.visible ? 'desktop menu visible' : null,
+            desktopMenu()?._boxPointer.visible ? 'desktop menu visible' : null,
             g.holds ? `${g.holds} holds` : null,
             g.settling ? `${g.settling} settling` : null,
             g.frozen ? `${g.frozen} frozen` : null,
