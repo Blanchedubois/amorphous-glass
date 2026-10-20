@@ -21,7 +21,6 @@ import { buildWidgetStack } from './widgetstack.js';
 import { buildPromptGlass } from './promptglass.js';
 import { GlassPane, MENU_GLASS } from './widgets/paneglass.js';
 import { buildMenus } from './widgets/glassmenus.js';
-import { buildMenuGlass } from './menuglass.js';
 
 const DIGITS_EM = 0.730;      // Space Grotesk's digit height
 const DATE_TOP = 0.108;       // top of the date's letters
@@ -94,7 +93,6 @@ export function buildLayout(frame, dialog) {
     const widgets = buildWidgetStack(frame, dialog, backdrop, nowPlaying.gate);
     const music = buildMusicMode(frame, dialog, nowPlaying, backdrop, () => relayout(), () => widgets.recheck?.());
     relayout = placePrompt(frame, dialog, nowPlaying, music, widgets);
-    buildMenuGlass(frame, dialog);
 }
 
 // ---- the wallpaper: sharp, as the user asked ----

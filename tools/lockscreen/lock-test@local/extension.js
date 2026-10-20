@@ -179,12 +179,13 @@ async function runQs() {
     const mbox = menu.box ?? menu.actor;
     write({ label: 'qs', open: menu.isOpen, actor: mbox ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
         boxStyle: menu.box?.style_class, chain, frame: frameState().frame,
-        glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-lock:menu-glass' || a.name === 'menu-glass') n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
+        glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-gdm-glass' && a.visible && a.mapped && !Main.screenShield._dialog?.contains(a)) n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
     const [x, y] = menu.box.get_transformed_position(); const [w, h] = menu.box.get_transformed_size();
-    const pieceDump = []; const wg = (a, d) => { if (a.name === 'menu-glass' && a.visible) pieceDump.push({ glass: box(a) }); for (const c of a.get_children()) wg(c, d + 1); }; wg(global.stage, 0);
+    const pieceDump = []; for (const a of [...Main.layoutManager.uiGroup.get_children(), ...(Main.panel.statusArea.quickSettings.menu.actor?.get_children() ?? [])]) if (a.name === 'tahoe-gdm-glass' && a.visible) pieceDump.push({ glass: box(a) });
     const toggles = []; const w2 = a => { if (a.has_style_class_name?.('quick-toggle') && a.mapped) toggles.push({ toggle: box(a), radius: a.get_theme_node().get_border_radius(0), margin: a.get_theme_node().get_margin?.(St.Side.RIGHT) ?? null }); for (const c of a.get_children()) w2(c); }; w2(menu.box);
     write({ label: 'qs-pieces', glass: pieceDump, toggles, pointer: menu._boxPointer ? { tx: menu._boxPointer.translation_x, ty: menu._boxPointer.translation_y, o: menu._boxPointer.opacity } : null });
     write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
+    { const t = []; const w = (a, d) => { if (d > 4) return; t.push(`${'  '.repeat(d)}${a.constructor.name}${a.name ? '#' + a.name : ''}.${a.style_class ?? ''} ${box(a)} bin=${!!a.bin}`); a.get_children().forEach(c => w(c, d + 1)); }; w(menu.actor, 0); write({ label: 'qs-tree', t }); }
     await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);
     qs.menu.close(false);
     await sleep(500);
@@ -220,7 +221,7 @@ async function runQsSub() {
         t.menu?.open(true);
         await sleep(1500);
         const [x, y] = qs.menu.box.get_transformed_position(); const [w, h] = qs.menu.box.get_transformed_size();
-        const glass = []; const wg = a => { if (a.name === 'menu-glass' && a.visible) glass.push(box(a)); for (const c of a.get_children()) wg(c); }; wg(global.stage);
+        const glass = []; for (const a of [...Main.layoutManager.uiGroup.get_children(), ...(Main.panel.statusArea.quickSettings.menu.actor?.get_children() ?? [])]) if (a.name === 'tahoe-gdm-glass' && a.visible) glass.push(box(a));
         const subs = []; const ws = a => { if (a.has_style_class_name?.('quick-toggle-menu') && a.mapped) subs.push(box(a)); for (const c of a.get_children()) ws(c); }; ws(qs.menu.actor);
         write({ label: 'qs-sub', i, open: t.menu?.isOpen ?? null, glass, submenus: subs, frame: frameState().frame });
         await shotRect(`qssub-${i}`, [Math.max(0, Math.round(x) - 30), Math.max(0, Math.round(y) - 10), Math.round(w) + 60, Math.round(h) + 40]);

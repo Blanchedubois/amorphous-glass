@@ -171,6 +171,21 @@ export default class {
                 await wait(1.2);
                 record(name, d);
                 await shot(name);
+                // the system menu: its first submenu open too (Wi-Fi or Power Mode)
+                if (name === 'system') {
+                    const toggles = [];
+                    const w = a => { if (a.menu && a.has_style_class_name?.('quick-toggle-has-menu') === false && a.menu.open) toggles.push(a); a.get_children().forEach(w); };
+                    const w2 = a => { if (a.menu?.open) toggles.push(a); a.get_children().forEach(w2); };
+                    w2(menu.box);
+                    const t = toggles.find(x => x.mapped && x.menu?.open && !x.has_style_class_name?.('quick-slider') && !x.get_parent()?.has_style_class_name?.('quick-slider'));
+                    if (t) {
+                        t.menu.open(true);
+                        await wait(1.2);
+                        await shot('system-sub');
+                        t.menu.close(false);
+                        await wait(0.4);
+                    }
+                }
                 menu.close(false);
                 await wait(0.5);
             }
