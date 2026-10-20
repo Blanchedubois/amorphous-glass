@@ -13,7 +13,7 @@ index 67d4d97..e6c759a 100644
  .PHONY: build install pot test-shell test-prefs test-vm remove clean
  
 diff --git a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
-index d983d96..7a28e95 100644
+index d983d96..31dd14d 100644
 --- a/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 +++ b/schemas/org.gnome.shell.extensions.blur-my-shell.gschema.xml
 @@ -296,6 +296,11 @@
@@ -39,8 +39,8 @@ index d983d96..7a28e95 100644
 +        </key>
 +        <!-- TAHOE GLASS: MOTION FREEZE -->
 +        <key type="b" name="motion-freeze">
-+            <default>false</default>
-+            <summary>Boolean, whether a popup's glass keeps its backdrop while the popup opens, closes or resizes (captured once where it comes to rest), going live when the motion is over</summary>
++            <default>true</default>
++            <summary>Boolean, whether quick settings' glass keeps its backdrop while it opens, closes or resizes (captured once where it comes to rest), going live when the motion is over; other popups stay live</summary>
 +        </key>
          <!-- SIGMA -->
          <key type="i" name="sigma">
@@ -417,7 +417,7 @@ index 4d16af5..eed8f3d 100644
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..4e0c441 100644
+index 5a891b9..8ab3e9e 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -461,7 +461,7 @@ index 5a891b9..4e0c441 100644
          this.parent.add_child(this.actor);
          if (!this.static_blur)
              this.pipeline.attach_pipeline();
-@@ -77,11 +89,89 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -77,11 +89,93 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.connect_ancestors(this.root_actor);
          if (has_style_class(this.target, 'screenshot-ui-panel'))
              this.signals.connect_actor(this.parent);
@@ -476,8 +476,12 @@ index 5a891b9..4e0c441 100644
 +    begin_settle() {
 +        this.settling = true;
 +        this.signals.remove_idle_update();
-+        // banners slide in from off screen: there is no whole backdrop to keep, they stay live
-+        if (this.static_blur || !this.settings.popup.MOTION_FREEZE || this.is_notification_surface())
++        // banners slide in from off screen: there is no whole backdrop to keep, they stay live.
++        // Only quick settings freezes (some 35 pieces: live, they cost about 3.5 ms of CPU a
++        // frame on the user's desktop). A menu with one glass stays live while it moves (about
++        // 0.2 ms a frame): it shows what is behind it where it is, never where it was.
++        if (this.static_blur || !this.settings.popup.MOTION_FREEZE || this.is_notification_surface()
++            || !(this.is_quick_settings() || this.in_quick_settings))
 +            return;
 +        this.frozen = true;
 +        this.pipeline.freeze(!this.actor.visible, (x, y) => this.motion.rest_point(x, y));
@@ -551,7 +555,7 @@ index 5a891b9..4e0c441 100644
      // Our overlay lives in `parent`, so tear it down before a destroyed
      // parent disposes of it as one of its children.
      connect_lifetime() {
-@@ -161,6 +251,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -161,6 +255,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
  
@@ -563,7 +567,7 @@ index 5a891b9..4e0c441 100644
      is_heavy_surface() {
          return this.matches_any_style_class(HEAVY_SURFACE_STYLE_CLASSES);
      }
-@@ -174,10 +269,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -174,10 +273,23 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      uses_full_actor_geometry() {
@@ -588,7 +592,7 @@ index 5a891b9..4e0c441 100644
          if (this.is_notification_surface()) {
              this.update_live_surface();
              return;
-@@ -267,7 +375,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -267,7 +379,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
          if (this.static_blur)
              return this.static_actor.has_opacity(opacity);
          return this.actor.opacity === opacity
@@ -597,7 +601,7 @@ index 5a891b9..4e0c441 100644
      }
  
      update_surface_opacity(opacity) {
-@@ -276,6 +384,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -276,6 +388,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
              return;
          }
          this.actor.opacity = opacity;
@@ -608,7 +612,7 @@ index 5a891b9..4e0c441 100644
          this.pipeline.set_opacity_factor(this.get_pipeline_opacity(opacity) / 255);
      }
  
-@@ -286,7 +398,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -286,7 +402,8 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_update() {
@@ -618,7 +622,7 @@ index 5a891b9..4e0c441 100644
              return;
          this.update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -299,8 +412,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -299,8 +416,10 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      queue_transition_update(transition_state = null) {
@@ -630,7 +634,7 @@ index 5a891b9..4e0c441 100644
              return;
          this.transition_update_id = global.compositor.get_laters().add(
              Meta.LaterType.BEFORE_REDRAW,
-@@ -332,7 +447,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -332,7 +451,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
      }
  
      get_corner_radius() {
@@ -639,7 +643,7 @@ index 5a891b9..4e0c441 100644
      }
  
      is_visible() {
-@@ -372,6 +487,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -372,6 +491,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);
@@ -1602,7 +1606,7 @@ index b779058..ee6000e 100644
              'opacity_factor', 'Opacity Factor', 'Refraction blend strength',
              0, 1, DEFAULT_PARAMS.opacity_factor
 diff --git a/src/render/backdrop/capture.js b/src/render/backdrop/capture.js
-index cee1710..3039aaa 100644
+index cee1710..16d8816 100644
 --- a/src/render/backdrop/capture.js
 +++ b/src/render/backdrop/capture.js
 @@ -9,6 +9,7 @@ import { BackdropOutputEffect } from './output.js';
@@ -1690,7 +1694,7 @@ index cee1710..3039aaa 100644
          }
          const texture = Cogl.Texture2D.new_with_size(context, textureWidth, textureHeight);
          texture.set_components(Cogl.TextureComponents.RGBA);
-@@ -242,20 +282,57 @@ export const BackdropCaptureEffect = GObject.registerClass({
+@@ -242,20 +282,68 @@ export const BackdropCaptureEffect = GObject.registerClass({
          this.viewDestroyIds.delete(view);
      }
  
@@ -1698,6 +1702,7 @@ index cee1710..3039aaa 100644
 +    /// `fresh`: the surface was hidden, its captures are out of date and are taken once again.
 +    freeze(fresh, restPoint) {
 +        this.frozen = true;
++        this.restChecked = false;
 +        if (fresh) {
 +            for (const target of this.targets.values())
 +                target.frozenValid = false;
@@ -1735,6 +1740,16 @@ index cee1710..3039aaa 100644
          const inClone = actor.is_in_clone_paint();
 +        // frozen with a backdrop already captured in this view: draw it as it is
 +        const frozenTarget = this.frozen && !inClone && view ? this.targets.get(view) : null;
++        // the backdrop kept from before is only good where the popup comes to rest this time
++        // (a popup opened again elsewhere while its close still showed: the old place's blur)
++        if (frozenTarget?.frozenValid && !this.restChecked && this.restPoint) {
++            this.restChecked = true;
++            const rest = restCaptureGeometry(actor, sourceFramebuffer, view, this.restPoint);
++            const kept = frozenTarget.geometry;
++            if (!rest || !kept || rest.sourceX !== kept.sourceX || rest.sourceY !== kept.sourceY
++                || rest.width !== kept.width || rest.height !== kept.height)
++                frozenTarget.frozenValid = false;
++        }
 +        if (frozenTarget?.frozenValid && frozenTarget.context === sourceFramebuffer.get_context()) {
 +            prof_count('capture.frozen');
 +            this.target = frozenTarget;
@@ -1752,7 +1767,7 @@ index cee1710..3039aaa 100644
          if (inClone) {
              this.ensureFramebuffer(this.cloneTargetsFor(view), `${geometry.width}x${geometry.height}`,
                  geometry.width, geometry.height, sourceFramebuffer, view);
-@@ -274,10 +351,14 @@ export const BackdropCaptureEffect = GObject.registerClass({
+@@ -274,10 +362,14 @@ export const BackdropCaptureEffect = GObject.registerClass({
          this.target.geometry = geometry;
          this.target.inClone = inClone;
          this.target.lastUsed = GLib.get_monotonic_time();
@@ -1768,7 +1783,7 @@ index cee1710..3039aaa 100644
              blitFramebuffer(sourceFramebuffer,
                  this.target.framebuffer,
                  rect.x,
-@@ -290,7 +371,11 @@ export const BackdropCaptureEffect = GObject.registerClass({
+@@ -290,7 +382,11 @@ export const BackdropCaptureEffect = GObject.registerClass({
          }
  
          node.add_child(new Clutter.ActorNode(actor, -1));
