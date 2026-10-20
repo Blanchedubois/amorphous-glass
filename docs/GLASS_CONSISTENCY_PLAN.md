@@ -168,3 +168,19 @@ GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
   login screen's menu, submenu, accessibility menu and calendar.
 - Gates: the lock screen's qs and qs-sub (glass on every piece, the submenu included), the fault
   gates on both screens.
+
+## Phase E workshop (2026-10-20)
+
+- One layout module for the widget column on both screens (tahoe-gdm widgetlayout.js, shared):
+  rows of small (170) and wide (356 x 170) widgets; `TAHOE_WIDGET_LAYOUT` in the test shells.
+  E1: Weather Medium (the hourly forecast) + the month. E2: Weather Medium + Calendar Medium
+  (day and month). E3: 2 x 2: weather, month, two analogue clocks.
+- The calendars take `{events: false}` on both screens (tahoe-widgets calendar.js, opt-in; the
+  desktop is unchanged): no event list, and the calendar store is not opened at all.
+- The column keeps clear of the centre: its right edge at most 29 % of the width; a layout wider
+  than that is scaled down evenly (glass.js places the backdrop in the pane's own units, so a
+  scaled pane still lies exactly over the background). Rows drop from the bottom on short monitors.
+- The user (during Phase E): no card behind the system and accessibility menus, only their
+  pieces in glass (menus.js); the calendar keeps its card.
+- Sheets: `phaseE-columns.png`, `phaseE-screens.png`, `phaseE-E2-1280x720.png`,
+  `phaseE-menus-nocard.png`.

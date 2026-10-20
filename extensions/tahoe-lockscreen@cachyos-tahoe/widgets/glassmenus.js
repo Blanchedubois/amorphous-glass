@@ -79,14 +79,19 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
         pane.set_position(Math.round(x - px), Math.round(y - py));
         pane.set_scale(tw / w, th / h);
         pane.opacity = opacity;
-        pane.show();
+        // a quick settings menu (the system menu, the accessibility menu): only its pieces are glass,
+        // no card behind them (the user, 2026-10-20); other menus (the calendar) keep the card
+        if (pane._isQuick ??= isQuickSettings(pointer))
+            pane.hide();
+        else
+            pane.show();
         followPieces(pointer, pane, opacity);
     };
 
     // the pieces' glass, between the menu's frosted pane and the menu
     const hidePieces = pane => pane._pieces?.forEach(p => p.hide());
     const followPieces = (pointer, pane, opacity) => {
-        if (!(pane._isQuick ??= isQuickSettings(pointer)))
+        if (!pane._isQuick)
             return;
         pane._pieces ??= new Map();
         const parent = pane.get_parent();

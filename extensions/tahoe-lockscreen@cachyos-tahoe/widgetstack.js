@@ -12,15 +12,25 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
-import {CalendarDay, CalendarMonth} from './widgets/calendar.js';
+import {CalendarDay, CalendarMedium, CalendarMonth} from './widgets/calendar.js';
+import {AnalogClock, AnalogQuartersClock} from './widgets/clocks.js';
 import {GlassPane} from './widgets/paneglass.js';
-import {WeatherSmall} from './widgets/weather.js';
+import {WeatherMedium, WeatherSmall} from './widgets/weather.js';
+import {SIZE, arrange, layoutRows, widthOf} from './widgets/widgetlayout.js';
 
-export const WIDGET_STACK = {kinds: ['weather-small', 'calendar-month']};
+// the rows of the column (widgetlayout.js, shared with the login screen); a test may set rows
+export const WIDGET_STACK = {rows: null};
 
-const KINDS = {'weather-small': WeatherSmall, 'calendar-day': CalendarDay, 'calendar-month': CalendarMonth};
-const SIZE = 170;          // tahoe-widgets SIZES.small, logical px
-const GAP = 16;            // between widgets, as on the desktop grid
+// calendars without events here (the user's rule); "calendar-day" with events stays available
+const KINDS = {
+    'weather-small': () => new WeatherSmall(),
+    'weather-medium': () => new WeatherMedium(),
+    'calendar-day': () => new CalendarDay(),
+    'calendar-month': () => new CalendarMonth({events: false}),
+    'calendar-medium': () => new CalendarMedium({events: false}),
+    'clock-analog': () => new AnalogClock(),
+    'clock-quarters': () => new AnalogQuartersClock(),
+};
 const RADIUS = 24;         // tokens/radius.json widget
 const LEFT = 0.045;        // the column's left edge, share of the monitor's width
 const MARGIN = 0.04;       // clear of the monitor's top and bottom, share of its height
@@ -28,7 +38,8 @@ const WEATHER_WAIT = 4000; // ms: the weather shows by then, forecast or not
 
 // backdrop: () => the primary monitor's lock background actor; gate: nowplaying.js' (not idle or dimming)
 export function buildWidgetStack(frame, dialog, backdrop, gate) {
-    const kinds = WIDGET_STACK.kinds.filter(k => KINDS[k]);
+    const rows = (WIDGET_STACK.rows ?? layoutRows()).map(row => row.filter(k => KINDS[k])).filter(row => row.length);
+    const kinds = rows.flat();
     if (kinds.length === 0)
         return {place() {}};
 
@@ -40,7 +51,7 @@ export function buildWidgetStack(frame, dialog, backdrop, gate) {
         const actor = new St.Widget({
             style_class: `tahoe-widget tahoe-widget-${kind} tahoe-lock-pane`,
             layout_manager: new Clutter.BinLayout(),
-            width: SIZE, height: SIZE,
+            width: widthOf(kind), height: SIZE,
         });
         actor.add_child(new GlassPane(backdrop, RADIUS));
         const content = new St.Widget({
@@ -48,7 +59,7 @@ export function buildWidgetStack(frame, dialog, backdrop, gate) {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true, y_expand: true,
         });
-        const widget = new KINDS[kind]();
+        const widget = KINDS[kind]();
         content.add_child(widget.actor);
         actor.add_child(content);
         layer.add_child(actor);
@@ -123,19 +134,11 @@ export function buildWidgetStack(frame, dialog, backdrop, gate) {
     return {
         // the column on this monitor: as many widgets as fit, centred on its height
         place(monitorBox) {
-            const H = monitorBox.height;
-            let n = items.length;
-            while (n > 1 && n * SIZE + (n - 1) * GAP > H * (1 - 2 * MARGIN))
-                n--;
-            const total = n * SIZE + (n - 1) * GAP;
-            let y = Math.round(monitorBox.y + (H - total) / 2);
-            const x = Math.round(monitorBox.x + LEFT * monitorBox.width);
+            const {spots, scale} = arrange(rows, monitorBox, monitorBox.x + LEFT * monitorBox.width, MARGIN);
             items.forEach((item, i) => {
-                item.actor.visible = i < n;
-                if (i < n) {
-                    item.actor.set_position(x, y);
-                    y += SIZE + GAP;
-                }
+                item.actor.visible = spots[i].visible;
+                item.actor.set_position(spots[i].x, spots[i].y);
+                item.actor.set_scale(scale, scale);
             });
             syncTick();
         },

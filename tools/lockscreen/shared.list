@@ -16,3 +16,5 @@ clocks.js clocks.js
 ../tahoe-gdm@cachyos-tahoe/menus.js glassmenus.js
 # the clock's glass panes (date and time), shared with the login screen
 ../tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
+# the widget column's layout (rows of small and wide widgets), shared with the login screen
+../tahoe-gdm@cachyos-tahoe/widgetlayout.js widgetlayout.js
