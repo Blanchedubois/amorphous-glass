@@ -165,5 +165,9 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
     picture with GDM in dark mode;
   - tests: G1 light and dark, verifying, music-idle, ours-cover/throw, churn 8 (actors flat,
     unlock median 94 ms), login screen glass and fail-safe; 0 PAM lines.
-- Next: phase 3 (the login screen's glass clock with the date, widgets), after the user's
-  choices on the clock format, weather and covers.
+- Phase 3, part 1 (2026-10-20): the login screen's time and date in Liquid Glass (clock.js),
+  the lock screen's type, size, place and material, the user's clock format (12 h without
+  AM/PM); GNOME's clock transparent. Both clocks have the edge C now (glassclock.js too), and
+  side by side the two screens' clocks match (docs/unified/...). The login harness read the
+  user's colour scheme after replacing its settings (always light): fixed.
+- Next: the widget column on the login screen, after the user's choices on weather and covers.

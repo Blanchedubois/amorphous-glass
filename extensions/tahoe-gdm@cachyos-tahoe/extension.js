@@ -16,6 +16,7 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
 import { GlassPane } from './glass.js';
 import { buildLayout } from './layout.js';
+import { buildClock } from './clock.js';
 
 // GNOME versions this was tested on; the private parts of LoginDialog it relies on
 const TESTED_MAJORS = [51];
@@ -86,6 +87,8 @@ export default class TahoeLoginScreen extends Extension {
 
         // the clock, the prompt and the rows in the Tahoe proportions for this monitor
         buildLayout(this, dialog);
+        // the time and date in Liquid Glass, as on the lock screen
+        buildClock(this);
 
         // the password capsule: glass under the entry, in the entry's own BinLayout slot (GNOME
         // swaps the password and text entries in that slot with replace_child, which keeps ours)

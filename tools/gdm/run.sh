@@ -15,6 +15,10 @@ set -eu
 out=$1; fonts=${2:-system}
 H=$(cd "$(dirname "$0")" && pwd)
 gres=${3:-$H/../../build/gdm/gnome-shell-theme.gresource}
+# the user's own settings, read before this shell's XDG dirs replace them (read after, gsettings
+# gives the defaults: the light colour scheme and 24 h, 2026-10-20)
+user_clock=$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")
+user_scheme=$(gsettings get org.gnome.desktop.interface color-scheme | tr -d "'")
 root=$(mktemp -d -p "${TMPDIR:-/tmp}" gdmroot.XXXX)
 mkdir -p "$out"
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
@@ -40,8 +44,8 @@ disable-extension-version-validation=true
 [org/gnome/desktop/interface]
 clock-show-date=false
 clock-show-weekday=false
-clock-format='${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}'
-color-scheme='${GDM_COLOR_SCHEME:-$(gsettings get org.gnome.desktop.interface color-scheme | tr -d "'")}'
+clock-format='${GDM_CLOCK_FORMAT:-$user_clock}'
+color-scheme='${GDM_COLOR_SCHEME:-$user_scheme}'
 [org/gnome/login-screen]
 logo=''
 KF

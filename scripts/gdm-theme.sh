@@ -3,8 +3,8 @@
 #   build     make build/gdm/gnome-shell-theme.gresource (no root): the base theme's files plus
 #             gdm/tahoe-gdm.css appended to every stylesheet and the lock picture as a sharp
 #             background (tahoe-gdm-background.png: lossless, dithered down from the 16-bit picture)
-#   install   install it (asks for the sudo password): the user's choices by default, a 24 h
-#             clock, Space Grotesk and the login screen extension (GDM_CLOCK_FORMAT, GDM_FONTS,
+#   install   install it (asks for the sudo password): the user's choices by default, the user's
+#             own clock format, Space Grotesk and the login screen extension (GDM_CLOCK_FORMAT, GDM_FONTS,
 #             GDM_EXTENSION override). Shows at the next logout or boot.
 #   undo      put the previous login screen back (asks for the sudo password); it shows at the
 #             next logout or boot. If the login screen is broken: from a text console
@@ -103,7 +103,8 @@ commands() {
   local fmt="" ext="" cs=""
   # the login screen in the user's colour scheme (its theme's variant and the glass follow it)
   [ "$(scheme)" = prefer-dark ] && cs="color-scheme='prefer-dark'\\n"
-  [ "${GDM_CLOCK_FORMAT:-}" = 24h ] && fmt="clock-format='24h'\\n"
+  # the login screen's clock format (GNOME's default there is 24 h): as given, else the user's
+  [ -n "${GDM_CLOCK_FORMAT:-}" ] && fmt="clock-format='${GDM_CLOCK_FORMAT}'\\n"
   [ "${GDM_EXTENSION:-}" = 1 ] && ext="\\n[org/gnome/shell]\\nenabled-extensions=['tahoe-gdm@cachyos-tahoe']\\n"
   if [ "${GDM_FONTS:-}" = 1 ]; then cat <<EOF
 # Space Grotesk for the login screen's clock (SIL Open Font License, so it may be copied)
@@ -143,7 +144,10 @@ EOF
 
 # run the install or the undo half of the commands (the same text `commands` prints)
 run_part() {
-  export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-24h} GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1}
+  # the user's choices: the clock as the user's own (12 h shows without AM/PM, as the lock screen),
+  # Space Grotesk, the extension
+  export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}
+  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1}
   local text part
   text=$(commands)
   case $1 in
