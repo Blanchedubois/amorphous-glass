@@ -17,7 +17,7 @@
    darkened 1280x720 copy). The lock screen draws its own background over this group. */
 #lockDialogGroup {
   background-color: #1d1d1f;
-  background-image: url("resource:///org/gnome/shell/theme/tahoe-gdm-background.jpg");
+  background-image: url("resource:///org/gnome/shell/theme/tahoe-gdm-background.png");
   background-size: cover;
 }
 
