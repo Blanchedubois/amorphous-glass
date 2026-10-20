@@ -498,6 +498,66 @@ the size signal, which fires during layout, after that frame's updates have run.
 - Test: `TAHOE_TEST_ONLY=widgetmenu` (tools/headless; desktop menu with tahoe-widgets, expand and
   collapse, right-click then far away), with `TAHOE_TEST_KEYS` for settings changed per run.
 
+### Impact analysis: live blur broke quick settings submenus (2026-10-19, after d5413a8)
+
+User, after logging in with d5413a8: "the right click dropdown is broken and glitches out", "the
+power button dropdown is broken same with the wifi and bluetooth dropdown when it expands".
+
+**Phase 0: measure.** The probe logged the real desktop for 2 minutes after the login. Medians
+per open:
+
+| Real desktop | Round 4 (freeze on) | d5413a8 (live) |
+|---|---|---|
+| QS submenu open, worst frame | 16 ms | **28 ms** |
+| QS submenu open, CPU per frame p95 | 5.0 ms | **8.4 ms** (over the 8.3 ms budget) |
+| QS submenu close, worst frame | 15 ms | **28 ms** |
+| Desktop right-click open, frame p95 | 8.9 ms | 8.9 ms |
+
+**Bisect** (headless, same CPU, five builds × five runs): the three changes in d5413a8 tested
+apart. All of the CPU is the live blur. Quick settings has some 35 glass pieces, each captured,
+blurred and refracted every frame. The resize fix and the relayout read cost nothing measurable.
+
+| CPU per frame p50 / p95 (ms) | Round 4 | Live (d5413a8) | Live without the resize fix | Live without the relayout read | d5413a8 with freeze on |
+|---|---|---|---|---|---|
+| QS open | 0.9 / 2.7 | 3.3 / 4.5 | 3.4 / 4.6 | 3.4 / 4.6 | 0.9 / 2.6 |
+| QS submenu open | 2.1 / 4.6 | 3.6 / 6.2 | 3.6 / 6.2 | 3.5 / 5.9 | 2.0 / 4.7 |
+| Desktop right-click open | 0.5 / 1.4 | 0.7 / 1.6 | 0.7 / 1.6 | 0.7 / 1.6 | 0.4 / 1.3 |
+
+Right-click placement with real clicks (9 clicks, 120 ms apart, with widgets and the dock) was
+identical in all five builds. Visual stills of a submenu expand, slowed 8x, were identical too,
+with all of the user's extensions loaded. The headless shell cannot show the real desktop's
+frame drops, only their CPU.
+
+**Phase 1: done here.**
+
+- (a) Only quick settings freezes while it moves. A menu with one glass (desktop, calendar,
+  dock, panel menus, app menus) stays live, about 0.2 ms a frame. It blurs where it is from
+  its first frame. `motion-freeze` is back on by default, and `tahoe-repair.sh` keeps it on.
+- (b) A frozen glass checks once, on its first frame, that the backdrop it kept was taken where
+  the popup comes to rest this time, and captures again if not. A popup reopened elsewhere
+  while its close still showed can no longer show the old place's blur.
+- (c) The resize fix stays: no cost, and "Add Widget" keeps up with its menu.
+- (d) tahoe-motion: a row GNOME destroys under a running animation (network lists, calendar
+  rows) is left alone. Writing to it logged about 1,200 stack traces in one second of the stress
+  run. Now 0.
+
+After Phase 1 (headless): QS open CPU 0.96 / 3.1 ms, submenu open 2.1 / 4.6 ms, both back to
+round 4. Desktop open 0.7 / 1.6. Right-click far away: the glass matches live blur by 120 ms.
+Round 4's frozen glass was 3–7% off there. "Add Widget": glass and menu are the same height
+every frame after the first.
+
+**Open, not explained yet:** in 4 of 9 full stress runs with the new builds, desktop right-clicks
+stopped opening the menu after the Dark Style and Wi-Fi spam cases. That is 0 opens, one frame per
+click, no JS error, and no gesture or grab stuck. In the one run caught with a probe, the point
+on the desktop hit a plain reactive `Clutter.Actor` instead of the wallpaper. It was never seen
+with round 4's build (0 of 4 runs), nor with any part of the sequence run alone. The stress
+driver now reports anything reactive covering the desktop after every case, with its parents and
+size, to name it next time.
+
+**Phase 2: later, after the user tries Phase 1.** Live blur for quick settings at low cost: one
+capture and one blur of the whole quick settings rectangle per frame, each piece only refracting
+its part (the plan's old Phase 2).
+
 ## Where the code would go
 
 - Phases 1 to 3: `config/bms-tahoe-glass.patch` (popup surfaces, backdrop capture, refraction

@@ -4,6 +4,7 @@
 // end state (every popup closed, no glass left frozen or held), and counts before and after
 // (handlers, actors, memory) to catch anything that piles up.
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -176,8 +177,26 @@ export async function runStress(write) {
         const after = snapshot();
         const g = after.glass;
         const m = after.motion;
+        // something reactive left over the desktop swallows its right-clicks (seen in some runs)
+        const hit = global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, 500, 300);
+        let cover = null;
+        if (hit && hit.constructor.name !== 'Meta_BackgroundActor') {
+            const chain = [];
+            for (let a = hit; a; a = a.get_parent())
+                chain.push(`${a.constructor.name}${a.name ? `#${a.name}` : ''}${a.style_class ? `.${a.style_class}` : ''}`);
+            const [w, h] = hit.get_transformed_size();
+            const [x, y] = hit.get_transformed_position();
+            cover = `desktop covered by ${chain.join(' < ')} at ${Math.round(x)},${Math.round(y)} ${Math.round(w)}x${Math.round(h)} op${hit.opacity} vis${hit.visible} delegate:${hit._delegate?.constructor?.name}`;
+        }
         const stuck = [
+            cover,
             Main.panel.menuManager.activeMenu ? 'panel menu open' : null,
+            ...Main.layoutManager._backgroundGroup.get_children().flatMap(b => b.get_actions())
+                .filter(a => a.state !== undefined && a.state !== Clutter.GestureState.WAITING)
+                .map(a => `desktop ${a.constructor.name} stuck in ${Object.keys(Clutter.GestureState).find(k => Clutter.GestureState[k] === a.state)}`),
+            Main.modalCount > 1 ? `modal ${Main.modalCount} (${Main.modalActorFocusStack?.map(e => e.actor?.constructor.name).join(',')})` : null,
+            global.stage.get_grab_actor?.() && global.stage.get_grab_actor() !== global.stage ? `grab ${global.stage.get_grab_actor().constructor.name}` : null,
+            qs.menu._grid?.get_children().some(c => c.menu?.isOpen) ? 'a quick settings submenu open' : null,
             qs.menu._boxPointer.visible ? 'quick settings visible' : null,
             date.menu._boxPointer.visible ? 'calendar visible' : null,
             desktopMenu()?._boxPointer.visible ? 'desktop menu visible' : null,
@@ -243,6 +262,31 @@ export async function runStress(write) {
         for (let i = 0; i < 12 && wifi; i++) {
             await left(arrow(wifi) ?? centre(wifi));
             await sleep(50);
+        }
+    });
+    // a light/dark switch swaps the wallpaper: the shell rebuilds the background and its menu
+    await runCase('desktop right-click after a wallpaper swap', 1, async () => {
+        const iface = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+        const scheme = iface.get_string('color-scheme');
+        iface.set_string('color-scheme', scheme === 'prefer-dark' ? 'default' : 'prefer-dark');
+        await sleep(2500);
+        // what a right-click on the desktop reaches
+        move(500, 300);
+        await sleep(50);
+        const under = global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, 500, 300);
+        const bgs = Main.layoutManager._backgroundGroup.get_children();
+        write({ note: 'desktop', under: `${under?.constructor.name}.${under?.name ?? ''}`, under_menu: Boolean(under?._backgroundMenu),
+            backgrounds: bgs.map(b => `${b.constructor.name} menu:${Boolean(b._backgroundMenu)} actions:${b.get_actions().map(a => a.constructor.name).join('+')} reactive:${b.reactive} op:${b.opacity}`),
+            managers: (Main.layoutManager._bgManagers ?? []).length });
+        for (let i = 0; i < 10; i++) {
+            await right([400 + (i % 4) * 200, 300 + (i % 3) * 150]);
+            await sleep(300);
+        }
+        iface.set_string('color-scheme', scheme);
+        await sleep(2500);
+        for (let i = 0; i < 10; i++) {
+            await right([400 + (i % 4) * 200, 300 + (i % 3) * 150]);
+            await sleep(300);
         }
     });
     await runCase('spam desktop right-click, moving (60 ms)', 14, i =>
