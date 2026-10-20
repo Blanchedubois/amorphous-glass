@@ -304,7 +304,7 @@ index 0ca7acc..2adcb7b 100644
          const listed = this.settings.applications.ENABLE_ALL
              ? !matches_any(wm_class, this.blacklist)
 diff --git a/src/components/popup/index.js b/src/components/popup/index.js
-index 4d16af5..cfa98f7 100644
+index 4d16af5..3c42988 100644
 --- a/src/components/popup/index.js
 +++ b/src/components/popup/index.js
 @@ -1,5 +1,6 @@
@@ -393,7 +393,7 @@ index 4d16af5..cfa98f7 100644
      enable() {
          if (this.enabled) {
              this._log("blur already enabled");
-@@ -69,8 +132,23 @@ export const PopupBlur = class PopupBlur {
+@@ -69,8 +132,25 @@ export const PopupBlur = class PopupBlur {
          this.track_container(Main.layoutManager.screenShieldGroup);
          this.track_container(Main.messageTray._bannerBin);
          this.track_container(Main.panel.statusArea.quickSettings.menu._overlay);
@@ -410,26 +410,40 @@ index 4d16af5..cfa98f7 100644
          this.track_container(global.window_group);
 +        // tahoe glass: the app grid's folder tiles live deep in the overview, out of reach of the
 +        // containers tracked above: they are looked for each time it opens
-+        Main.overview.connectObject('showing', () => this.blur_folder_tiles(), this);
++        Main.overview.connectObject('showing', () => this.blur_overview_targets(), this);
++        // search result panels are made as providers first answer: looked for as the text changes
++        Main.overview.searchEntry?.connectObject('notify::text', () => this.queue_overview_scan(), this);
          this.track_keyboard();
 +        if (!this.settings.popup.STATIC_BLUR)
 +            this.warm_up_shaders();
      }
  
      track_container(container) {
-@@ -95,6 +173,48 @@ export const PopupBlur = class PopupBlur {
+@@ -95,6 +175,60 @@ export const PopupBlur = class PopupBlur {
          });
      }
  
-+    /// tahoe glass: a glass of its own under each folder tile of the app grid (few: one per folder)
-+    blur_folder_tiles() {
-+        const display = Main.overview._overview?.controls?._appDisplay;
-+        if (!display)
++    queue_overview_scan() {
++        if (this.overview_scan_id)
 +            return;
-+        const stack = [display];
++        this.overview_scan_id = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
++            this.overview_scan_id = 0;
++            this.blur_overview_targets();
++            return GLib.SOURCE_REMOVE;
++        });
++    }
++
++    /// tahoe glass: a glass of its own under each folder tile of the app grid (one per folder) and
++    /// each search result panel (one per search provider)
++    blur_overview_targets() {
++        const controls = Main.overview._overview?.controls;
++        if (!controls)
++            return;
++        const stack = [controls];
 +        while (stack.length > 0) {
 +            const actor = stack.pop();
-+            if (actor instanceof St.Widget && actor.has_style_class_name('app-folder')) {
++            if (actor instanceof St.Widget && (actor.has_style_class_name('app-folder')
++                || actor.has_style_class_name('search-section-content'))) {
 +                this.try_blur(actor);
 +                this.follow_scrolling(actor);
 +            } else {
@@ -466,7 +480,7 @@ index 4d16af5..cfa98f7 100644
      track_keyboard() {
          const keyboard_box = Main.layoutManager.keyboardBox;
          this.track_container(keyboard_box);
-@@ -228,6 +348,16 @@ export const PopupBlur = class PopupBlur {
+@@ -228,6 +362,16 @@ export const PopupBlur = class PopupBlur {
              return { parent, sibling };
          }
  
@@ -483,19 +497,23 @@ index 4d16af5..cfa98f7 100644
          const overlay_groups = [
              Main.uiGroup,
              Main.layoutManager.modalDialogGroup,
-@@ -351,6 +481,10 @@ export const PopupBlur = class PopupBlur {
+@@ -351,6 +495,14 @@ export const PopupBlur = class PopupBlur {
          }
  
          this.cancel_queued_blurs();
 +        this.finish_warm_up();
 +        Main.panel.statusArea.quickSettings?.menu?.disconnectObject(this);
 +        Main.overview.disconnectObject(this);
++        Main.overview.searchEntry?.disconnectObject(this);
++        if (this.overview_scan_id)
++            global.compositor.get_laters().remove(this.overview_scan_id);
++        this.overview_scan_id = 0;
 +        this.scroll_tiles = null;
  
          if (!this.enabled) {
              this._log("blur already removed");
 diff --git a/src/components/popup/surface/blur_surface.js b/src/components/popup/surface/blur_surface.js
-index 5a891b9..7ac0d63 100644
+index 5a891b9..7b7c7fd 100644
 --- a/src/components/popup/surface/blur_surface.js
 +++ b/src/components/popup/surface/blur_surface.js
 @@ -1,5 +1,6 @@
@@ -519,7 +537,7 @@ index 5a891b9..7ac0d63 100644
 +];
  const FULL_GEOMETRY_STYLE_CLASSES = [
 -    'popup-menu-content', 'candidate-popup-content',
-+    'popup-menu-content', 'candidate-popup-content', 'app-folder',
++    'popup-menu-content', 'candidate-popup-content', 'app-folder', 'search-section-content',
      'quick-settings', 'quick-toggle-menu', 'screenshot-ui-panel',
      'notification-banner', 'snap-assistant',
      'osd-window', 'resize-popup', 'workspace-switcher',
@@ -640,6 +658,15 @@ index 5a891b9..7ac0d63 100644
      // Our overlay lives in `parent`, so tear it down before a destroyed
      // parent disposes of it as one of its children.
      connect_lifetime() {
+@@ -102,7 +200,7 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         this.pipeline = new DynamicPipeline(
+             this.effects_manager,
+             global.blur_my_shell._pipelines_manager,
+-            this.settings.popup.PIPELINE,
++            this.get_pipeline_id(),
+             {
+                 corner_radius: this.get_corner_radius(),
+                 get_corners: () => this.settings.popup.ROUNDED_CORNERS,
 @@ -161,6 +259,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          return this.matches_any_style_class(QUICK_SETTINGS_STYLE_CLASSES);
      }
@@ -728,7 +755,29 @@ index 5a891b9..7ac0d63 100644
      }
  
      is_visible() {
-@@ -372,6 +495,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
+@@ -353,10 +476,20 @@ export const PopupBlurSurface = class PopupBlurSurface {
+         if (this.static_blur)
+             this.static_actor.update_pipeline();
+         else
+-            this.pipeline.change_pipeline_to(this.settings.popup.PIPELINE);
++            this.pipeline.change_pipeline_to(this.get_pipeline_id());
+         this.style.update_target_style();
+     }
+ 
++    /// tahoe glass: the overview's search result panels use a glass of their own, shaded more
++    /// (glass-bar.sh writes it), when it exists; every other popup the popup pipeline
++    get_pipeline_id() {
++        const search = 'pipeline_glassbar_search';
++        if (has_style_class(this.target, 'search-section-content')
++            && Object.hasOwn(global.blur_my_shell._pipelines_manager?.pipelines ?? {}, search))
++            return search;
++        return this.settings.popup.PIPELINE;
++    }
++
+     destroy() {
+         const laters = global.compositor.get_laters();
+         if (this.update_id)
+@@ -372,6 +505,11 @@ export const PopupBlurSurface = class PopupBlurSurface {
          this.signals.destroy();
          this.style.restore_target_style();
          unregisterSurface(this);
@@ -1180,7 +1229,7 @@ index d13b7f3..cf8ab85 100644
              this.add_descendants(actors, seen, this.surface.root_actor);
          }
 diff --git a/src/components/popup/targets.js b/src/components/popup/targets.js
-index 0dce45a..6b08747 100644
+index 0dce45a..7ff3ff2 100644
 --- a/src/components/popup/targets.js
 +++ b/src/components/popup/targets.js
 @@ -1,4 +1,5 @@
@@ -1189,7 +1238,7 @@ index 0dce45a..6b08747 100644
  
  import { has_any_style_class, is_internal_actor } from './actors.js';
  
-@@ -6,9 +7,26 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
+@@ -6,9 +7,31 @@ const POPUP_STYLE_CLASSES = ['popup-menu', 'quick-toggle-menu-container', 'candi
  const POPUP_TARGET_STYLE_CLASSES = [
      'popup-menu-content', 'quick-settings', 'quick-toggle-menu', 'notification-banner',
      'candidate-popup-content', 'screenshot-ui-panel', 'bms-keyboard-surface',
@@ -1197,9 +1246,14 @@ index 0dce45a..6b08747 100644
 +    'dash-label',
 +    // tahoe glass: the app grid's folder tiles, the glass of the folder popup they open into
 +    'app-folder',
++    // tahoe glass: the overview's search result panels (docs/gnome-tahoe/search-glass-plan.md)
++    'search-section-content',
  ];
 +// tahoe glass: capsules whatever their height
 +const CAPSULE_STYLE_CLASSES = ['dash-label'];
++// tahoe glass: search result panels, concentric with their capsule rows: an 18 px row end plus
++// the 12 px gap (tokens/radius.json 'search')
++const SEARCH_SECTION_RADIUS = { key: null, property: null, value: 30 };
  const POPUP_CHILD_STYLE_CLASSES = ['osd-window', 'resize-popup', 'switcher-list', 'workspace-switcher', 'modal-dialog', 'run-dialog', 'clipboard-dialog'];
  const POPUP_DESCENDANT_TARGET_STYLE_CLASSES = ['switcher-list'];
 +// Quick settings without a card: each toggle, slider, system button and opened
@@ -1216,7 +1270,7 @@ index 0dce45a..6b08747 100644
  
  export const POPUP_BACKGROUND_STYLES = ['bms-popup-background-transparent', 'bms-popup-background-light', 'bms-popup-background-dark'];
  export const POPUP_SURFACE_STYLES = POPUP_BACKGROUND_STYLES.map(
-@@ -29,7 +47,8 @@ export const POPUP_CORNER_RADII = [
+@@ -29,7 +52,8 @@ export const POPUP_CORNER_RADII = [
      {
          key: 'calendar-corner-radius',
          property: 'CALENDAR_CORNER_RADIUS',
@@ -1226,7 +1280,7 @@ index 0dce45a..6b08747 100644
      },
      {
          key: 'notification-corner-radius',
-@@ -95,6 +114,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -95,6 +119,15 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
  
          const box = actor._delegate?.box;
@@ -1242,7 +1296,7 @@ index 0dce45a..6b08747 100644
          if (this.has_any_style_class(box, POPUP_TARGET_STYLE_CLASSES))
              targets.add(box);
  
-@@ -143,6 +171,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -143,6 +176,11 @@ export const PopupBlurTargets = class PopupBlurTargets {
                  }
              }
  
@@ -1254,7 +1308,7 @@ index 0dce45a..6b08747 100644
              if (this.is_blur_target_actor(child)) {
                  targets.add(child);
                  continue;
-@@ -152,6 +185,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -152,6 +190,25 @@ export const PopupBlurTargets = class PopupBlurTargets {
          }
      }
  
@@ -1280,7 +1334,7 @@ index 0dce45a..6b08747 100644
      push_children(stack, children) {
          for (let index = children.length - 1; index >= 0; index--)
              stack.push({ actor: children[index], fallback_count: null });
-@@ -167,6 +219,12 @@ export const PopupBlurTargets = class PopupBlurTargets {
+@@ -167,6 +224,14 @@ export const PopupBlurTargets = class PopupBlurTargets {
      }
  
      get_corner_radius(target, root_actor) {
@@ -1290,6 +1344,8 @@ index 0dce45a..6b08747 100644
 +            return ROUND_CORNER_RADIUS;
 +        if (this.has_any_style_class(target, CAPSULE_STYLE_CLASSES))
 +            return ROUND_CORNER_RADIUS;
++        if (this.has_any_style_class(target, ['search-section-content']))
++            return SEARCH_SECTION_RADIUS;
          return POPUP_CORNER_RADII.find(radius =>
              has_any_style_class(target, radius.style_classes)
              || has_any_style_class(root_actor, radius.style_classes)
