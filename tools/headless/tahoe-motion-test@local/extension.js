@@ -10,6 +10,7 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { runStress } from './stress.js';
 
 const OUT = GLib.getenv('TAHOE_TEST_OUT');
 const RUNS = Number(GLib.getenv('TAHOE_TEST_RUNS') ?? 5);
@@ -147,6 +148,11 @@ export default class Driver extends Extension {
         write('log.jsonl', { start: true, animations: St_animations() });
         const qs = Main.panel.statusArea.quickSettings.menu;
         const date = Main.panel.statusArea.dateMenu.menu;
+        if (GLib.getenv('TAHOE_TEST_ONLY') === 'stress') {
+            await runStress(obj => write('log.jsonl', obj));
+            write('log.jsonl', { done: true });
+            return;
+        }
         if (GLib.getenv('TAHOE_TEST_ONLY') === 'vitals') {
             const vitals = Main.panel.statusArea.vitalsMenu?.menu;
             vitals.open(true);

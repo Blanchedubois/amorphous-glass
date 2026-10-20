@@ -420,6 +420,53 @@ user from VM recordings and then on the real screen at 120 Hz. Re-run Phase 0's 
 the after. Ship through `glass-bar.sh rebuild`, apply in the live glass-bar checkout (own lines
 only), record in the shared notes, and have `tahoe-repair.sh` keep any new keys.
 
+### Stress and impact analysis: spam clicks and quick scrolls (2026-10-19, after round 4)
+
+Asked for by the user ("make sure this can withstand quick scrolls and spam clicks"). Run in the
+headless shell (2560x1440 at 120 Hz, the user's glass settings, dash-to-dock, tahoe-motion from
+this checkout), with real input from a virtual pointer: `tools/headless/stress.sh BMS_ZIP OUTDIR`
+(`TAHOE_STRESS_CASES=regex` runs some cases only; `TAHOE_NO_MOTION=1` runs without tahoe-motion,
+the baseline). Each case gets:
+
+- **opens**: how many popups it actually opened (BoxPointer opens plus GTK popup windows mapped).
+- **frames**: p95 and max frame interval while it ran.
+- **idle**: frames in the idle second after it. 0 means nothing keeps animating.
+- **stuck**: anything left behind. That is a menu still open, glass still held, settling or
+  frozen, a frame callback still queued, a morph, close or icon timeline still running, or a JS
+  error.
+- **counts**: before and after for the glass's signal handlers (`__tahoeGlass.debug()`), stage
+  actors and shell RSS.
+- **jump**: the largest one-frame change of a card's revealed height as a share of the card,
+  per 120 Hz frame. A reversal that restarted instead of turning round would show close to 1.
+
+| case | before (round 4) | fix | after |
+|---|---|---|---|
+| calendar icon clicked 14x, 40 ms apart | 7 opens, p95 11.9 ms, idle 0, nothing stuck, handlers 4170→4170 | — | same (p95 12.1) |
+| quick settings icon clicked 14x, 40 ms | 7 opens, p95 12.1, idle 0, ok | — | same |
+| open→close→open mid spring (calendar, 60 ms; random 20–160 ms for calendar and QS) | turns round from where it is: jump ≤ 0.07 (0.19 when spammed: the reopened pour starting fast, no restart), ok | — | same |
+| two panel icons alternated 14x, 50 ms | 14 opens, p95 13.8, ok | — | same (13.6; 13.6 without motion) |
+| hover-slide between panel menus 20x, 30 ms | 20 opens, p95 16.5, ok | — | same (17.5; 12.8 without motion, the one case where motion costs frames) |
+| Dark Style toggle clicked 12x, 40 ms | p95 33, ok | — | same (36 without motion: the theme reload) |
+| Wi-Fi submenu arrow clicked 12x, 50 ms | p95 9.9, ok, 5 actors more (the network list) | — | same |
+| desktop right-click 14x at moving places, 60 ms | p95 9.6, ok (a reopen elsewhere starts afresh, by design) | — | same |
+| dock icon right-click 12x, 60 ms | p95 14.2 (16.2 without motion), ok; +65 handlers and +36 actors once, the dock menu's first glass | — | same |
+| volume slider scrolled 30 notches while QS opens | p95 10, ok | — | same |
+| top-bar volume icon scrolled 40 notches while the calendar opens | p95 8.8, ok | — | same |
+| calendar scrolled 24 notches mid-open | p95 8.9, ok | — | same |
+| GTK popover opened/closed 25x, 40 ms, app quit while open | 26 popup windows, p95 31 (33 without motion: the client), ok | — | same |
+| **popup closed at once mid-open** (`menu.close({animate: false})`: the overview, the lock screen, a lost grab), 8x calendar and QS | **broken: after the first, 1 morph left running on the hidden popup, its glass held and frozen (QS: 35 surfaces frozen), so the next open began on stale blur** | `BoxPointer.open/close` with no animation ends a running morph where it is, puts the glass at rest and releases it; a handover close still waiting runs its callback too (`stop()` in extension.js) | 8 opens each, nothing left, p95 9.7/10.5 |
+| overview toggled 50 ms into a calendar open, 4x | ok (GNOME closes it animated here) | — | same |
+| 50x calendar open/close | handlers 4235→4235, actors 2744→2744, RSS ±2 MB, idle 0 | — | same |
+| 50x quick settings open/close | same, flat | — | same |
+| 50x desktop right-click | same, flat | — | same |
+
+No JS errors in any run. Frames: the headless shell renders in software, so its baseline without
+tahoe-motion is a p95 of 9 to 13 ms in these cases, not 8.3. The only case where motion adds frame
+time is skimming the panel by hover (p95 +4.7 ms; GNOME's own handover with the partial pour).
+That is worth checking on the real desktop, where the GPU does the blur. A first stress run passed
+`menu.close(false)` to GNOME 51 and missed the bug: `close()` takes `{animate}`, and `false`
+animates.
+
 ## Where the code would go
 
 - Phases 1 to 3: `config/bms-tahoe-glass.patch` (popup surfaces, backdrop capture, refraction
