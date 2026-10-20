@@ -10,6 +10,11 @@ H=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d -p "${TMPDIR:-/tmp}" lockroot.XXXX)
 mkdir -p "$out"
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
+# its own runtime dir, so the test shell never creates or deletes the real session's
+# gnome-shell-disable-extensions crash guard in /run/user/$UID
+# (short path: the Wayland socket path must fit in 108 bytes)
+export XDG_RUNTIME_DIR=$(mktemp -d "/tmp/lockrun.XXXX")
+chmod 700 "$XDG_RUNTIME_DIR"
 export GSETTINGS_BACKEND=keyfile TAHOE_TEST_OUT=$out TAHOE_LOCK_TAG=${TAHOE_LOCK_TAG:-$mode}
 rm -f "$out/log-$TAHOE_LOCK_TAG.jsonl"
 ext=$XDG_DATA_HOME/gnome-shell/extensions
@@ -53,5 +58,7 @@ open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 timeout ${TAHOE_TEST_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-lock-$$" \
   --virtual-monitor 2560x1440@120 > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
-rm -rf "$root"
+# the test session's document portal mounts a FUSE file system in its runtime dir
+fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
+rm -rf "$root" "$XDG_RUNTIME_DIR"
 echo "done: $(grep -c . "$out/log-$TAHOE_LOCK_TAG.jsonl" 2>/dev/null || echo 0) records"

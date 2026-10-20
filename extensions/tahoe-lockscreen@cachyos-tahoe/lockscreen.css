@@ -1,6 +1,7 @@
-/* Tahoe Lock Screen. Loaded only while the screen is locked (session mode unlock-dialog). The user
-   theme is switched off on the lock screen, so these rules sit on the system shell theme
-   (/usr/share/gnome-shell/gnome-shell-theme.gresource, currently MacTahoe's GDM build).
+/* Tahoe Lock Screen. Loaded by frame.js only while the screen is locked and only on a GNOME version
+   the extension was tested on (it is not named stylesheet.css, so the shell never loads it by
+   itself). The user theme is switched off on the lock screen, so these rules sit on the system
+   shell theme (/usr/share/gnome-shell/gnome-shell-theme.gresource, currently MacTahoe's GDM build).
 
    Password capsule. GNOME overlays the unlock arrow (.login-dialog-default-button-well) on the
    right end of the entry and reserves room for it with padding-right: 2.5em on the entry; the
