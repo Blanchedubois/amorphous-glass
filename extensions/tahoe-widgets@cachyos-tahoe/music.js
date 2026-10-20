@@ -171,7 +171,8 @@ class AppButton {
     update(state) {
         const app = state?.app ?? null;
         this._app = app;
-        this.actor.visible = Boolean(state);
+        // never on the lock screen (its copy of this module): no window may come up from there
+        this.actor.visible = Boolean(state) && !Main.sessionMode.isLocked;
         const key = app ? `${app.desktopEntry}|${app.pid}` : null;
         if (key === this._shown)
             return;
@@ -183,7 +184,7 @@ class AppButton {
 
     _open() {
         const app = this._app;
-        if (!app)
+        if (!app || Main.sessionMode.isLocked)
             return;
         this._player.raise();
         if (this._settleId)
