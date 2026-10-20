@@ -676,3 +676,35 @@ The menu bar's contents and icons, the quick settings layout, the Tahoe Control 
 7. Extra Phase 1 items: capture once at the final geometry, pre-allocate textures at the final
    size, unfreeze on the transition's `completed` (no timer), warm the shaders at startup so the
    first open does not hitch, no per-frame JS allocations.
+
+### Quick settings submenus: the card's bottom clipped, then snapping (2026-10-20)
+
+User: "the power dropdown animation is broken because for a moment the bottom of the card is
+clipped and then it glitches to the right size. Same with the other dropdowns in the control
+center."
+
+**Measured** (`TAHOE_TEST_ONLY=subprobe`, per frame: the container's height, the box's height,
+the glass's height, the reveal's bottom edge). The glass took its size from the box's
+allocation of the frame before. Blur My Shell places it before GNOME lays the stage out for the
+new frame. So it trailed the growing card by up to 20 px, then caught up when the motion ended:
+
+| frame | 4 | 5 | 6 |
+|---|---|---|---|
+| card (box) | 82 | 100 | 120 |
+| glass | 69 | 82 | 100 |
+
+This was already there in round 4's build; it is not from a recent change.
+
+**Fix** (tahoe-motion `holdBox`): while a submenu opens or closes, its box (the glass's target)
+keeps its final geometry (360 × 248 for Power, at the container's padding, less its own margins)
+under a fixed layout, and the container clips it. The bin layout would cap the box at the
+container's height. The glass never resizes mid-motion, and its edge is the reveal, set in the
+same frame as the container's height. The container's own layout comes back when the motion
+ends. Measured after: the box and glass stay 248 from the first frame to the last, the reveal
+follows the card every frame, and nothing changes size at the end.
+
+The box's width was stale before its first open (220 px in place of 360). So the card now
+visibly pours sideways out of its toggle as designed, where before it filled the width at once.
+Stress (quick settings spam, reversals, Wi-Fi arrow spam, instant closes, ×50): all ok.
+
+![before (top) and after: Power submenu opening and closing, slowed 10x](shots/submenu-glass-held.jpg)
