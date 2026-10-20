@@ -73,6 +73,61 @@ export async function runSurvey(write) {
     };
 
     await sleep(1500);
+    // TAHOE_SURVEY_SEARCH=1: only the overview search (docs/gnome-tahoe/search-glass-plan.md)
+    if (GLib.getenv('TAHOE_SURVEY_SEARCH') === '1') {
+        const find = (root, test) => { const st = [root]; while (st.length) { const a = st.pop(); if (test(a)) return a; st.push(...a.get_children()); } return null; };
+        const visible = cls => find(Main.overview._overview, a => a.mapped && a.has_style_class_name?.(cls));
+        const at = a => { const [x, y] = a.get_transformed_position(); const [w, h] = a.get_transformed_size(); return [x + w / 2, y + h / 2]; };
+        // two list providers of our own (the real ones, Settings, Characters, Clocks, are other
+        // apps over D-Bus, which the test shell cannot start)
+        const provider = (id, app, words) => ({
+            id, isRemote: false, canLaunchSearch: false,
+            appInfo: Gio.DesktopAppInfo.new(app),
+            getInitialResultSet: async terms => words.filter(w => terms.some(t => w.toLowerCase().includes(t.toLowerCase()))),
+            getSubsearchResultSet: async (prev, terms) => prev.filter(w => terms.some(t => w.toLowerCase().includes(t.toLowerCase()))),
+            getResultMetas: async ids => ids.map(w => ({ id: w, name: w, description: `${id} result: ${w}`, createIcon: size => new (imports.gi.St.Icon)({ icon_name: 'emblem-documents-symbolic', icon_size: size }) })),
+            filterResults: (r, max) => r.slice(0, max),
+            activateResult: () => {}, launchSearch: () => {}, createResultObject: () => null,
+        });
+        const controller = Main.overview.searchController ?? Main.overview._overview.controls._searchController;
+        try {
+            controller.addProvider(provider('tahoe-test-settings', 'org.gnome.Settings.desktop',
+                ['Wi-Fi network', 'Power saving', 'Wellbeing', 'Mobile network', 'Wallpaper', 'Passwords', 'Panel', 'Parental']));
+            controller.addProvider(provider('tahoe-test-files', 'org.gnome.Nautilus.desktop',
+                ['wallpaper.png', 'passport.pdf', 'paint notes.txt', 'web page.html', 'walk.mp4', 'party.jpg']));
+        } catch (e) { write({ survey: 'providers', error: `${e}` }); }
+        Main.overview.show();
+        await sleep(1200);
+        Main.overview.searchEntry.grab_key_focus();
+        await step('search-w', () => Main.overview.searchEntry.set_text('w'), 2500);
+        const row = visible('list-search-result');
+        if (row) await step('search-hover-row', () => { mouse.notify_absolute_motion(t(), ...at(row)); }, 600);
+        const prov = visible('search-provider-icon');
+        if (prov) await step('search-hover-provider', () => { mouse.notify_absolute_motion(t(), ...at(prov)); }, 600);
+        {
+            const results = find(Main.overview._overview, a => a.has_style_class_name?.('search-results-scrollview') || a.constructor.name === 'SearchResultsView');
+            const seen = new Map(); const st = [results ?? Main.overview._overview];
+            while (st.length) { const a = st.pop(); if (a.mapped) { const k = `${a.constructor.name}.${a.get_style_class_name?.() ?? ''}`; seen.set(k, (seen.get(k) ?? 0) + 1); } st.push(...a.get_children()); }
+            write({ survey: 'result-classes', classes: [...seen.entries()].filter(([k]) => /search|icon|result|tile/i.test(k)).map(([k, n]) => `${k} x${n}`) });
+        }
+        const tile = find(Main.overview._overview, a => a.mapped && a.has_style_class_name?.('overview-tile') && a.get_parent()?.has_style_class_name?.('grid-search-results'));
+        if (tile) {
+            const chain = []; for (let a = tile; a && chain.length < 3; a = a.get_parent()) chain.push(`${a.constructor.name}.${a.get_style_class_name?.()}`);
+            const kids = []; const st = [tile]; while (st.length) { const a = st.pop(); if (a !== tile && a.get_style_class_name?.()) kids.push(`${a.constructor.name}.${a.get_style_class_name()}`); st.push(...a.get_children()); }
+            write({ survey: 'tile-classes', chain, kids: kids.slice(0, 8) });
+        }
+        if (tile) await step('search-hover-tile', () => { mouse.notify_absolute_motion(t(), ...at(tile)); }, 600);
+        mouse.notify_absolute_motion(t(), 100, 700);
+        await step('search-pa', () => Main.overview.searchEntry.set_text('pa'), 2500);
+        await step('search-keys', async () => { Main.overview.searchEntry.grab_key_focus(); await key(Clutter.KEY_Down); await key(Clutter.KEY_Down); }, 600);
+        const view = find(Main.overview._overview, a => a.constructor.name === 'St_ScrollView' && a.mapped && find(a, b => b.has_style_class_name?.('search-section-content')));
+        await step('search-scrolled', () => { view?.vadjustment?.set_value(view.vadjustment.upper); return view ? null : 'no scroll view'; }, 800);
+        await step('search-scrolled-back', () => { view?.vadjustment?.set_value(0); }, 800);
+        write({ survey: 'search-glass', surfaces: globalThis.__tahoeGlass?.debug?.() });
+        await step('search-closing', () => Main.overview.hide(), 120);
+        await step('search-closed', () => null, 1500);
+        return;
+    }
     // TAHOE_SURVEY_GRID=1: only the app grid (GNOME's own dash: run without dash-to-dock)
     if (GLib.getenv('TAHOE_SURVEY_GRID') === '1') {
         if (GLib.getenv('TAHOE_SURVEY_GRID_MOTION') === '1') {
