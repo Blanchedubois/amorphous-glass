@@ -1,4 +1,4 @@
-# Music widgets: album-colour swirl (plan, 2026-10-20)
+# Music widgets: album-colour swirl (2026-10-20)
 
 The Music widgets (small, wide, large, lyrics) tint their glass with a slow swirl made from the
 album cover's main colours, the way Apple Music's full-screen lyrics background moves. The glass
@@ -25,32 +25,66 @@ warp, mixed with Gaussian weights (that is the "heavily blurred mesh"), plus a d
 fragment-only shader with no texture reads beyond the glass. Credits for AMLL (AGPL-3.0,
 technique) and Adaptive Palette (MIT, technique) go in the README.
 
-## Plan
+## What was built (phases 1 to 8, 2026-10-20)
 
-1. **Colour extraction** (`swirl.js`): the cover loaded once per track at 40x40 with GdkPixbuf
-   (async), k-means (k = 5, a fixed seed so a track always gives the same palette) over the
-   opaque pixels; clusters ranked by size and colourfulness, the top 4 kept. Cached per cover.
-   Never per frame. No cover: a neutral grey palette at a lower strength.
-2. **Swirl shader on a still card**: a `Clutter.OffscreenEffect` on the card's glass backdrop
-   (like the glass text clock), so the glass is rendered once into the effect's texture and each
-   swirl frame only re-runs the shader over it (`queue_repaint` on the effect, not the actor).
-3. **Inside the glass**: the swirl colours the glass in a "colour" blend (the glass keeps its
-   own light and dark, so the rim light and the edge shadow stay), plus a smaller pull towards
-   the swirl's lightness, faded out across the refraction band at the edge. The palette is mapped
-   per mode (dark and milky: deep colours under white text; light: pale ones under dark text).
-   The 1 px edge is CSS on the content, over all of it.
-4. **Large**: the cover across the full width inside the 16 px padding (radius 24 - 16 = 8),
-   the widget taller to fit, title, artist, progress with times and controls under it.
-5. **Wide**: 16 px on every side; the cover as tall as the card less the two gaps; title and
-   artist at the top right of the cover; the controls right-aligned at the right of the column
-   with the progress bar under them, level with the cover's bottom edge.
-6. **Lyrics**: the same swirl.
-7. **Performance**: about 24 fps from a GLib timer (the motion is slow; 120 Hz buys nothing), and
-   no timer at all when paused or stopped, hidden or unmapped, under a fullscreen window, locked,
-   or with GNOME animations off (a still gradient then). A track change while paused or with
-   animations off cross-fades only when animations are on, then stops. Checked with
-   `tools/widgets-stress`.
-8. Docs and light/dark screenshots.
+- **Colours** (`palette.js`): the cover read once per track at 40 px (async), k-means (k = 5,
+  deterministic seed) in OkLab, the 4 most present and colourful kept; ~2 ms a cover, cached per
+  cover (32). No cover: a neutral grey field at half strength. `tools/widgets-stress/covers.js`
+  makes the test covers (dark, bright, monochrome, blue and orange) and prints their palettes.
+- **The cover's own colours, the same in every mode** (user, mid-way): no per-mode remapping.
+  The text ink follows the swirl instead of the mode: dark text when the palette's mean luma is
+  over 0.56, white otherwise (the mode's text without a cover), with a 20 % scrim on that side.
+- **Waves, not blobs** (user, mid-way): a three-step sine domain warp folds two smooth waves that
+  mix the four colours into long ribbons, the plane turning at 0.04 rad/s; the warps move at
+  0.08 to 0.23 rad/s, so a ribbon takes about half a minute to roll over. Dithered.
+- **Inside the glass, translucent, highlights only** (user, mid-way): a `Clutter.OffscreenEffect`
+  on the card's glass backdrop. The glass takes the swirl's hue at its own lightness (70 %), then
+  moves 38 % towards the swirl's colour: the wallpaper's blur still shows through. Across the 14 px
+  edge band the glass is read from just inside the band and only what is brighter at the edge (the
+  rim light) is added back: no inner shadow or refraction bevel, no "3D emboss". The 1 px edge is
+  CSS over everything, unchanged. Without Blur My Shell (fallback card) there is no swirl.
+- **Large**: the cover 324 x 324 (356 less 16 px each side), radius 8 (24 - 16); title, artist,
+  progress with times and controls under it; the card is 356 x 496 (a widget class can set a
+  `static height`, `extension.js` `dims()`).
+- **Wide**: 16 px padding on every side and between cover and column; the cover 138 x 138 (170 less
+  two gaps); title and artist at its top right. **Controls**: right-aligned in the column to the
+  right of the cover, just above the progress bar, which ends level with the cover's bottom edge.
+  The hover circle of the last button (not its icon) ends on the column's edge, as the bar does.
+- **Lyrics** and **small** share the same swirl (all music cards are `MusicWidget`s); every music
+  card now has 16 px padding.
+- **Public API unchanged**: `MusicSmall`, `MusicMedium`, `MusicLarge`, `MusicLyrics` keep their
+  constructors, `size`, `setMode`, `tick`, `wantsSeconds`, `requestTick`, `destroy`; added
+  `attachCard(card)` (optional: without it no swirl) and `MusicLarge.height`.
+
+### Performance (headless shell, real GPU via gbm, 2560x1440, 4 music widgets, `STRESS_ONLY=swirl`)
+
+| State | Stage paints/s | Swirl timer | Shell CPU |
+|---|---|---|---|
+| Playing | 26 | on (25 fps, one timer for all) | 2.7 % |
+| Paused | 0 | off | 0.7 % (settling) |
+| Track change while paused | 11 for 1.2 s | on for the cross-fade only | 2.7 % for 1.2 s |
+| After that cross-fade | 0 | off | 0.2 % |
+| Playing, GNOME animations off | 1 (the progress second) | off, still gradient | 0.3 % |
+| Playing, under a fullscreen window | 0 | off | 0.2 % |
+| Playing, locked | 0 | off (the extension is off while locked) | 0.6 % |
+| Unlocked / animations back on | 26 | on again | 2.7 to 3 % |
+| Idle baseline: paused from the start | 0 | off | **0.2 %, same as main without the swirl** |
+
+The swirl paints at 25 fps whatever the refresh rate (120 Hz on the desktop: the frame clock only
+draws when the timer damages the cards). Each frame only re-runs the shader over the glass already
+rendered in the effect's texture (`queue_repaint` on the effect), so Blur My Shell's blur does
+not run again. A window covering the whole card is checked on `restacked` and once a second while
+playing. Full stress (`layout-all.json`): every scenario ok, timers 3, 2, 2, 2, 2, D-Bus subscriptions 1, actors
+3466 to 3462, match rules 89 to 87 over lock and disable cycles: no leaks. The remaining logged
+errors are the date menu's DBusProxy ones listed below.
+
+Rerun: `STRESS_COVERS=a.png,b.png STRESS_ONLY=swirl DRIVER=widget-stress@local bash
+tools/widgets-stress/run.sh OUT tools/widgets-stress/layout-music.json`. Screenshots:
+`SHOT_FAKE_PLAYER=1 SHOT_ART=cover.png|none bash tools/widgets-stress/run.sh OUT
+tools/widgets-stress/layout-music.json` (`SHOT_MOTION=ms` adds a later shot). The harness now uses
+its own `XDG_RUNTIME_DIR`, so it never touches the session's crash guard file.
+
+Sheets: `docs/shots/music-swirl-light.png`, `music-swirl-dark.png` (dark, bright, blue and no cover).
 
 # Desktop widgets: stress and impact check (2026-10-19)
 

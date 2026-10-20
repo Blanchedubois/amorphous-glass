@@ -45,13 +45,19 @@ Stress and idle-cost results (spam clicks, fast drags, lock cycles, leaks): `doc
 | Glass Text Clock (the digits are the glass) | medium | `glasstext.js` | local time; a shader cuts Blur My Shell's glass to the glyphs |
 | Calendar: Today, Month, Today and Month | small, small, medium | `calendar.js` | Evolution Data Server events |
 | Weather, Next Hours, Week | small, medium, large | `weather.js` | the shell's WeatherClient (libgweather), location from GNOME Weather, refreshed every 30 min |
-| Music, Wide, Large, Lyrics | small, medium, large, large | `music.js`, `mpris.js` | MPRIS; synced lyrics from a `.lrc` next to a local file, else lrclib.net (Lyrics widget only, once per track) |
+| Music, Wide, Large (356 x 496), Lyrics | small, medium, large, large | `music.js`, `mpris.js`, `swirl.js`, `palette.js` | MPRIS; synced lyrics from a `.lrc` next to a local file, else lrclib.net (Lyrics widget only, once per track); the glass is tinted by a slow swirl of the cover's colours (sheets `docs/shots/music-swirl-{light,dark}.png`) |
 
 Clock II and III, Glass Text, Weather and Music follow the designs of
 [liquidglass-kde-widgets](https://github.com/jaxparrow07/liquidglass-kde-widgets) by jaxparrow07
 (GPL-3.0), redrawn for GNOME Shell; no code, fonts or icons are taken from it (its fonts and icons
 are Apple's). Where the KDE look differs from the glass standard (weather-coloured cards, its own card
 glass), the standard wins.
+
+The Music widgets' album-colour swirl follows the technique of the background renderer in
+[applemusic-like-lyrics](https://github.com/Steve-xmh/applemusic-like-lyrics) by Steve-xmh
+(AGPL-3.0) and of [Adaptive Palette](https://pub.dev/documentation/adaptive_palette/latest/) (MIT):
+dominant colours by k-means, a heavily blurred field turning slowly, a cross-fade per track. The
+shader and the colour code here are written for this repo (GPL-3.0); no code is taken from either.
 
 ## Where this came from
 
