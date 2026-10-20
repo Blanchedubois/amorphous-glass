@@ -24,6 +24,7 @@ const RADIUS = 24;         // tokens/radius.json widget
 const LEFT = 0.045;        // the column's left edge, share of the monitor's width
 const MARGIN = 0.04;       // clear of the monitor's top and bottom, share of its height
 const TICK = 10;           // s: the calendar turns over at midnight, the weather each hour
+const WEATHER_WAIT = 4000; // ms: the weather shows by then, forecast or not
 
 export function buildWidgets(ext, dir) {
     const group = Main.screenShield?._lockDialogGroup;
@@ -59,6 +60,31 @@ export function buildWidgets(ext, dir) {
         content.add_child(widget.actor);
         actor.add_child(content);
         layer.add_child(actor);
+        // the weather shows once it has its forecast, not "Loading…" first: faded in then, or
+        // after WEATHER_WAIT whatever it has (no network yet at boot, say)
+        const client = widget._client;
+        if (client && !(client.hasLocation && client.info?.is_valid?.())) {
+            actor.opacity = 0;
+            const show = () => {
+                if (actor.opacity === 0)
+                    actor.ease({opacity: 255, duration: 250, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            };
+            const changedId = client.connect('changed', () => {
+                if (client.info?.is_valid?.())
+                    show();
+            });
+            let id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, WEATHER_WAIT, () => {
+                id = 0;
+                show();
+                return GLib.SOURCE_REMOVE;
+            });
+            ext._undo.push(() => {
+                if (id)
+                    GLib.source_remove(id);
+                id = 0;
+                client.disconnect(changedId);
+            });
+        }
         return {actor, widget};
     });
     ext._undo.push(() => items.forEach(({widget}) => widget.destroy()));

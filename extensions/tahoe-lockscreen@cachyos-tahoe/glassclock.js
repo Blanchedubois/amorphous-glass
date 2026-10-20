@@ -177,6 +177,7 @@ class TahoeLockGlyphGlassEffect extends Clutter.OffscreenEffect {
         }
         super.vfunc_paint_target(node, paintContext);
         this.paints++;
+        this.onPaint?.();
     }
 });
 

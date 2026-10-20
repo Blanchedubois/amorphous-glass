@@ -323,6 +323,29 @@ async function runDemo() {
     write({ label: 'demo', frames: n, fps: Math.round(real * 100) / 100, frame: frameState().frame });
 }
 
+// TAHOE_LOCK_GATE=lockvideo: frames from the moment Super+L locks (lock(true), animated, as the
+// shortcut) for 5 s, as fast as screenshots go, then the prompt: to see what glitches on locking
+async function runLockVideo() {
+    await sleep(3000);
+    let n = 0;
+    const start = GLib.get_monotonic_time();
+    const times = [];
+    const grab = async () => {
+        times.push(Math.round((GLib.get_monotonic_time() - start) / 1000));
+        await shotRect(`lv-${String(n++).padStart(4, '0')}`, [0, 0, global.screen_width, global.screen_height]);
+    };
+    await grab();
+    Main.screenShield.lock(true);
+    while (GLib.get_monotonic_time() - start < 5e6)
+        await grab();
+    Main.screenShield._wakeUpScreen();
+    await typeKeys('x');
+    const s2 = GLib.get_monotonic_time();
+    while (GLib.get_monotonic_time() - s2 < 3e6)
+        await grab();
+    write({ label: 'lockvideo', frames: n, times, frame: frameState().frame });
+}
+
 // a submitted password being checked: GNOME makes the field insensitive and spins in the arrow's
 // place (AuthPrompt.updateSensitivity(false), startSpinning) until PAM answers. The frame must
 // keep running (the real lock screen fell back to GNOME's here, 2026-10-20), and the field must be
@@ -749,7 +772,7 @@ export default class Driver extends Extension {
         isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'verifying' ? runVerifying() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'verifying' ? runVerifying() : GATE === 'lockvideo' ? runLockVideo() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
