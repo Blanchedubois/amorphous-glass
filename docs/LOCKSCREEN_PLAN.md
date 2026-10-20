@@ -668,3 +668,27 @@ Not done: install, logout and merge into main. They wait for the user.
   - SF Pro Display heavy (closest to the image) or SF Pro Rounded?
   - How milky? Picked from screenshots.
 - **Phase 5:** Now Playing under the clock, or above the avatar?
+
+## Incident, 2026-10-20 14:32 to 14:46: the test harness locked the user's account
+
+`tools/lockscreen/run.sh` starts a throwaway gnome-shell, and its unlock prompt, like a real one,
+asked the **real GDM daemon** (on the system bus) to start a `gdm-password` PAM conversation for
+the user. The harness never answered and ended those shells mid-conversation. Each dropped
+conversation was logged as "conversation failed" and counted by `pam_faillock`: three within 15
+minutes (14:32:25, 14:33:53, 14:35:44) locked the user's account for 10 minutes. During that time
+sudo and the real lock screen refused the password. The GDM-login session caught it.
+
+Fix:
+- **Driver:** `lock-test@local` cuts the test shell off from GDM before anything locks.
+  `ShellUserVerifier.prototype.begin` becomes a no-op, the `Gdm.Client` channel calls throw, and
+  it logs `pam-isolated` and `pam-blocked`.
+- **run.sh, before a run:** it refuses to start while `faillock` shows any failure for the user
+  in the last 15 minutes.
+- **run.sh, after a run:** it fails if the driver did not log `pam-isolated`.
+
+Verified: a run now leaves no `gdm-password`/`pam_unix` lines in the system journal and no
+faillock entry. The journal did show the 14:32 to 14:35 ones, so that check is real.
+
+The production extension is not affected: on the real lock screen the password check is GNOME's
+own, as designed.
+
