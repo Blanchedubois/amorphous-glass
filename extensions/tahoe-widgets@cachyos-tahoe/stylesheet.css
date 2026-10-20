@@ -107,6 +107,25 @@
 .tahoe-music-lyric-current { font-size: 19px; color: #ffffff; }
 .tahoe-widget-light .tahoe-music-lyric-current { color: #1c1c1e; }
 
+/* the music text over the album swirl: its ink follows the cover's colours, not the glass mode
+   (the swirl is the same in every mode); without a cover it follows the mode as above */
+.tahoe-music-ink-white { color: #ffffff; }
+.tahoe-music-ink-white .tahoe-widget-secondary { color: rgba(255, 255, 255, 0.72); }
+.tahoe-music-ink-white .tahoe-music-track { background-color: rgba(255, 255, 255, 0.22); }
+.tahoe-music-ink-white .tahoe-music-fill { background-color: rgba(255, 255, 255, 0.88); }
+.tahoe-music-ink-white .tahoe-music-button:hover { background-color: rgba(255, 255, 255, 0.14); }
+.tahoe-music-ink-white .tahoe-music-button:active { background-color: rgba(255, 255, 255, 0.20); }
+.tahoe-music-ink-white .tahoe-music-lyric { color: rgba(255, 255, 255, 0.45); }
+.tahoe-music-ink-white .tahoe-music-lyric-current { color: #ffffff; }
+.tahoe-music-ink-dark { color: #1c1c1e; }
+.tahoe-music-ink-dark .tahoe-widget-secondary { color: rgba(28, 28, 30, 0.66); }
+.tahoe-music-ink-dark .tahoe-music-track { background-color: rgba(0, 0, 0, 0.14); }
+.tahoe-music-ink-dark .tahoe-music-fill { background-color: rgba(28, 28, 30, 0.80); }
+.tahoe-music-ink-dark .tahoe-music-button:hover { background-color: rgba(0, 0, 0, 0.07); }
+.tahoe-music-ink-dark .tahoe-music-button:active { background-color: rgba(0, 0, 0, 0.11); }
+.tahoe-music-ink-dark .tahoe-music-lyric { color: rgba(28, 28, 30, 0.42); }
+.tahoe-music-ink-dark .tahoe-music-lyric-current { color: #1c1c1e; }
+
 /* glass text clock: a bare card, the glass is cut to the glyphs by a shader (glasstext.js);
    the labels show only without Blur My Shell */
 .tahoe-widget-bare .tahoe-widget-content { border-width: 0; }
