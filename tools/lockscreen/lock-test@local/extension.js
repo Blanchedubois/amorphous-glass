@@ -9,7 +9,96 @@ import Shell from 'gi://Shell';
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import GObject from 'gi://GObject';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+
+const FAULT = GLib.getenv('TAHOE_LOCK_FAULT');
+
+// Fault injection: what a broken lock screen widget extension could do to GNOME's unlock dialog.
+const ThrowingWidget = GObject.registerClass(class ThrowingWidget extends St.Widget {
+    vfunc_allocate(box) { super.vfunc_allocate(box); throw new Error('injected: widget allocate'); }
+});
+const ThrowingLayout = GObject.registerClass(class ThrowingLayout extends Clutter.LayoutManager {
+    vfunc_get_preferred_width() { return [0, 0]; }
+    vfunc_get_preferred_height() { return [0, 0]; }
+    vfunc_allocate() { throw new Error('injected: dialog layout allocate'); }
+});
+
+function inject(dialog) {
+    switch (FAULT) {
+    case 'widget-allocate':   // a widget whose allocation throws every layout pass
+        dialog.add_child(new ThrowingWidget({ width: 300, height: 150, x: 100, y: 100, style: 'background-color: red;' }));
+        break;
+    case 'layout-allocate':   // a Tahoe layout manager on the dialog that throws
+        dialog.layout_manager = new ThrowingLayout();
+        break;
+    case 'focus-steal': {      // a focusable widget button that takes key focus on lock
+        const b = new St.Button({ label: 'widget', can_focus: true, reactive: true, x: 100, y: 100, style: 'background-color: red; padding: 20px;' });
+        dialog.add_child(b);
+        b.grab_key_focus();
+        break;
+    }
+    case 'cover': {            // a reactive widget laid out over the password capsule
+        const w = new St.Widget({ reactive: true, x: 1000, y: 780, width: 560, height: 160, style: 'background-color: rgba(255,0,0,0.5);' });
+        dialog.add_child(w);
+        dialog.connect('notify::allocation', () => dialog.set_child_above_sibling(w, null));
+        break;
+    }
+    case 'timer-throws':       // a widget timer whose callback throws every 100 ms
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => { throw new Error('injected: timer'); });
+        break;
+    case 'enable-throws':      // a lock screen extension whose enable() throws: see faulty-ext below
+        break;
+    }
+}
+
+async function typeKeys(text) {
+    const seat = (global.stage.get_context?.()?.get_backend?.() ?? global.backend).get_default_seat();
+    const kb = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+    for (const ch of text) {
+        const keyval = Clutter.unicode_to_keysym(ch.codePointAt(0));
+        const t = GLib.get_monotonic_time();
+        kb.notify_keyval(t, keyval, Clutter.KeyState.PRESSED);
+        kb.notify_keyval(t + 1000, keyval, Clutter.KeyState.RELEASED);
+        await sleep(60);
+    }
+}
+
+async function runFault() {
+    await sleep(3000);
+    Main.screenShield.lock(false);
+    await sleep(2500);
+    Main.screenShield._wakeUpScreen();
+    await sleep(800);
+    const dialog = Main.screenShield._dialog;
+    try { inject(dialog); } catch (e) { write({ label: 'inject-threw', error: String(e) }); }
+    await sleep(500);
+    const f0 = global.stage.key_focus;
+    const inside = a => { for (; a; a = a.get_parent()) if (a === dialog) return true; return false; };
+    write({ label: 'focus-before', focus: f0 ? f0.constructor.name : null, insideDialog: inside(f0) });
+    // a real lock leaves key focus on the dialog (screenShield._ensureUnlockDialog); the headless
+    // wake-up loses it, so put it back unless a widget inside the dialog took it
+    if (!inside(f0))
+        dialog.grab_key_focus();
+    // from the clock page, as a person would: just start typing
+    const typed = 'fakepass';
+    await typeKeys(typed);
+    await sleep(1500);
+    const prompt = dialog._authPrompt;
+    if (prompt && !prompt._entryArea.visible) { prompt.setQuestion('Enter Password'); await sleep(600); }
+    const entry = prompt?._entry;
+    const b = box(entry);
+    const at = b ? global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, b[0] + b[2] / 2, b[1] + b[3] / 2) : null;
+    let chainOpacity = 255, a = entry;
+    while (a) { chainOpacity = Math.min(chainOpacity, a.opacity); a = a.get_parent(); }
+    write({ label: 'fault', fault: FAULT, page: dialog._activePage === dialog._promptBox ? 'prompt' : 'clock',
+        entryText: entry?.text === typed ? 'all typed keys arrived' : `got ${entry?.text?.length ?? 'no entry'} of ${typed.length}`,
+        entryBox: b, entryMapped: entry?.mapped ?? false, chainOpacity,
+        hitAtEntry: at === entry ? 'entry' : `${at?.constructor?.name}`,
+        keyFocus: global.stage.key_focus === entry ? 'entry' : `${global.stage.key_focus?.constructor?.name}`,
+        dialogBox: box(dialog), stillLocked: Main.sessionMode.isLocked });
+    await shotRect('fault', [0, 0, global.screen_width, global.screen_height]);
+}
 
 const OUT = GLib.getenv('TAHOE_TEST_OUT');
 const TAG = GLib.getenv('TAHOE_LOCK_TAG') ?? 'lock';
@@ -107,7 +196,7 @@ export default class Driver extends Extension {
     enable() {
         if (this._started) return;
         this._started = true;
-        run().catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
