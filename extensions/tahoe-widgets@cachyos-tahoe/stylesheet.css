@@ -55,3 +55,26 @@
 .tahoe-widget-light .tahoe-cal-today { color: #ffffff; }
 .tahoe-cal-medium { spacing: 16px; }
 .tahoe-cal-medium .tahoe-cal-day { width: 130px; }
+
+/* weather */
+.tahoe-weather-place { font-size: 15px; font-weight: 700; }
+.tahoe-weather-temp { font-family: "SF Pro Display", sans-serif; font-size: 44px; font-weight: 300; }
+.tahoe-weather-condition { font-size: 13px; font-weight: 600; }
+.tahoe-weather-icon { color: inherit; padding-bottom: 2px; }
+.tahoe-weather-small { font-size: 11px; font-weight: 600; }
+.tahoe-weather-hourly { padding-top: 4px; }
+.tahoe-weather-hour { spacing: 4px; }
+.tahoe-weather-hour-temp { font-size: 13px; font-weight: 600; }
+.tahoe-weather-separator { height: 1px; margin: 10px 0 4px 0; background-color: rgba(255, 255, 255, 0.10); }
+.tahoe-widget-light .tahoe-weather-separator { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-weather-day { spacing: 10px; }
+.tahoe-weather-day-name { font-size: 13px; font-weight: 600; width: 52px; }
+.tahoe-weather-day-temp { font-size: 13px; font-weight: 600; width: 34px; text-align: right; }
+.tahoe-weather-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.16); }
+.tahoe-widget-light .tahoe-weather-track { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-weather-fill {
+  border-radius: 2px;
+  background-gradient-direction: horizontal;
+  background-gradient-start: #64d2ff;
+  background-gradient-end: #ffd60a;
+}
