@@ -63,6 +63,9 @@ today, bottom row the prototype, 4x (the music card corner, a widget, the passwo
 crisp hairline, smooth corners.
 For the clock's digits (a glyph shape, not a rectangle) the same thin rim, from a mask drawn at
 twice the size.
+The user found 1.25 px too thin (2026-10-20). Rim options rendered at 4x on the lock screen
+(`docs/unified/glass-rim-options.png`): today's soft band, a crisp line of 1.25, 2 or 3 px, and
+a 2 px line with a soft 5 px glow inside it. The width becomes the token; waiting for the pick.
 The login screen's wallpaper was an 8-bit JPEG (soft colour edges): already replaced by a
 lossless dithered PNG (1705842), 0.3 levels off the 16-bit picture instead of 1.5 to 2.7.
 
@@ -125,6 +128,7 @@ Phase 4 (only if the user wants B): automatic login with an early lock and a fai
 
 ## Decisions needed from the user
 
+0. The rim: 2 px, 3 px, or 2 px with the soft glow (glass-rim-options.png)?
 1. A, or A then B?
 2. Login screen clock: 12 h without AM/PM (as the lock screen) or 24 h?
 3. Weather on the login screen (location stored system-wide)?
