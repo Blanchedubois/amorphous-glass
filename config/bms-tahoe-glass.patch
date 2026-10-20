@@ -677,10 +677,10 @@ index 3130fdd..058815e 100644
  };
 diff --git a/src/components/popup/surface/motion.js b/src/components/popup/surface/motion.js
 new file mode 100644
-index 0000000..3264319
+index 0000000..ad1bf43
 --- /dev/null
 +++ b/src/components/popup/surface/motion.js
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,285 @@
 +import GLib from 'gi://GLib';
 +import Meta from 'gi://Meta';
 +import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
@@ -898,6 +898,25 @@ index 0000000..3264319
 +                ...reveal, x: reveal.x - actor.x, y: reveal.y - actor.y,
 +            }),
 +        };
++    },
++
++    /// counts for stress tests (tools/headless): motion groups, holds, surfaces settling or frozen,
++    /// running frame callbacks and signal handlers held by the popup glass
++    debug() {
++        const out = { groups: groups.size, holds: 0, frame_callbacks: 0, surfaces: 0, settling: 0, frozen: 0, handlers: 0 };
++        for (const group of groups.values()) {
++            out.holds += group.holds;
++            out.frame_callbacks += group.frame_id ? 1 : 0;
++            out.handlers += [...group.movers.values()].reduce((n, mover) => n + mover.ids.length, 0);
++            for (const surface of group.surfaces) {
++                out.surfaces++;
++                out.settling += surface.settling ? 1 : 0;
++                out.frozen += surface.frozen ? 1 : 0;
++                for (const record of surface.signals?.connections?.records?.values() ?? [])
++                    out.handlers += record.ids.size + (record.destroy_id ? 1 : 0);
++            }
++        }
++        return out;
 +    },
 +
 +    /// the popup's motion root for an actor in it, or null when it has no glass
