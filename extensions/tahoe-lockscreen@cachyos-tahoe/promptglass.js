@@ -12,6 +12,9 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import St from 'gi://St';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {GlassPane, THIN_EDGE} from './widgets/paneglass.js';
 
@@ -31,13 +34,18 @@ export function buildPromptGlass(frame, dialog, backdrop) {
     dialog.set_child_above_sibling(layer, background);
     frame.addStyleClass(dialog, STYLE_CLASS);
 
-    // what gets glass: the password field, the back button beside it and Switch User (GNOME's
-    // buttons are capsules on glass, as on the login screen; the user, 2026-10-20)
+    // what gets glass: the password field, the back button beside it, Switch User and the top-right
+    // status pill (GNOME's buttons are capsules on glass, as on the login screen; the user,
+    // 2026-10-20)
     const TARGETS = [
         () => dialog._authPrompt?._entry,
         () => dialog._authPrompt?.cancelButton,
         () => dialog._otherUserButton,
+        () => Main.panel?.statusArea?.quickSettings,   // the top-right status pill
     ];
+    const pill = Main.panel?.statusArea?.quickSettings;
+    if (pill)
+        frame.addStyleClass(pill, 'tahoe-glass-pill');
     const panes = TARGETS.map(() => {
         const pane = new GlassPane(backdrop, 'capsule', THIN_EDGE);
         pane.set_pivot_point(0, 0);
@@ -54,17 +62,21 @@ export function buildPromptGlass(frame, dialog, backdrop) {
             return;
         }
         const box = actor.get_allocation_box();
-        const w = box.get_width(), h = box.get_height();
+        // the drawn shape: inside the actor's (transparent) border, as GNOME draws its fill
+        const node = actor.get_theme_node();
+        const [bl, br, bt, bb] = [St.Side.LEFT, St.Side.RIGHT, St.Side.TOP, St.Side.BOTTOM].map(side => node.get_border_width(side));
+        const w = box.get_width() - bl - br, h = box.get_height() - bt - bb;
         if (!(w > 0 && h > 0)) {
             pane.hide();
             return;
         }
         const [x, y] = actor.get_transformed_position();
         const [tw, th] = actor.get_transformed_size();
+        const kx = tw / box.get_width(), ky = th / box.get_height();
         const [dx, dy] = dialog.get_transformed_position();
         pane.set_size(w, h);
-        pane.set_position(Math.round(x - dx), Math.round(y - dy));
-        pane.set_scale(tw / w, th / h);
+        pane.set_position(Math.round(x + bl * kx - dx), Math.round(y + bt * ky - dy));
+        pane.set_scale(kx, ky);
         pane.opacity = actor.get_paint_opacity();
         pane.show();
     };
