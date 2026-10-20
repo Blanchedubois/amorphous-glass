@@ -37,7 +37,7 @@ function findBelow(root, styleClass) {
 export default class {
     enable() {
         this._widgets = [];
-        this._timer = GLib.timeout_add(0, 2500, () => {
+        this._timer = GLib.timeout_add(0, Number(GLib.getenv("WIDGETS_TEST_DELAY") || 2500), () => {
             this._timer = 0;
             try { this._build(); } catch (e) { console.warn(`widgets-test: ${e}\n${e.stack}`); }
             return false;
@@ -77,7 +77,7 @@ export default class {
                 layout_manager: new Clutter.BinLayout(), width: w, height: h, x, y,
             });
             card.add_child(new GlassPane(backdrop, 24));
-            const content = new St.Widget({style_class: 'tahoe-widget-content', layout_manager: new Clutter.BinLayout(), x_expand: true, y_expand: true});
+            const content = new St.Widget({style_class: 'tahoe-widget-content', style: 'border-width: 0;', layout_manager: new Clutter.BinLayout(), x_expand: true, y_expand: true});
             const widget = new cls();
             content.add_child(widget.actor);
             card.add_child(content);
