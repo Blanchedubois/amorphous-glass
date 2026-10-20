@@ -26,6 +26,11 @@ OUT=$R/build/gdm
 DCONF_PROFILE=/etc/dconf/profile/gdm
 DCONF_KEYS=/etc/dconf/db/gdm.d/90-tahoe-gdm
 
+# the colour scheme the login screen follows: GDM_COLOR_SCHEME, else the user's own
+scheme() {
+  echo "${GDM_COLOR_SCHEME:-$(gsettings get org.gnome.desktop.interface color-scheme | tr -d "'")}"
+}
+
 build() {
   local base=$SYS
   [ -f "$BACKUP" ] && base=$BACKUP
@@ -74,8 +79,12 @@ with open(os.path.join(src, 'theme.gresource.xml'), 'w') as x:
         x.write(f'    <file>{rel}</file>\n')
     x.write('  </gresource>\n</gresources>\n')
 PY
-  # the lock screen's picture (org.gnome.desktop.screensaver picture-uri), cropped to 16:9 at 2560x1440
-  local pic; pic=$(gsettings get org.gnome.desktop.screensaver picture-uri | tr -d "'")
+  # the picture GNOME 51's lock screen shows: the desktop background, its dark variant in dark
+  # mode (org.gnome.desktop.screensaver picture-uri is not used by the lock screen any more; it was
+  # the light one, so the login screen was light, 2026-10-20), cropped to 16:9 at 2560x1440
+  local key=picture-uri
+  [ "$(scheme)" = prefer-dark ] && key=picture-uri-dark
+  local pic; pic=$(gsettings get org.gnome.desktop.background "$key" | tr -d "'")
   pic=${pic#file://}
   case $pic in
     *.jxl) djxl "$pic" "$work/pic.png" >/dev/null 2>&1; pic=$work/pic.png ;;
@@ -91,7 +100,9 @@ PY
 }
 
 commands() {
-  local fmt="" ext=""
+  local fmt="" ext="" cs=""
+  # the login screen in the user's colour scheme (its theme's variant and the glass follow it)
+  [ "$(scheme)" = prefer-dark ] && cs="color-scheme='prefer-dark'\\n"
   [ "${GDM_CLOCK_FORMAT:-}" = 24h ] && fmt="clock-format='24h'\\n"
   [ "${GDM_EXTENSION:-}" = 1 ] && ext="\\n[org/gnome/shell]\\nenabled-extensions=['tahoe-gdm@cachyos-tahoe']\\n"
   if [ "${GDM_FONTS:-}" = 1 ]; then cat <<EOF
@@ -116,7 +127,7 @@ sudo install -m 644 $OUT/gnome-shell-theme.gresource $SYS
 # the time only, and no distribution logo under the prompt (as on the Mac; it sat behind the field)
 printf 'user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n' | sudo tee $DCONF_PROFILE
 sudo mkdir -p /etc/dconf/db/gdm.d
-printf "[org/gnome/desktop/interface]\nclock-show-date=false\nclock-show-weekday=false\n${fmt}\n[org/gnome/login-screen]\nlogo=''\n${ext}" | sudo tee $DCONF_KEYS
+printf "[org/gnome/desktop/interface]\nclock-show-date=false\nclock-show-weekday=false\n${fmt}${cs}\n[org/gnome/login-screen]\nlogo=''\n${ext}" | sudo tee $DCONF_KEYS
 sudo dconf update
 # shows at the next logout or boot; the lock screen uses the new file from its next lock
 

@@ -41,6 +41,7 @@ disable-extension-version-validation=true
 clock-show-date=false
 clock-show-weekday=false
 clock-format='${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}'
+color-scheme='${GDM_COLOR_SCHEME:-$(gsettings get org.gnome.desktop.interface color-scheme | tr -d "'")}'
 [org/gnome/login-screen]
 logo=''
 KF

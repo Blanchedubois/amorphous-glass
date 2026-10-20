@@ -298,6 +298,7 @@ export function buildMusicMode(frame, dialog, nowPlaying, backdrop, onChange, on
     };
     const listener = () => frame.guard(update);
     player.listen(listener);
+    nowPlaying.onWantedChanged(listener);
     frame.addUndo(() => player.unlisten(listener));
 
     // the gate changes (idle, dimming, animations): the frames and the tick follow

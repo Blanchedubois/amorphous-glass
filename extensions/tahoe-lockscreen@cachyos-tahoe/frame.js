@@ -401,6 +401,12 @@ export class Frame {
             x >= m.x && y >= m.y && x + w <= m.x + m.width && y + h <= m.y + m.height);
         if (!onScreen)
             return 'the password field is off screen';
+        // While GNOME checks a submitted password it makes the field insensitive (not reactive)
+        // and puts a spinner in the arrow's place: a click then lands on the field's own row, which
+        // is not "covered" (the user's real lock screen fell back to GNOME's on every unlock,
+        // 2026-10-20). The field's place and size are still checked above.
+        if (!entry.reactive)
+            return null;
         if (!this._hits(entry, cx, cy))
             return `something covers the password field (${this._describeHit(cx, cy)})`;
 

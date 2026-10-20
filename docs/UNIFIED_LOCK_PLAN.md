@@ -31,15 +31,15 @@ GNOME has two screens by design, and they stay two whatever we build:
 - the login screen (GDM): after boot, logout or Switch User; a separate shell running as a system
   account (`gdm-greeter`), with no access to the user's session or home folder.
 
-### 2. Super+L is light: the lock picture has no dark variant
+### 2. Super+L is light: the glass, not the picture (corrected while building)
 
-`org.gnome.desktop.interface color-scheme` is 'prefer-dark' and the desktop shows `fold-d`, but
-the lock screen draws `org.gnome.desktop.screensaver picture-uri`, a single setting, still
-`fold-l`. Nothing keeps it in step with the desktop's light/dark wallpaper. The login screen's
-copy (scripts/gdm-theme.sh) is made from the same setting, so it is light too.
-Fix: the lock picture follows the mode. The lock screen draws the desktop's dark wallpaper
-(`picture-uri-dark`) while the scheme is dark, and the login screen is built from the dark picture
-(its own colour scheme set to dark).
+GNOME 51's lock screen draws the desktop background (its dark variant in dark mode), not
+`org.gnome.desktop.screensaver picture-uri`, so the lock picture was already dark. What read as
+light was the glass: a milky white material over a dark theme (the user: "the liquid glass in
+dark mode, as the current theme"). Fixed: the glass follows GNOME's colour scheme, dark tint as
+the desktop's dark glass (#222226). The login screen really was light: its picture came from the
+screensaver setting; now built from the desktop's dark picture, and the login screen's colour
+scheme set to dark (scripts/gdm-theme.sh).
 
 ### 3. Music and the swirl
 
@@ -152,3 +152,18 @@ On local main (not pushed; the lock screen session reviewed and approved the loc
 - Test harnesses never reach the real GDM or PAM (tools/gdm/sysbus.sh plus the lock screen
   session's driver guard): earlier runs had locked the user's account through pam_faillock.
 - Details: docs/GDM_PLAN.md.
+
+## Progress
+
+- Phase 1 and 2 built and tested (2026-10-20), lock screen installed:
+  - the watchdog false alarm fixed; gate `verifying` (main's code before the fix fails it with
+    the user's exact log line, the fix passes);
+  - music mode's race fixed: it missed GNOME's media card appearing after the player, so it could
+    stay off (Now Playing's `wanted` now notifies it); 3 of 3 runs on;
+  - glass: exact shapes in the shader, rim C (2 px line, 5 px glow), dark material in dark mode,
+    on the lock screen's panes and the login screen's; the login screen built from the dark
+    picture with GDM in dark mode;
+  - tests: G1 light and dark, verifying, music-idle, ours-cover/throw, churn 8 (actors flat,
+    unlock median 94 ms), login screen glass and fail-safe; 0 PAM lines.
+- Next: phase 3 (the login screen's glass clock with the date, widgets), after the user's
+  choices on the clock format, weather and covers.
