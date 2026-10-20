@@ -317,3 +317,14 @@ lock screen is unchanged until merged and installed with scripts/tahoe-lockscree
   keeps the frame running; ours-* (7) and outside faults (3) restore GNOME's lock screen with the
   swirl, prompt glass and style class gone; churn 10 cycles clean, actors 2654 -> 2654, unlock
   median 95 ms. The swirl effect is now off (enabled = false) while it shows nothing.
+- Review by the lock-screen session (2026-10-20) and the fixes:
+  - prompt glass moved out of GNOME's AuthPrompt into our own layer below the dialog's content,
+    placed from the entry's on-screen box, updated just before the next frame (d38c27d);
+  - perf gate (stage update ms, p50/p95/max): no music 0.41/1.25/2.14, music mode 0.53/1.48/3.06,
+    main's Now Playing with music 0.43/1.22/2.34;
+  - music-idle gate: swirl frames 1 active, 0 after 35 s idle, 1 after a key;
+  - scripts/tahoe-lockscreen.sh on, run from this commit in a sandbox (temporary HOME, memory
+    settings): check-shared in sync (tahoe-gdm present), installed copy identical. Local main is
+    contained in this branch, so merging is a fast-forward;
+  - open, the user's call: today's event titles on the lock screen (WIDGET_STACK.kinds has
+    'calendar-day'; docs/lockscreen/widget-risks.md hides titles by default).
