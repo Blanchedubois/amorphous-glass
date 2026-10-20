@@ -15,6 +15,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {GlassCard, STATE_FILE, bmsUuid, glassMode, loadBms, scaleFactor} from './glass.js';
 import {AnalogClock, AnalogMarksClock, AnalogQuartersClock, DateTimeClock, DigitalClock} from './clocks.js';
 import {CalendarDay, CalendarMedium, CalendarMonth} from './calendar.js';
+import {WeatherLarge, WeatherMedium, WeatherSmall} from './weather.js';
 
 const LAYOUT_FILE = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass', 'widgets.json']);
 const GRID = 8;   // logical px
@@ -31,6 +32,9 @@ const TYPES = {
     'calendar-day': {name: 'Calendar: Today', cls: CalendarDay},
     'calendar-month': {name: 'Calendar: Month', cls: CalendarMonth},
     'calendar-medium': {name: 'Calendar: Today and Month', cls: CalendarMedium},
+    'weather-small': {name: 'Weather', cls: WeatherSmall},
+    'weather-medium': {name: 'Weather: Next Hours', cls: WeatherMedium},
+    'weather-large': {name: 'Weather: Week', cls: WeatherLarge},
 };
 
 const DEFAULT_LAYOUT = [
