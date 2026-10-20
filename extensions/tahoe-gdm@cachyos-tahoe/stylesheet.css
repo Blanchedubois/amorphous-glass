@@ -41,6 +41,12 @@
   margin: 0;
   padding: 14px;
 }
+/* the list's scroll viewport clips to its content box (inside that padding), which ended exactly
+   at each row's sides: the outer half of the rim and its anti-aliasing, just outside the row, were
+   cut there and the round ends looked flat (the user, 2026-10-20). The rows keep clear of it. */
+.login-dialog.tahoe-gdm-glass .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item {
+  margin: 0 6px;
+}
 
 /* the widget column's cards (widgets.js): the shader draws the glass and its edge, no CSS rim or
    fill over it, as on the lock screen (lockscreen.css .tahoe-lock-pane) */
@@ -50,3 +56,13 @@
   background-color: transparent;
   box-shadow: none;
 }
+
+/* the song from the locked session (nowplaying.js): the music widget's type, sizes set in code */
+.tahoe-gdm-song-title,
+.tahoe-gdm-song-artist {
+  font-family: "SF Pro Text", sans-serif;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.tahoe-gdm-song-title { font-weight: 600; }
+.tahoe-gdm-song-artist { color: rgba(255, 255, 255, 0.72); }

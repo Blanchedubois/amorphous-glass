@@ -139,6 +139,13 @@ sudo cp -r $R/extensions/tahoe-gdm@cachyos-tahoe/. /usr/share/gnome-shell/extens
 sudo chmod -R a+rX /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe
 EOF
   fi
+  if [ "${GDM_SONG:-}" = 1 ]; then cat <<EOF
+# the song for Switch User: the locked session writes what plays here, the login screen reads it
+# (yours, readable by all, made again at every boot)
+echo 'd /run/tahoe-nowplaying 0755 $USER $USER -' | sudo tee /etc/tmpfiles.d/tahoe-nowplaying.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/tahoe-nowplaying.conf
+EOF
+  fi
   cat <<EOF
 # install (keeps the current theme as $BACKUP; skips the copy if that backup already exists)
 sudo test -f $BACKUP || sudo cp -a $SYS $BACKUP
@@ -159,6 +166,7 @@ sudo rm -rf /etc/dconf/db/gdm.d /etc/dconf/db/gdm $DCONF_PROFILE
 sudo dconf update
 sudo rm -rf /usr/local/share/fonts/SpaceGrotesk && sudo fc-cache -f    # if it was installed
 sudo rm -rf /usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe   # if it was installed
+sudo rm -rf /etc/tmpfiles.d/tahoe-nowplaying.conf /run/tahoe-nowplaying   # if it was installed
 sudo systemctl restart gdm    # only from the text console: it ends any graphical session
 EOF
 }
@@ -166,9 +174,9 @@ EOF
 # run the install or the undo half of the commands (the same text `commands` prints)
 run_part() {
   # the user's choices: the clock as the user's own (12 h shows without AM/PM, as the lock screen),
-  # Space Grotesk, the extension
+  # Space Grotesk, the extension, the weather, the song for Switch User
   export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}
-  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1}
+  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1} GDM_SONG=${GDM_SONG:-1}
   local text part
   text=$(commands)
   case $1 in

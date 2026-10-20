@@ -316,10 +316,14 @@ export const GlassPane = GObject.registerClass({
         // ancestors and asks for a new layout when any of them moves.
         this._watched = [];
         this.connect('notify::mapped', () => this._watchAncestors());
+        this._failId = 0;
         this.connect('destroy', () => {
             if (this._maskId)
                 GLib.source_remove(this._maskId);
             this._maskId = 0;
+            if (this._failId)
+                GLib.source_remove(this._failId);
+            this._failId = 0;
             St.Settings.get().disconnect(this._schemeId);
             this._unwatch();
         });
@@ -417,7 +421,8 @@ export const GlassPane = GObject.registerClass({
             } catch (e) {
                 this.failed = `${e}`;
                 // not from inside the layout pass: the owner removes the pane
-                GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                this._failId ||= GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    this._failId = 0;
                     this.emit('mask-failed');
                     return GLib.SOURCE_REMOVE;
                 });

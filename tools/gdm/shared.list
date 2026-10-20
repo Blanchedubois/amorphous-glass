@@ -5,3 +5,6 @@ calendar.js calendar.js
 clocks.js clocks.js
 glass.js glass.js
 stylesheet.css widgets.css
+palette.js palette.js
+# the lock screen's background swirl (music mode), for the song on the login screen
+../tahoe-lockscreen@cachyos-tahoe/bgswirl.js bgswirl.js

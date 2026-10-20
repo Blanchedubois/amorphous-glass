@@ -2,6 +2,7 @@
 // daemon behind it), shows the greeter's user list, then the password prompt for the first user,
 // and screenshots each. It drives LoginDialog's own methods; nothing here talks to GDM or PAM.
 import Clutter from 'gi://Clutter';
+import St from 'gi://St';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -40,6 +41,11 @@ function record(label, d) {
         promptAlloc: ap.get_allocation_box() ? [ap.get_allocation_box().x1, ap.get_allocation_box().y1] : null,
         promptTx: ap.translation_x, dialog: box(d), avatar: box(ap._userWell.get_child()?.get_first_child?.()),
         listItem: box([...d._userList._items.values()][0]),
+        rowBox: box([...d._userList._items.values()][0]?.child),
+        rowPane: box([...d._userList._items.values()][0]?.child?.get_first_child?.()),
+        rowContent: box([...d._userList._items.values()][0]?.child?.get_last_child?.()),
+        listBox: box(d._userList._box ?? d._userList.get_child?.()),
+        itemPadding: (() => { const i = [...d._userList._items.values()][0]; const n = i?.get_theme_node?.(); return n ? [n.get_padding(St.Side.LEFT), n.get_padding(St.Side.RIGHT), n.get_border_width(St.Side.LEFT)] : null; })(),
     };
     const f = Gio.File.new_for_path(`${OUT}/${TAG}-log.jsonl`);
     const s = f.append_to(0, null);
