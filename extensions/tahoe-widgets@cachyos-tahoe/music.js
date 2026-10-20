@@ -11,7 +11,6 @@ import Graphene from 'gi://Graphene';
 import St from 'gi://St';
 
 import {scaleFactor} from './glass.js';
-import {GlassInkEffect} from './glassink.js';
 import {acquirePlayer, releasePlayer} from './mpris.js';
 import {Swirl} from './swirl.js';
 
@@ -93,6 +92,14 @@ class Progress {
         }
     }
 
+    // css: (alpha) => colour, or null for the stylesheet's colours
+    setInk(css) {
+        this._track.set_style(css ? `background-color: ${css(0.22)};` : null);
+        this._fill.set_style(css ? `background-color: ${css(0.88)};` : null);
+        for (const l of [this._elapsed, this._left].filter(Boolean))
+            l.set_style(css ? `color: ${css(0.72)};` : null);
+    }
+
     _place() {
         if (!this._track.get_stage())   // placed again once allocated
             return;
@@ -152,8 +159,8 @@ class Transport {
 // bright, the others smaller and dim. At each line's own time the lines drift up one by one, each
 // a little after the one above it, so the text flows like a wave; the old line shrinks and dims
 // as it goes up and the new one grows into its place. Layout never changes (scale and translation
-// only), and every line's motion is eased on the compositor between lines only. The text is
-// Liquid Glass (glassink.js). With GNOME animations off the eases end at once.
+// only), and every line's motion is eased on the compositor between lines only. The text takes
+// the cover's tint (MusicWidget._setInk). With GNOME animations off the eases end at once.
 
 // a viewport that asks for no height of its own: it takes what the card has left (y_expand),
 // however long the song's column inside it is
@@ -177,8 +184,6 @@ class LyricsView {
             orientation: Clutter.Orientation.VERTICAL,
         });
         this.actor.add_child(this._column);
-        // on the viewport, not the column: the glass is rendered only for the part on screen
-        this.actor.add_effect_with_name('tahoe-lyrics-glass', new GlassInkEffect(0.62));
         // the column is as wide as the view; its height follows the wrapped lines
         this.actor.connect('notify::width', () => (this._column.width = this.actor.width));
         // once laid out (or reflowed), every line is placed again without animation
@@ -186,6 +191,13 @@ class LyricsView {
         this._labels = [];
         this._lines = null;
         this._shown = -2;
+        this._inkStyle = null;
+    }
+
+    // css: (alpha) => colour, or null for the stylesheet's colours
+    setInk(css) {
+        this._inkStyle = css ? `color: ${css()};` : null;
+        this._labels.forEach(l => l.set_style(this._inkStyle));
     }
 
     setLines(lines, message) {
@@ -195,6 +207,7 @@ class LyricsView {
         const texts = lines ? lines.map(l => l[1] || '♪') : [message];
         this._labels = texts.map(text => {
             const l = new St.Label({style_class: 'tahoe-music-lyric', text, pivot_point: new Graphene.Point({x: 0, y: 0.5})});
+            l.set_style(this._inkStyle);
             l.clutter_text.line_wrap = true;
             this._column.add_child(l);
             return l;
@@ -264,11 +277,12 @@ class MusicWidget {
         this._player = acquirePlayer();
         this._swirl = new Swirl();
         // the text follows the swirl's colours (light covers: dark text), not the glass mode
-        this._swirl.onInk = dark => {
+        this._swirl.onInk = (dark, rgb) => {
             this.actor.remove_style_class_name('tahoe-music-ink-dark');
             this.actor.remove_style_class_name('tahoe-music-ink-white');
             if (dark !== null)
                 this.actor.add_style_class_name(dark ? 'tahoe-music-ink-dark' : 'tahoe-music-ink-white');
+            this._setInk(rgb);
         };
         this._title = ellipsized('tahoe-music-title');
         this._artist = ellipsized('tahoe-widget-secondary tahoe-music-artist');
@@ -320,6 +334,15 @@ class MusicWidget {
     }
 
     _refreshLyrics() {}
+
+    // the text, the progress, the lyrics and the controls in the cover's tint (null: the CSS's)
+    _setInk(rgb) {
+        const css = rgb && ((a = 1) => `rgba(${rgb.map(v => Math.round(v * 255)).join(', ')}, ${a})`);
+        this.actor.set_style(css ? `color: ${css()};` : null);
+        this._artist.set_style(css ? `color: ${css(0.72)};` : null);
+        this._progress?.setInk(css);
+        this._lyrics?.setInk(css);
+    }
 
     destroy() {
         if (this._lyricTimer)
