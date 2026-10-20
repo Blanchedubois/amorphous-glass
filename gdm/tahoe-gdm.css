@@ -3,7 +3,13 @@
    screen and (under the user theme) the desktop all share. So every rule here is scoped to the
    greeter: .login-dialog (LoginDialog) or #panel.login-screen (the panel in session mode gdm),
    never .unlock-dialog or a bare class. The lock screen's own look is tahoe-lockscreen's.
-   Sizes are for the 2560x1440 monitor at scale 1 and match tahoe-lockscreen/layout.js. */
+
+   CSS cannot size anything by the screen, so the sizes here are a SAFE BASELINE that works on any
+   monitor from 720 px tall up (at its scale): a smaller clock, the prompt only a little low.
+   The tahoe-gdm extension (layout.js) then sets the exact Tahoe proportions from the real
+   monitor (clock 12 % of the height, avatar at 82.5 %), as tahoe-lockscreen does. Without the
+   extension, or if it fails, this baseline is what shows, so it must never push the password
+   field off a small screen. */
 
 /* St reads a font-family list only unquoted (a quoted list is dropped with "Couldn't parse family").
 
@@ -16,18 +22,17 @@
 }
 
 /* ---- the clock: GNOME's panel clock (time only: clock-show-date=false for the gdm user) in the
-   lock screen's type, size and place (tahoe-lockscreen/layout.js, CLOCK.digits 0.12): digits 12 %
-   of the height (173 px at 1440, type 237 px, Space Grotesk digits are 0.730 em) with their top at
-   207 px, where the lock screen's digits sit under its date. The label's line box puts the digit
-   tops 0.270 em below its top, so the label starts at 143 px (140 measured: ink 207-380 in tools/gdm/run.sh shots). The panel is made tall enough to
-   hold it; the left and right boxes keep their content in the top 32 px. */
+   lock screen's type. Baseline: the lock screen's size and place on a 720 px screen (digits 12 %
+   of 720 = 86 px, type 118 px, digit tops at 14.4 % = 104 px, the line's digit tops 0.270 em
+   below its top, so the label starts at 72 px). The panel is tall enough to hold it; the left and
+   right boxes keep their content in the top 32 px. tahoe-gdm scales all of this to the monitor. */
 #panel.login-screen {
   background-color: transparent;
-  height: 410px;
+  height: 206px;
 }
 
 #panel.login-screen #panelLeft,
-#panel.login-screen #panelRight { padding-bottom: 378px; }
+#panel.login-screen #panelRight { padding-bottom: 174px; }
 
 #panel.login-screen .panel-button.clock-display,
 #panel.login-screen .panel-button.clock-display:hover,
@@ -47,7 +52,7 @@
 #panel.login-screen .panel-button.clock-display:active .clock,
 #panel.login-screen .panel-button.clock-display:checked .clock {
   font-family: Space Grotesk, Adwaita Sans, sans-serif;
-  font-size: 237px;
+  font-size: 118px;
   font-weight: 600;
   font-feature-settings: "tnum";
   /* the lock screen's clock is subtle glass (no glass here, no shader in the greeter): a
@@ -57,19 +62,19 @@
   background-color: transparent;
   box-shadow: none;
   padding: 0;
-  margin-top: 140px;
+  margin-top: 72px;
 }
 
-/* ---- the user list and the password prompt sit low, as on the Mac.
+/* ---- the user list and the password prompt sit a little low.
    LoginDialog centres both in JS (the prompt 50 px below the middle). Top padding is part of the
-   preferred height, so the content moves down by half of it, and the avatar lands where the lock
-   screen's sits (centre at 82.5 % of the height, tahoe-lockscreen/layout.js AVATAR_CENTRE).
-   The prompt's box then reaches up into the (empty) banner area under the tall panel, and a
-   prompt narrower than a third of the screen would be moved into a right-hand column; the side
-   padding makes it wider than that (367 + 2 x 270 > 2560 / 3), so it stays centred. St ignores
-   negative margins (they stretch the box), so padding it is. */
-.login-dialog .login-dialog-prompt-layout { padding: 966px 270px 0; }
-.login-dialog-user-selection-box { padding-top: 1114px; padding-bottom: 40px; }
+   preferred height, so the content moves down by half of it. Limits, for any screen from 720 px:
+   - the prompt's box must stay below the panel plus the (empty) banner, or LoginDialog switches
+     to a two-column layout with the prompt on the right: at 720 px that allows about 130 px;
+   - the content must stay on screen.
+   tahoe-gdm moves both to the lock screen's place (avatar centre at 82.5 %, never closer than 4 %
+   to the bottom) and widens the prompt so the two-column layout cannot happen. */
+.login-dialog .login-dialog-prompt-layout { padding-top: 120px; }
+.login-dialog-user-selection-box { padding-top: 240px; padding-bottom: 40px; }
 
 /* the user: a 64 px avatar and the name under it */
 .login-dialog .user-widget.vertical { spacing: 10px; }

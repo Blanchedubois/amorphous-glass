@@ -236,3 +236,44 @@ prototype only translates it); the cover's rounded corners need a mask (St draws
 without anti-aliasing); the swirl must stop when idle or dimmed and with animations off, as Now
 Playing's does, and its cost (a full-screen shader at 25 fps plus the glass re-rendering) measured.
 This belongs in tahoe-lockscreen (another session's extension), not in the GDM work.
+- The user's pick (2026-10-20): **A**, the clock stays centred at the top, the cover in the
+  centre, the widgets stacked on the left.
+
+### Any monitor size (2026-10-20)
+
+The user asked that all of this works on other monitor sizes and ratios.
+- **Theme (phase 1)**: CSS cannot size by the screen, and the first version (clock 237 px, prompt
+  pushed 966 px) was tuned to 1440: on a 768 or 1080 screen it would push the password field off
+  the screen. `gdm/tahoe-gdm.css` is now a safe baseline for any monitor from 720 px tall (clock at
+  the 720 px size, prompt only a little low, no side padding), and the extension sets the exact
+  proportions.
+- **tahoe-gdm `layout.js`**: the clock from the monitor's height (digits 12 %, top 14.4 %), the
+  prompt and the account rows placed by measuring where GNOME put the avatar and correcting the
+  padding (avatar centre at 82.5 %, never closer than 4 % to the bottom), the prompt widened past
+  a third of the screen so LoginDialog keeps one column on any width, refit on monitor changes; a
+  watchdog fails the extension (everything undone) if the password field is ever off the monitor.
+- **Glass**: each pane's backdrop lines up with the real background wherever the pane is (the
+  cloned actor's own place, or the login screen's whole group for the theme's picture), and a
+  pane re-aims when any ancestor moves (found here: the layout moving the prompt left the glass
+  showing the background from the old place).
+- Measured (`GDM_MONITOR=WxH tools/gdm/run.sh`), with the extension:
+
+  | monitor | clock digits top / height | avatar centre | password field bottom |
+  |---|---|---|---|
+  | 1366x768 | 14.45 % / 11.98 % | 74.9 % (bottom margin) | 697 / 768 |
+  | 1920x1080 | 14.44 % / 12.13 % | 81.0 % (bottom margin) | 997 / 1080 |
+  | 2560x1440 | 14.31 % / 12.08 % | 82.5 % | 1310 / 1440 |
+  | 2560x1600 | 14.31 % / 12.06 % | 82.5 % | 1442 / 1600 |
+  | 3440x1440 | 14.31 % / 12.08 % | 82.5 % | 1310 / 1440 |
+
+  All centred (clock x 50.1 %). Without the extension (baseline) the avatar sits at 53-56 % on
+  every size, password field always on screen. Shots: `docs/gdm/login-sizes.png`.
+- **Music mode A** (`LOCK_MONITOR=WxH tools/gdm/lockmusic-test.sh`, a patched temp copy of main's
+  lock harness): the card fits the room between the clock and the password page's avatar on each
+  monitor (the cover shrinks on short screens, a long title is ellipsized at the cover's width),
+  the widget column keeps as many widgets as fit. Shots: `docs/gdm/music-mode-sizes.png`.
+- Music mode, the user's request: the cover, title, artist and buttons in one Liquid Glass card
+  (plain glass, no swirl of its own; it bends the swirling background), corners concentric with
+  the cover (48 = 24 + 24). Shot: `docs/gdm/music-mode-card.png`.
+- Not covered: two monitors at once (GDM shows the prompt on the primary one; the theme's picture
+  spans the whole stage), and fractional or 2x scaling (worked out in logical px, untested).

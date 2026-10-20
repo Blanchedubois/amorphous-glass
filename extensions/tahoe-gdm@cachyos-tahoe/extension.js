@@ -1,7 +1,8 @@
 // Tahoe Login Screen (prototype, docs/GDM_PLAN.md phase 2). Runs only in session mode "gdm", the
 // login screen. GDM's own LoginDialog and AuthPrompt do all of the authentication; this only adds
-// Liquid Glass under GNOME's password field and behind each account row, and a stylesheet that
-// clears their flat fills while the glass is there. Every change is recorded and undone on
+// Liquid Glass under GNOME's password field and behind each account row, a stylesheet that
+// clears their flat fills while the glass is there, and the Tahoe proportions for the monitor
+// (layout.js: the clock, and where the prompt and the rows sit). Every change is recorded and undone on
 // disable, and on any error (enable throws, a glass mask fails), leaving GNOME's login screen.
 //
 // Never touched: the user verifier, the entries themselves, key focus, the dialog's layout.
@@ -14,6 +15,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
 import { GlassPane } from './glass.js';
+import { buildLayout } from './layout.js';
 
 // GNOME versions this was tested on; the private parts of LoginDialog it relies on
 const TESTED_MAJORS = [51];
@@ -75,6 +77,9 @@ export default class TahoeLoginScreen extends Extension {
 
         dialog.add_style_class_name(STYLE_CLASS);
         this._undo.push(() => dialog.remove_style_class_name(STYLE_CLASS));
+
+        // the clock, the prompt and the rows in the Tahoe proportions for this monitor
+        buildLayout(this, dialog);
 
         // the password capsule: glass under the entry, in the entry's own BinLayout slot (GNOME
         // swaps the password and text entries in that slot with replace_child, which keeps ours)

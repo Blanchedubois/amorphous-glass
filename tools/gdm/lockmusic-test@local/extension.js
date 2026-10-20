@@ -4,8 +4,9 @@
 //   field, the cover's colours from palette.js), cross-faded in over the picture. It is an effect
 //   ON the lock background actor, so everything that copies that actor (the glass clock, the
 //   glass widgets) bends the swirl too;
-// - the cover sits large in the centre with the title, the artist and the transport buttons, and
-//   the lock screen's own Now Playing card steps aside;
+// - the cover sits large in the centre with the title, the artist and the transport buttons, all
+//   in one Liquid Glass card (plain glass, no swirl of its own: it bends the swirling background
+//   behind it), and the lock screen's own Now Playing card steps aside;
 // - the widgets stack in a column on the left, as on the iPad.
 // LOCKMUSIC_WIDGETS="weather-small calendar-day ..." (default weather-small calendar-day calendar-month).
 // LOCKMUSIC_LAYOUT=centre (the clock stays centred at the top) | ipad (iPadOS landscape: the
@@ -169,16 +170,40 @@ export default class {
             }
         });
         const ipad = GLib.getenv('LOCKMUSIC_LAYOUT') === 'ipad';
-        const side = Math.round((ipad ? 0.38 : COVER) * H);
-        const centre = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_align: Clutter.ActorAlign.CENTER, style: 'spacing: 6px;'});
+        // the card: CARD_PAD around the cover, so its corners are concentric with the cover's
+        // (24 + 24 = 48, docs/STANDARD.md)
+        const CARD_PAD = 24, COVER_RADIUS = 24;
+        // the room between the clock and the avatar, on any monitor: the clock's digits end at
+        // ~26.4 % (tahoe-lockscreen/layout.js clockBottom), the avatar is GNOME's (its top), or at
+        // 82.5 % - 32 px while the prompt is not shown; the card fits in it with GAP_V each side
+        const GAP_V = Math.round(0.03 * H);
+        const clockBottom = ipad ? 0.06 * H : 0.264 * H;
+        // where the password page will put the avatar (the card must fit it, shown or not):
+        // tahoe-lockscreen keeps it at 82.5 % unless the prompt under it (name, field, about
+        // 180 px from the avatar's top) would come closer than 4 % to the bottom
+        const PROMPT_BELOW = 180;
+        const avatarTop = Math.min(0.825 * H - 32, 0.96 * H - PROMPT_BELOW);
+        const room = [monitor.y + clockBottom + GAP_V, monitor.y + avatarTop - GAP_V];
+        const TEXT = 175;    // title, artist, buttons and the card's padding under the cover, logical px
+        const side = Math.max(120, Math.round(Math.min((ipad ? 0.38 : COVER) * H, room[1] - room[0] - TEXT)));
+        const card = new St.Widget({layout_manager: new Clutter.BinLayout()});
+        card.add_child(new GlassPane(backgrounds[0], COVER_RADIUS + CARD_PAD));
+        const centre = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL, x_align: Clutter.ActorAlign.CENTER,
+            style: `spacing: 6px; padding: ${CARD_PAD}px ${CARD_PAD}px 20px;`,
+        });
+        card.add_child(centre);
         const cover = new St.Widget({
-            width: side, height: side,
-            style: `background-image: url("${track.art}"); background-size: cover; border-radius: 24px;`,
+            width: side, height: side, x_align: Clutter.ActorAlign.CENTER,   // square, even when the title is wider
+            style: `background-image: url("${track.art}"); background-size: cover; border-radius: ${COVER_RADIUS}px;`,
         });
         centre.add_child(cover);
         const text = (t, css) => new St.Label({text: t, x_align: Clutter.ActorAlign.CENTER, style: css});
-        centre.add_child(new St.Widget({height: 14}));
-        centre.add_child(text(track.title, 'font-family: SF Pro Display, Adwaita Sans, sans-serif; font-size: 26px; font-weight: 700; color: #ffffff;'));
+        centre.add_child(new St.Widget({height: 10}));
+        const title = text(track.title, 'font-family: SF Pro Display, Adwaita Sans, sans-serif; font-size: 26px; font-weight: 700; color: #ffffff;');
+        title.clutter_text.ellipsize = 3;   // Pango.EllipsizeMode.END: a long title never widens the card past the cover
+        title.style += ` max-width: ${side}px;`;
+        centre.add_child(title);
         centre.add_child(text(track.artist, 'font-family: SF Pro Text, Adwaita Sans, sans-serif; font-size: 20px; color: rgba(255, 255, 255, 0.72);'));
         const buttons = new St.BoxLayout({x_align: Clutter.ActorAlign.CENTER, style: 'spacing: 36px; padding-top: 14px;'});
         for (const [icon, method] of [['media-skip-backward-symbolic', 'Previous'], ['media-playback-pause-symbolic', 'PlayPause'], ['media-skip-forward-symbolic', 'Next']]) {
@@ -187,12 +212,12 @@ export default class {
             buttons.add_child(b);
         }
         centre.add_child(buttons);
-        group.add_child(centre);
-        this._undo.push(() => centre.destroy());
-        const [, natH] = centre.get_preferred_height(side);
-        // between the clock (its digits end at ~26 % of the height) and the avatar (82.5 %); in the
-        // ipad layout the top is free, so between the top bar and the avatar
-        centre.set_position(monitor.x + Math.round((W - side) / 2), monitor.y + Math.round((ipad ? 0.42 : 0.545) * H - natH / 2));
+        group.add_child(card);
+        this._undo.push(() => card.destroy());
+        const [, natH] = card.get_preferred_height(-1);
+        const [, natW] = card.get_preferred_width(-1);
+        // centred in the room between the clock and the avatar
+        card.set_position(monitor.x + Math.round((W - natW) / 2), Math.round((room[0] + room[1] - natH) / 2));
 
         // the ipad layout: the clock to the top left, at the column's left edge
         let columnTop = null;
@@ -223,7 +248,10 @@ export default class {
         }
 
         // 3. the widgets in a column on the left, on glass over the (swirling) background
-        const kinds = (GLib.getenv('LOCKMUSIC_WIDGETS') ?? 'weather-small calendar-day calendar-month').split(/\s+/).filter(k => KINDS[k]);
+        let kinds = (GLib.getenv('LOCKMUSIC_WIDGETS') ?? 'weather-small calendar-day calendar-month').split(/\s+/).filter(k => KINDS[k]);
+        // as many as fit on this monitor, 4 % clear of the top and the bottom
+        while (kinds.length > 1 && kinds.length * 170 + (kinds.length - 1) * GAP > 0.92 * H)
+            kinds = kinds.slice(0, -1);
         const total = kinds.length * 170 + (kinds.length - 1) * GAP;
         let y = columnTop ?? monitor.y + Math.round((H - total) / 2);
         const x = columnX;

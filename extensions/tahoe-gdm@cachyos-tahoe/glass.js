@@ -15,6 +15,7 @@ import Cogl from 'gi://Cogl';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -218,11 +219,59 @@ export const GlassPane = GObject.registerClass({
         this._maskSize = '';
         this._maskId = 0;
         this.failed = null;   // set when the mask could not be made; the owner then removes the pane
+        // The backdrop is placed from this pane's place on screen, worked out when the pane is
+        // laid out. When something above it moves (the layout module moving the prompt), the
+        // pane's own slot does not change and it is not laid out again: so it watches its
+        // ancestors and asks for a new layout when any of them moves.
+        this._watched = [];
+        this.connect('notify::mapped', () => this._watchAncestors());
         this.connect('destroy', () => {
             if (this._maskId)
                 GLib.source_remove(this._maskId);
             this._maskId = 0;
+            this._unwatch();
         });
+    }
+
+    _unwatch() {
+        this._watched.forEach(([actor, id]) => actor.disconnect(id));
+        this._watched = [];
+        if (this._relayoutLater)
+            global.compositor.get_laters().remove(this._relayoutLater);
+        this._relayoutLater = 0;
+    }
+
+    _watchAncestors() {
+        this._unwatch();
+        if (!this.mapped)
+            return;
+        // not from inside the layout pass that moved the ancestor (Clutter warns): just before the
+        // next frame
+        const moved = () => {
+            if (this._relayoutLater)
+                return;
+            const laters = global.compositor.get_laters();
+            this._relayoutLater = laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
+                this._relayoutLater = 0;
+                this.queue_relayout();
+                return GLib.SOURCE_REMOVE;
+            });
+        };
+        for (let a = this.get_parent(); a; a = a.get_parent())
+            this._watched.push([a, a.connect('notify::allocation', moved)]);
+    }
+
+    _frame() {
+        const source = this._backdrop.source;
+        const of = actor => {
+            const [x, y] = actor.get_transformed_position();
+            const [w, h] = actor.get_transformed_size();
+            return [x, y, w, h];
+        };
+        if (source)
+            return of(source);
+        const group = Main.screenShield?._lockDialogGroup;
+        return group ? of(group) : [0, 0, global.stage.width, global.stage.height];
     }
 
     vfunc_get_preferred_width() {
@@ -239,12 +288,14 @@ export const GlassPane = GObject.registerClass({
         g.set_origin(-PAD, -PAD);
         g.set_size(box.get_width() + 2 * PAD, box.get_height() + 2 * PAD);
         this._glass.allocate(g);
-        // the backdrop covers the monitor, placed so it lines up with the real background
-        const monitor = Main.layoutManager.primaryMonitor;
+        // the backdrop lies exactly over the real background, wherever this pane is: a cloned
+        // actor at that actor's own place and size (one monitor's lock background); the picture
+        // over the whole of the login screen's group, as the theme draws it (any monitor layout)
+        const [fx, fy, fw, fh] = this._frame();
         const [sx, sy] = this.get_transformed_position();
         const b = new Clutter.ActorBox();
-        b.set_origin(monitor.x - (sx - PAD), monitor.y - (sy - PAD));
-        b.set_size(monitor.width, monitor.height);
+        b.set_origin(fx - (sx - PAD), fy - (sy - PAD));
+        b.set_size(fw, fh);
         this._backdrop.allocate(b);
 
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
