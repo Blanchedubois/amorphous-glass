@@ -502,6 +502,16 @@ Then:
 
 [phase4-glass-clock.png](lockscreen/shots/phase4-glass-clock.png): both pages in light and dark.
 
+Then, after seeing it on the real lock screen ("a bit too big and too embossed"), the user picked
+option A of [clock-size-options.png](lockscreen/shots/clock-size-options.png):
+- **Size:** the digits at **12 %** of the height. `layout.js` now has one setting,
+  `CLOCK.digits`, with the date and the gap in proportion.
+- **Subtler glass:** bevel 6, bend 10 (at 192 px type; they scale with the size), rim 0.22 and
+  0.08 all round, shade 0.04, colour split 0.05.
+
+The other options were 12 % with flatter glass, and 10.5 % with flatter glass; both turned faint
+on light wallpapers.
+
 Still to do in Phase 4 (superseded by the next request):
 - the user's pick of face A or B;
 - a full G4 churn with the glass;

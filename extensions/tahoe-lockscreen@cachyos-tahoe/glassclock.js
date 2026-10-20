@@ -24,13 +24,14 @@ import Pango from 'gi://Pango';
 import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
 
-// The material, tuned against Apple's press image (the workshop changes these)
+// The material, tuned against Apple's press image, then made subtler at the user's request
+// ("too embossed"; option A of docs/lockscreen/shots/clock-size-options.png)
 export const MATERIAL = {
     timeFont: 'Space Grotesk SemiBold',   // the user's choice (OFL, ~/.local/share/fonts)
     dateFont: 'Space Grotesk SemiBold',
     round: 0,           // logical px: corners softened by growing the glyphs with round joins (off: the user wants SF Pro's own corners)
-    edge: 10,           // logical px of bevel inside the time's strokes, at 192 px type
-    bend: 22,           // logical px the backdrop is pushed at the time's very edge, at 192 px type
+    edge: 6,            // logical px of bevel inside the time's strokes, at 192 px type
+    bend: 10,           // logical px the backdrop is pushed at the time's very edge, at 192 px type
     refSize: 192,       // the type size edge and bend are given for; they scale with the time
     dateScale: 0.3,     // the date's bevel, bend and rim, as a fraction of the time's
     dateMilk: 0.30,     // extra white in the date, so its thin strokes stay legible
@@ -39,10 +40,10 @@ export const MATERIAL = {
     saturation: 1.0,    // > 1 strengthens its colour
     brightness: 0.05,   // a slight lift, so the glass reads lighter than what is behind it
     milk: 0.06,         // how much white is laid over the backdrop
-    rim: 0.38,          // rim light toward the top left
-    rimBase: 0.14,      // rim light all round
-    shade: 0.10,        // darkening of the edge facing away from the light
-    split: 0.10,        // colour split, as a fraction of the bend
+    rim: 0.22,          // rim light toward the top left
+    rimBase: 0.08,      // rim light all round
+    shade: 0.04,        // darkening of the edge facing away from the light
+    split: 0.05,        // colour split, as a fraction of the bend
     // dark mode (GNOME's dark style): a light tint, so the clock stays easy to read on the
     // darker wallpaper (the user first asked for a darker tint, then found it hard to see)
     darkTint: 0,        // how far the glass is pulled toward black
