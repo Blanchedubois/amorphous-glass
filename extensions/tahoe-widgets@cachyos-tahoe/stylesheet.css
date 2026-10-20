@@ -84,7 +84,7 @@
 .tahoe-widget-music-medium .tahoe-widget-content,
 .tahoe-widget-music-large .tahoe-widget-content,
 .tahoe-widget-music-lyrics .tahoe-widget-content { padding: 16px; }
-.tahoe-music-row { spacing: 14px; }
+.tahoe-music-row { spacing: 16px; }
 .tahoe-music-art { border-radius: 8px; background-color: rgba(255, 255, 255, 0.12); }
 .tahoe-widget-light .tahoe-music-art { background-color: rgba(0, 0, 0, 0.06); }
 .tahoe-music-art-image { background-color: transparent; background-size: cover; }
