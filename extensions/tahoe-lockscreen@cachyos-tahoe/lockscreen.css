@@ -61,15 +61,15 @@
 /* our clock (layout.js sets the font sizes from the monitor height): the plain fallback under the
    glass (glassclock.js draws the glass in the same faces) */
 .tahoe-lock-clock-date {
-  font-family: "SF Pro Display", sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .tahoe-lock-clock-time {
-  font-family: "SF Pro Display", sans-serif;
-  font-weight: 800;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
   font-feature-settings: "tnum";
   color: rgba(255, 255, 255, 0.88);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.16);

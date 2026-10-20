@@ -20,6 +20,8 @@ export GSETTINGS_BACKEND=keyfile TAHOE_TEST_OUT=$out TAHOE_LOCK_TAG=${TAHOE_LOCK
 rm -f "$out/log-$TAHOE_LOCK_TAG.jsonl"
 ext=$XDG_DATA_HOME/gnome-shell/extensions
 mkdir -p "$ext" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
+# the user's own fonts (SF Pro, Space Grotesk): fontconfig looks for them under $XDG_DATA_HOME
+[ -d "$HOME/.local/share/fonts" ] && ln -s "$HOME/.local/share/fonts" "$XDG_DATA_HOME/fonts"
 cp -r "$HOME/.local/share/gnome-shell/extensions/blur-my-shell@aunetx" "$ext/"
 glib-compile-schemas "$ext/blur-my-shell@aunetx/schemas"
 cp -r "$H/lock-test@local" "$ext/"

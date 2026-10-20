@@ -14,17 +14,20 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Layout from 'resource:///org/gnome/shell/ui/layout.js';
 
-import { GlassClock, buildMask, measure } from './glassclock.js';
+import { GlassClock, MATERIAL, buildMask, measure } from './glassclock.js';
 
 const DATE_TOP = 0.108;       // top of the date's letters
-const DATE_SIZE = 0.0245;     // date type size (35 px at 1440)
-const TIME_SIZE = 0.1335;     // time type size (192 px at 1440: digits about 9.8 % of the height)
-const TIME_GAP = 0.014;       // from the bottom of the date's letters to the top of the digits
+// 1.5x Apple's size, as the user asked: digits 15 % of the height (Space Grotesk's digits are
+// 0.730 em), the date and the gap in the same proportion
+const DATE_SIZE = 0.0375;     // date type size (54 px at 1440)
+const TIME_SIZE = 0.2055;     // time type size (296 px at 1440: digits 216 px, 15 %)
+const TIME_GAP = 0.017;       // from the bottom of the date's letters to the top of the digits
 
-// where the letters sit inside an St.Label line, as fractions of the type size, measured on
-// SF Pro Display in the harness: the cap/digit top below the line top, and the cap height
-const INK_TOP = {date: 0.375, time: 0.35};
-const CAP_HEIGHT = 0.72;
+// where the letters sit inside an St.Label line, as fractions of the type size, measured with
+// Pango on Space Grotesk SemiBold: the cap/digit top below the line top, and the cap height
+// (these place the plain fallback labels; the glass places its letters from Pango's ink itself)
+const INK_TOP = {date: 0.278, time: 0.270};
+const CAP_HEIGHT = 0.741;
 const AVATAR_CENTRE = 0.825;  // centre of the avatar
 const AVATAR_SIZE = 64;       // logical px, matches lockscreen.css
 const BOTTOM_MARGIN = 0.04;   // the prompt never comes closer to the bottom edge than this
@@ -179,7 +182,7 @@ function buildClock(frame, dialog) {
 // painted, and come back if the glass cannot be built or never paints. A glass failure therefore
 // costs the glass, not the layout, and never sends the lock screen back to GNOME's.
 
-const GLASS_PAD = 40;   // logical px around the letters, room for the bevel and the bend
+const GLASS_PAD = 64;   // logical px around the letters, room for the bevel and the bend
 
 function buildGlass(frame, dialog, labels) {
     const area = new St.Widget({
@@ -237,7 +240,7 @@ function buildGlass(frame, dialog, labels) {
             glass.setBackdrop(backgroundOf(), x, y);
             const dark = interfaceSettings.get_string('color-scheme') === 'prefer-dark';
             glass.setMask(buildMask(boxWidth * scale, boxHeight * scale, spec, scale),
-                boxWidth * scale, boxHeight * scale, scale, dark);
+                boxWidth * scale, boxHeight * scale, scale, dark, spec.timeSize / (MATERIAL.refSize * scale));
         } catch (e) {
             giveUp(`${e}`);
             return;
