@@ -25,8 +25,8 @@ import { EXPRESSIVE, LIQUID_MASS, Spring, lerp, smoothstep, speedFor, stagger } 
 // the drop: falls this share of the card's height (at most FALL_MAX_PX) and spreads once it has
 // covered SPREAD_AT of its fall
 const FALL_SHARE = 0.18;
-const FALL_MAX_PX = 40;
-const SPREAD_AT = 0.55;
+const FALL_MAX_PX = 32;
+const SPREAD_AT = 0.4;
 // how much the drop lengthens per px/s of its speed, at most MAX_STRETCH
 const STRETCH_PER_SPEED = 0.0012;
 const MAX_STRETCH = 0.5;
@@ -36,30 +36,35 @@ const SIDE = 0.95;
 const TRAIL = 0.75;
 const EDGE_DAMPING = 0.9;
 // the popup's elastic growth about its origin: from ELASTIC_FROM, overshooting about 2 %
-const ELASTIC_FROM = 0.86;
-const ELASTIC = { damping: 0.55, stiffness: 380 };
+const ELASTIC_FROM = 0.9;
+const ELASTIC = { damping: 0.6, stiffness: 700 };
 // while the popup is past its size, its height gives way to its width (a liquid keeps its volume)
 const JELLY = 0.7;
 // rows: an eased stagger, `inQuad`, at most ROW_SPREAD_MS for all of them
-const ROW_BASE_MS = 50;
-const ROW_SPREAD_MS = 240;
+const ROW_BASE_MS = 30;
+const ROW_SPREAD_MS = 150;
 const ROW_REVEALED = 0.35;
 // and once the glass is this wide (a row never shows outside the glass)
 const ROW_WIDE = 0.85;
 // closing: the edges gather to the drop, then it rises into its origin
 const GATHERED = 0.35;
 // quick settings buttons
-const BUTTON_ROW_MS = 70;
-const BUTTON_ROW_SPREAD_MS = 320;
-const BUTTON_COLUMN_MS = 20;
+const BUTTON_ROW_MS = 45;
+const BUTTON_ROW_SPREAD_MS = 200;
+const BUTTON_COLUMN_MS = 15;
 // the blob a button starts as: this share of its height, round
 const BUTTON_FROM = 0.55;
 const BUTTON_PARTS_AT = 0.35;
-const BUTTON_PART_MS = 50;
+// the height a little softer than the width (spatial fast), so the two settle out of step
+const BUTTON_HEIGHT = { damping: 0.72, stiffness: 560 };
+const BUTTON_PART_MS = 35;
 // the glass circle a card starts from: the clicked icon's capsule, or a small one at the pointer
 const CIRCLE_MIN_PX = 24;
 const CIRCLE_MAX_PX = 48;
 const POINTER_CIRCLE_PX = 18;
+// sliding between menus: the next one settles from QUICK_FROM, the last one shrinks to QUICK_TO
+const QUICK_FROM = 0.96;
+const QUICK_TO = 0.98;
 // how long a banner's or app menu's animation waits for its glass to appear
 const LAZY_MS = 150;
 const MORPHING_CLASS = 'tahoe-morphing';
@@ -209,7 +214,8 @@ export class CardPiece {
             : 0;
         this.originY = circleCentre;
         this.landingY = circleCentre + fall * this.direction;
-        this.speed = speedFor(this.card.width, this.card.height);
+        // one step faster than M3's size rule (user, after trying it: "a bit too silky")
+        this.speed = { fast: 'fast', default: 'fast', slow: 'default' }[speedFor(this.card.width, this.card.height)];
         this.edges = new Edges(this.circle);
         this.drop = new Spring(this.originY, EXPRESSIVE.spatial.fast, { mass: LIQUID_MASS });
         this.radius = new Spring(this.circleRadius, EXPRESSIVE.effects.slow);
@@ -277,9 +283,10 @@ export class CardPiece {
         }
     }
 
+    /// the drop where it landed (for a submenu, its toggle's capsule)
     landingDrop() {
-        const d = this.circle.width;
-        return { x: this.circle.x, y: this.landingY - d / 2, width: d, height: d };
+        const { x, width, height } = this.circle;
+        return { x, y: this.landingY - height / 2, width, height };
     }
 
     /// the drop pours out into the card, carrying its own velocity into the edges
@@ -300,6 +307,7 @@ export class CardPiece {
         // round while it moves: the radius never exceeds the shape's half size
         const radius = Math.min(this.radius.value, rect.width / 2, rect.height / 2);
         this.surface.set_reveal({ ...rect, radius });
+        this.lastRect = rect;
         return rect;
     }
 
@@ -371,8 +379,8 @@ export class CardPiece {
             }
         } else {
             this.drop.step(dt);
-            const d = this.circle.width;
-            this.edges.set({ x: this.circle.x, y: this.drop.value - d / 2, width: d, height: d });
+            const { x, width, height } = this.circle;
+            this.edges.set({ x, y: this.drop.value - height / 2, width, height });
         }
         this.reveal();
         return this.rising && this.drop.settled && this.items.every(item => item.settled);
@@ -434,7 +442,7 @@ export class ButtonPiece {
         this.fromX = Math.min(1, round / card.width);
         this.fromY = Math.min(1, round / card.height);
         this.width = new Spring(this.fromX, EXPRESSIVE.spatial.fast, { mass: LIQUID_MASS });
-        this.height = new Spring(this.fromY, EXPRESSIVE.spatial.default, { mass: LIQUID_MASS });
+        this.height = new Spring(this.fromY, BUTTON_HEIGHT, { mass: LIQUID_MASS });
         this.fade = new Spring(0, EXPRESSIVE.effects.fast);
         this.items = pieceItems(this.target);
         this.ready = true;
@@ -455,7 +463,7 @@ export class ButtonPiece {
         this.surface.set_reveal(null);
         if (opening) {
             this.width.setToken(EXPRESSIVE.spatial.fast, LIQUID_MASS);
-            this.height.setToken(EXPRESSIVE.spatial.default, LIQUID_MASS);
+            this.height.setToken(BUTTON_HEIGHT, LIQUID_MASS);
             this.width.retarget(1, 1 - this.fromX || 0.4);
             this.height.retarget(1, 1 - this.fromY || 0.4);
             this.fade.setToken(EXPRESSIVE.effects.fast);
@@ -527,7 +535,10 @@ export class Morph {
     /// appears in the first frames (a banner, an app menu); `step(piece)`: called each frame;
     /// `fadeRoot`: fade the popup with the drop; `elastic`: the popup grows about its origin and
     /// settles past its size (one card)
-    constructor(root, opening, { origin, pieces, quickSettings = false, lazy = null, step = null, fadeRoot = !quickSettings, hold = true, elastic = !quickSettings, onDone }) {
+    /// `quick`: sliding from one menu to the next (GNOME's fade-only open and close): no drop and
+    /// no pour, the menu is there at once, fading in on an effects spring with a light elastic
+    /// settle, and the one left behind only fades out; two liquid bodies never meet
+    constructor(root, opening, { origin, pieces, quickSettings = false, lazy = null, step = null, fadeRoot = !quickSettings, hold = true, elastic = !quickSettings, quick = false, onDone }) {
         this.root = root;
         this.opening = opening;
         this.origin = origin;
@@ -540,8 +551,12 @@ export class Morph {
         this.wantHold = hold;
         this.pieces = [];
         this.last = 0;
-        if (elastic)
+        if (quick) {
+            this.quick = this.startQuick(pieces);
+            pieces = [];
+        } else if (elastic) {
             this.elastic = this.startElastic(previousScale(root));
+        }
         pieces.forEach(piece => this.add(piece));
         this.order();
         this.render(0);
@@ -567,6 +582,26 @@ export class Morph {
             spring.retarget(0.94, 0.06);
         }
         return { spring, saved, started: !this.opening };
+    }
+
+    startQuick(pieces) {
+        // whatever an interrupted animation left: shown whole at once
+        pieces.forEach(piece => piece.restore());
+        this.handedOver = pieces;
+        const root = this.root;
+        const fade = new Spring(this.opening ? Math.min(root.opacity / 255, 0.35) : root.opacity / 255,
+            EXPRESSIVE.effects.fast);
+        fade.retarget(this.opening ? 1 : 0, 1);
+        const size = new Spring(this.opening ? QUICK_FROM : 1, EXPRESSIVE.spatial.fast);
+        size.retarget(this.opening ? 1 : QUICK_TO, 1 - QUICK_FROM);
+        if (this.origin && root.width > 0 && root.height > 0) {
+            root.set_scale(1, 1);
+            const [ok, x, y] = root.transform_stage_point(
+                this.origin.x + this.origin.width / 2, this.origin.y + this.origin.height / 2);
+            if (ok)
+                root.set_pivot_point(clamp01(x / root.width), clamp01(y / root.height));
+        }
+        return { fade, size };
     }
 
     add(piece) {
@@ -655,6 +690,15 @@ export class Morph {
             this.order();
         if (this.fadeRoot)
             this.root.opacity = Math.round(255 * smoothstep(0, 1, reach));
+        if (this.quick) {
+            const { fade, size } = this.quick;
+            fade.step(dt);
+            size.step(dt);
+            this.root.opacity = Math.round(255 * clamp01(fade.value));
+            const v = size.value;
+            this.root.set_scale(v, v > 1 ? 1 - (v - 1) * JELLY : v);
+            done = fade.settled && size.settled;
+        }
         if (this.elastic) {
             const { spring } = this.elastic;
             if (this.opening && !this.elastic.started && (spreading || this.pieces.length === 0)) {
@@ -677,11 +721,16 @@ export class Morph {
         this.release();
         if (this.elastic)
             this.root._tahoe_elastic = this.elastic.spring.value;
-        return this.pieces;
+        return this.quick ? this.handedOver : this.pieces;
     }
 
     finish() {
         this.stopTimeline();
+        if (this.quick) {
+            this.root.set_scale(1, 1);
+            if (this.opening)
+                this.root.opacity = 255;
+        }
         if (this.elastic) {
             this.root.set_scale(1, 1);
             delete this.root._tahoe_elastic;
@@ -714,7 +763,7 @@ export class Morph {
 
     destroy() {
         this.stopTimeline();
-        if (this.elastic)
+        if (this.elastic || this.quick)
             this.root.set_scale(1, 1);
         this.pieces.forEach(piece => piece.restore());
         this.release();

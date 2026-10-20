@@ -12,6 +12,7 @@
 // `globalThis.__tahoeGlass` API. Without that API, with animations off or reduced motion, popups
 // open as GNOME opens them. GTK app menus close at once: GNOME destroys their windows before an
 // extension hears of it. docs/gnome-tahoe/animations.md, Phases 4 and 5.
+import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -23,6 +24,8 @@ import { animationsOn, ButtonPiece, CardPiece, glassApi, Morph, stageRect } from
 import { lerp } from './spring.js';
 
 const BANNER_CIRCLE_PX = 34;
+// quick settings is set up this long after the shell starts
+const WARM_MS = 3000;
 const APP_MENU_TYPES = [
     Meta.WindowType.DROPDOWN_MENU, Meta.WindowType.POPUP_MENU, Meta.WindowType.MENU, Meta.WindowType.COMBO,
 ];
@@ -37,20 +40,28 @@ export default class TahoeMotion extends Extension {
         proto.open = function (animate, onComplete) {
             if (!motion.handles(this, animate))
                 return motion._boxOpen.call(this, animate, onComplete);
-            return motion.open(this, onComplete);
+            return motion.open(this, onComplete, motion.sliding(animate));
         };
         proto.close = function (animate, onComplete) {
             if (!this.visible)
                 return undefined;
             if (!motion.handles(this, animate))
                 return motion._boxClose.call(this, animate, onComplete);
-            return motion.close(this, onComplete);
+            return motion.close(this, onComplete, motion.sliding(animate));
         };
         this.patchBanners();
         this.watchAppMenus();
         // quick settings icons bounce on press and replace on toggle (not while the panel moves)
         this._icons = new IconEffects(() => animationsOn() === false
             || this._morphs.has(Main.panel.statusArea.quickSettings?.menu?._boxPointer));
+        // the one-time setup of quick settings, done while idle rather than on its first open
+        // (23 ms of the first open's frame, measured)
+        this._warmId = GLib.timeout_add(GLib.PRIORITY_LOW, WARM_MS, () => {
+            this._warmId = 0;
+            this.patchSubmenus();
+            this._icons?.track(Main.panel.statusArea.quickSettings?.menu);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     /// GNOME 51 does not export QuickToggleMenu: its prototype comes from a live toggle's menu
@@ -129,8 +140,10 @@ export default class TahoeMotion extends Extension {
             pieces: [piece],
             fadeRoot: false,
             elastic: false,
+            // the submenu is as tall as its glass's poured edge: the buttons below move with it
             step: () => {
-                container.height = Math.max(0, lerp(0, fullHeight, Math.min(1, Math.max(0, piece.qy))));
+                const rect = piece.ready ? piece.lastRect : null;
+                container.height = rect ? Math.min(fullHeight, Math.max(0, rect.y + rect.height)) : 0;
             },
             onDone: () => {
                 this._morphs.delete(target);
@@ -288,6 +301,9 @@ export default class TahoeMotion extends Extension {
     }
 
     disable() {
+        if (this._warmId)
+            GLib.source_remove(this._warmId);
+        this._warmId = 0;
         this._icons?.destroy();
         this._icons = null;
         if (this._mapId)
@@ -304,6 +320,12 @@ export default class TahoeMotion extends Extension {
         }
         this._morphs.forEach(morph => morph.destroy());
         this._morphs = null;
+    }
+
+    /// GNOME opens and closes with a fade only when the pointer slides from one menu to the next
+    sliding(animate) {
+        return (animate & BoxPointer.PopupAnimation.FADE) !== 0
+            && (animate & BoxPointer.PopupAnimation.SLIDE) === 0;
     }
 
     handles(boxPointer, animate) {
@@ -337,7 +359,7 @@ export default class TahoeMotion extends Extension {
         return pieces;
     }
 
-    open(boxPointer, onComplete) {
+    open(boxPointer, onComplete, quick = false) {
         this.patchSubmenus();
         if (this.isQuickSettings(boxPointer))
             this._icons?.track(Main.panel.statusArea.quickSettings.menu);
@@ -350,6 +372,7 @@ export default class TahoeMotion extends Extension {
             origin: stageRect(boxPointer._sourceActor),
             pieces: this.piecesOf(boxPointer, previous),
             quickSettings: this.isQuickSettings(boxPointer),
+            quick,
             onDone: () => {
                 this._morphs.delete(boxPointer);
                 boxPointer._muteInput.enabled = false;
@@ -359,7 +382,7 @@ export default class TahoeMotion extends Extension {
         this._morphs.set(boxPointer, morph);
     }
 
-    close(boxPointer, onComplete) {
+    close(boxPointer, onComplete, quick = false) {
         const previous = this.takeOver(boxPointer);
         boxPointer._muteInput.enabled = true;
         boxPointer._muteKeys.enabled = true;
@@ -368,6 +391,7 @@ export default class TahoeMotion extends Extension {
             origin: stageRect(boxPointer._sourceActor),
             pieces: this.piecesOf(boxPointer, previous),
             quickSettings: this.isQuickSettings(boxPointer),
+            quick,
             onDone: () => {
                 this._morphs.delete(boxPointer);
                 boxPointer.hide();

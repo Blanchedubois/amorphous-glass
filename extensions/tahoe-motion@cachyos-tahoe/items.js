@@ -101,7 +101,7 @@ const SLIDE_PX = 16;
 function tokens(kind, speed) {
     switch (kind) {
     case 'row':
-        return [EXPRESSIVE.spatial[speed === 'slow' ? 'default' : speed], EXPRESSIVE.effects.default];
+        return [EXPRESSIVE.spatial[speed === 'default' ? 'default' : 'fast'], EXPRESSIVE.effects.fast];
     case 'pop':
     case 'cell':
         return [EXPRESSIVE.spatial.fast, EXPRESSIVE.effects.fast];
