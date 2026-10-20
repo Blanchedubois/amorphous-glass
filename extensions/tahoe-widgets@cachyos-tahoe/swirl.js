@@ -19,7 +19,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {RADIUS, scaleFactor} from './glass.js';
 
-import {coverPalette, swirlPalette, wantsDarkInk} from './palette.js';
+import {coverPalette, inkColour, swirlPalette, wantsDarkInk} from './palette.js';
 
 // ---- the shader ----
 
@@ -197,7 +197,7 @@ export class Swirl {
         this._ink = null;
         this._inkFrom = 0;
         this._mode = 'dark';
-        this.onInk = null;          // (dark) true: dark text, false: white, null: as the glass mode
+        this.onInk = null;          // (dark, rgb): dark true/false/null (as the mode), rgb its tint or null
         this._lab = null;           // the cover's colours (OkLab), null: neutral
         this._from = null;          // sRGB palettes, for the cross-fade
         this._to = null;
@@ -233,12 +233,13 @@ export class Swirl {
         if (fade)
             this._inkFrom = this._inkValue();
         const ink = this._lab ? wantsDarkInk(this._to ?? swirlPalette(this._lab), this._mode) : null;
+        // the text's colour, tinted by this cover (it changes with the cover even when the ink stays)
+        this.onInk?.(ink, ink === null ? null : inkColour(this._lab, ink));
         if (ink === this._ink)
             return;
         if (!fade)
             this._inkFrom = ink === null ? 0 : ink ? 1 : -1;
         this._ink = ink;
-        this.onInk?.(ink);
         this._show();
     }
 
