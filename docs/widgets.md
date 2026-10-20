@@ -66,10 +66,12 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   into its place (650 ms). Only scale, translation and opacity move, so the column never reflows;
   lines more than 10 away are not drawn. The eases run on the compositor between lines only, and
   end at once with GNOME animations off. Checked frame by frame (`SHOT_BURST=count,ms`).
-- **Liquid Glass lyrics** (`glassink.js`): an OffscreenEffect on the lyrics viewport turns the text
-  into glass from its own coverage, with no mask. The body is translucent in the ink's colour (62 %,
-  dark ink a quarter more), with a thin, subtle rim lit from the top left and a faint shade (user:
-  "subtle and thinner"). The viewport is rendered again only while lines move.
+- **Text in the cover's tint** (user follow-up): the text, artist, times, progress bar, lyrics
+  and control icons take the cover's most colourful colour, very light (OkLab L 0.96, a little
+  chroma) under white text and deep (L 0.27) under dark text; a cover without real colour gives
+  plain white or near-black. The lyrics were Liquid Glass text for a while; the user found it
+  too prominent, and at a subtle setting it only made the text look washed out next to the tint,
+  so it was removed (solid tinted text, one fewer render pass).
 - **Fonts** (same follow-up): Apple's SF throughout, Text under 20 px and Display from 20 px. Song
   titles are bigger: small 15, wide 17, lyrics 16, large 22 (SF Pro Display); artists 13 to 16. The
   large card grew to 356 x 504 to fit.
