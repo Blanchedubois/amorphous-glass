@@ -591,6 +591,57 @@ went live at the end.
 - Quick settings stress cases are all ok: spam, reversals, Wi-Fi arrow, slider scroll, instant
   closes, 50× leak check.
 
+### Window menu (scope added 2026-10-20)
+
+The window menu (right-click on a title bar or header bar, or Alt+Space: Take Screenshot, Hide,
+Maximize, Move, Resize, Always on Top, ...) had glass but opened with GNOME's plain fade. GNOME 51
+(`js/ui/windowMenu.js`) builds a new `WindowMenu` for each open and opens it straight away. That
+caused three problems:
+
+- **No glass yet at open.** Blur My Shell glasses a popup on its `child-added`, at the next
+  `BEFORE_REDRAW`. So `BoxPointer.open` saw no glass surfaces and tahoe-motion handed the menu back
+  to GNOME. Now a window menu is animated whenever popups have glass at all (the calendar has).
+  Its glass joins in the first frames through the same `lazy` path banners use. The menu stays at
+  opacity 0 until its glass exists, and the elastic growth waits for it.
+- **Opened `fadeOnly`.** That is GNOME's signal for sliding from one panel menu to the next, so
+  it got the half-poured handover. Window menus now always get the full pour.
+- **Destroyed on close.** GNOME destroys the menu as soon as it closes. tahoe-motion now delays
+  `WindowMenu.destroy` until its close morph is over, or until an instant close stops it. When a
+  new window menu opens while the old one is still closing, the old one goes at once, so two
+  liquid bodies never meet. Disabling the extension runs any destroys still waiting.
+
+**Dock icon menus had the same gap (found 2026-10-20, user: "same for this aswell").** Dash to
+Dock (v110) makes an icon's menu on that icon's first right-click and opens it in the same call.
+So the first menu of every dock icon opened with GNOME's fade, and only later opens of the same
+icon morphed. The old stress case right-clicked one icon over and over, so it never saw this.
+The late-glass path now covers any popup menu opened before its glass exists (`glassComing()`).
+New case "dock: first right-click on each icon": main's code morphed 1 of 3 first opens, this
+branch 3 of 3. The stress table now has a **morph** column, the opens tahoe-motion actually
+animated: in the full run every BoxPointer open in every case morphed.
+
+Origin: the menu's source is GNOME's dummy widget at Mutter's rect. On a right-click that rect is
+the pointer, so the drop pours out of the pointer like the desktop menu (18 px circle). With
+Alt+Space it is the window's top-left corner, so the drop pours from there. The glass is 18 and
+its rows 14 (31 px tall), as STANDARD.md says for shell menus. No Blur My Shell change.
+
+Stress (`TAHOE_STRESS_CASES='window menu' tools/headless/stress.sh`), with a GTK 4 header-bar
+window (`tools/headless/stress-window.js`) and real input. Slowed stills:
+`TAHOE_TEST_ONLY=windowmenu` (`tahoe-motion-test@local/windowmenu.js`).
+
+| case | result |
+|---|---|
+| right-click title bar, open/close | ok, glass 18, rows 14 |
+| spam right-click (40 ms; random 20–200 ms), 20x | ok, p95 10 / 9.7 |
+| Alt+Space (pointer away), 8x | ok, pours from the window corner |
+| window at all four screen edges, 8x | ok, the menu always inside the monitor |
+| Move / Resize chosen | menu closes, the keyboard grab starts; ok |
+| window closed mid-open / mid-close, 5x each | ok, nothing left |
+| workspace switched mid-open, 6x | ok |
+| leak check x50 | handlers 4170→4170, no window menu left, idle 0; actors +14 once (the same after 1 and 50 cycles) |
+| dock: first right-click on each icon (new) | 4 of 4 opens morphed (main: 1 of 3) |
+
+No JS errors.
+
 ## Where the code would go
 
 - Phases 1 to 3: `config/bms-tahoe-glass.patch` (popup surfaces, backdrop capture, refraction
@@ -618,7 +669,7 @@ The menu bar's contents and icons, the quick settings layout, the Tahoe Control 
 5. Scope: top bar dropdowns, app dropdowns (GTK popovers, popover menus, drop-down lists, GTK3
    popup menus; added later the same evening), the quick settings panel (pieces pop in with a small stagger), QS
    submenus (the card grows out of its toggle, rows below slide on the same spring), dock icon
-   menus, the desktop right-click menu, notification banners. Reduced motion (GNOME animations
+   menus, the desktop right-click menu, notification banners, the window menu (added 2026-10-20). Reduced motion (GNOME animations
    off) = appear at once.
 6. Where: Phases 1 to 3 in the Blur My Shell patch; Phase 4 in a new `tahoe-motion@cachyos-tahoe`
    extension that can be switched off on its own.

@@ -12,11 +12,16 @@
 // `globalThis.__tahoeGlass` API. Without that API, with animations off or reduced motion, popups
 // open as GNOME opens them. GTK app menus close at once: GNOME destroys their windows before an
 // extension hears of it. docs/gnome-tahoe/animations.md, Phases 4 and 5.
+//
+// A menu opened in the call that made it (the window menu, a new menu each time; a dock icon's
+// first menu) has no glass yet: Blur My Shell makes it a frame later, so it joins in the first
+// frames. GNOME's destroy of a closing window menu waits for the close to play out.
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { State as TrayState } from 'resource:///org/gnome/shell/ui/messageTray.js';
+import { WindowMenu } from 'resource:///org/gnome/shell/ui/windowMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import { IconEffects } from './icons.js';
@@ -33,6 +38,17 @@ const HANDOVER_FRAMES = 2;
 /// its own position (the dummy cursor of a right-click moves; a panel button does not)
 function originKey(actor) {
     return actor ? { actor, x: actor.x, y: actor.y } : null;
+}
+
+/// the glass of a popup made after it appears (a banner, the window menu): it joins in the first
+/// frames
+function lateGlass(root) {
+    return have => {
+        const known = new Set(have.map(piece => piece.target));
+        return (glassApi()?.surfaces(root) ?? [])
+            .filter(surface => !known.has(surface.target) && surface.target.mapped)
+            .map(surface => new CardPiece(surface));
+    };
 }
 
 function sameOrigin(a, b) {
@@ -55,25 +71,34 @@ export default class TahoeMotion extends Extension {
         this._boxClose = proto.close;
         const motion = this;
         proto.open = function (animate, onComplete) {
-            if (!motion.handles(this, animate)) {
+            const windowMenu = motion.isWindowMenu(this);
+            if (windowMenu)
+                motion.dropClosingWindowMenus();
+            const late = motion.glassComing(this);
+            if (!motion.handles(this, animate, late)) {
                 motion.stop(this);
                 return motion._boxOpen.call(this, animate, onComplete);
             }
-            return motion.open(this, onComplete, motion.sliding(animate));
+            // GNOME opens the window menu fade-only, as if slid to from another menu: it pours
+            return motion.open(this, onComplete, !windowMenu && motion.sliding(animate), late);
         };
         proto.close = function (animate, onComplete) {
             if (!this.visible)
                 return undefined;
+            const windowMenu = motion.isWindowMenu(this);
             if (!motion.handles(this, animate)) {
                 // a close already waiting (a menu left for the next) has its callback run too
                 const waiting = motion.stop(this);
-                return motion._boxClose.call(this, animate, waiting ? () => {
+                const result = motion._boxClose.call(this, animate, waiting ? () => {
                     waiting();
                     onComplete?.();
                 } : onComplete);
+                motion.destroyWaiting(this);
+                return result;
             }
-            return motion.close(this, onComplete, motion.sliding(animate));
+            return motion.close(this, onComplete, !windowMenu && motion.sliding(animate));
         };
+        this.patchWindowMenu();
         this.patchBanners();
         this.watchAppMenus();
         // quick settings icons bounce on press and replace on toggle (not while the panel moves)
@@ -241,17 +266,11 @@ export default class TahoeMotion extends Extension {
             width: BANNER_CIRCLE_PX, height: BANNER_CIRCLE_PX,
         };
         const pieces = this.piecesOf(bin, previous);
-        // its glass is made just after the banner is added: it joins in the first frames
-        const lazy = opening ? have => {
-            const known = new Set(have.map(piece => piece.target));
-            return (glassApi()?.surfaces(bin) ?? [])
-                .filter(surface => !known.has(surface.target) && surface.target.mapped)
-                .map(surface => new CardPiece(surface));
-        } : null;
         const morph = new Morph(bin, opening, {
             origin,
             pieces,
-            lazy,
+            // its glass is made just after the banner is added: it joins in the first frames
+            lazy: opening ? lateGlass(bin) : null,
             onDone: () => {
                 this._morphs.delete(bin);
                 if (opening) {
@@ -325,6 +344,64 @@ export default class TahoeMotion extends Extension {
         }, this);
     }
 
+    /// GNOME destroys a window menu as soon as it starts to close (windowMenu.js): while its
+    /// close plays, the destroy waits, and runs when the close is over or stopped
+    patchWindowMenu() {
+        const proto = WindowMenu.prototype;
+        this._windowMenuDestroy = Object.prototype.hasOwnProperty.call(proto, 'destroy') ? proto.destroy : null;
+        const destroy = proto.destroy;
+        const motion = this;
+        this._windowMenusClosing = new Set();
+        proto.destroy = function () {
+            const boxPointer = this._boxPointer;
+            const running = motion._morphs?.get(boxPointer);
+            if (!running || running.opening)
+                return destroy.call(this);
+            boxPointer._tahoeDestroy = () => destroy.call(this);
+            motion._windowMenusClosing.add(boxPointer);
+            return undefined;
+        };
+    }
+
+    unpatchWindowMenu() {
+        const proto = WindowMenu.prototype;
+        if (this._windowMenuDestroy)
+            proto.destroy = this._windowMenuDestroy;
+        else
+            delete proto.destroy;
+        this._windowMenuDestroy = null;
+    }
+
+    /// a menu opened in the call that made it (the window menu, a dock icon's first menu: Dash to
+    /// Dock makes it on the first right-click): Blur My Shell makes its glass a frame later
+    glassComing(boxPointer) {
+        return boxPointer.has_style_class_name('popup-menu')
+            && (glassApi()?.surfaces(boxPointer).length ?? 0) === 0;
+    }
+
+    isWindowMenu(boxPointer) {
+        return boxPointer._delegate instanceof WindowMenu;
+    }
+
+    /// the destroy GNOME asked for while the window menu closed, once nothing animates it
+    destroyWaiting(boxPointer) {
+        const destroy = boxPointer._tahoeDestroy;
+        if (!destroy || this._morphs?.has(boxPointer))
+            return;
+        delete boxPointer._tahoeDestroy;
+        this._windowMenusClosing?.delete(boxPointer);
+        destroy();
+    }
+
+    /// a new window menu: one still closing goes at once (two liquid bodies never meet)
+    dropClosingWindowMenus() {
+        for (const boxPointer of [...(this._windowMenusClosing ?? [])]) {
+            this.stop(boxPointer);
+            boxPointer.hide();
+            this.destroyWaiting(boxPointer);
+        }
+    }
+
     disable() {
         for (const boxPointer of [...(this._closingSoon ?? [])])
             this.cancelCloseSoon(boxPointer);
@@ -346,6 +423,13 @@ export default class TahoeMotion extends Extension {
             this._submenuProto = null;
         }
         this._morphs.forEach(morph => morph.destroy());
+        this._morphs.clear();
+        this.unpatchWindowMenu();
+        for (const boxPointer of [...this._windowMenusClosing]) {
+            boxPointer.hide();
+            this.destroyWaiting(boxPointer);
+        }
+        this._windowMenusClosing = null;
         this._morphs = null;
     }
 
@@ -386,6 +470,7 @@ export default class TahoeMotion extends Extension {
             morphs: this._morphs?.size ?? 0,
             morph_timelines: [...(this._morphs?.values() ?? [])].filter(m => m.timeline).length,
             closing_soon: this._closingSoon?.size ?? 0,
+            window_menus_closing: this._windowMenusClosing?.size ?? 0,
             icon_buttons: icons?.tracked.size ?? 0,
             icon_timelines: [...(icons?.motions.values() ?? [])].filter(m => m.timeline).length
                 + [...(icons?.squishes.values() ?? [])].filter(m => m.timeline).length,
@@ -398,10 +483,13 @@ export default class TahoeMotion extends Extension {
             && (animate & BoxPointer.PopupAnimation.SLIDE) === 0;
     }
 
-    handles(boxPointer, animate) {
+    /// `late`: a popup whose glass is made after it opens (the window menu), animated when popups
+    /// have glass at all (the calendar's)
+    handles(boxPointer, animate, late = false) {
         const api = glassApi();
-        return Boolean(animate) && animationsOn() && api !== null
-            && api.surfaces(boxPointer).length > 0;
+        const glassed = late ? Main.panel.statusArea.dateMenu?.menu?._boxPointer : boxPointer;
+        return Boolean(animate) && animationsOn() && api !== null && Boolean(glassed)
+            && api.surfaces(glassed).length > 0;
     }
 
     isQuickSettings(boxPointer) {
@@ -455,7 +543,7 @@ export default class TahoeMotion extends Extension {
         return pieces;
     }
 
-    open(boxPointer, onComplete, quick = false) {
+    open(boxPointer, onComplete, quick = false, late = false) {
         // slid back before its close: it simply stays
         this.cancelCloseSoon(boxPointer);
         this.patchSubmenus();
@@ -487,6 +575,7 @@ export default class TahoeMotion extends Extension {
             // that menu printed in its backdrop
             partial: quick,
             hold: quick ? 'late' : true,
+            lazy: late ? lateGlass(boxPointer) : null,
             onDone: () => {
                 this._morphs.delete(boxPointer);
                 onComplete?.();
@@ -522,7 +611,11 @@ export default class TahoeMotion extends Extension {
                 boxPointer.opacity = 0;
                 boxPointer.translation_x = 0;
                 boxPointer.translation_y = 0;
-                onComplete?.();
+                try {
+                    onComplete?.();
+                } finally {
+                    this.destroyWaiting(boxPointer);
+                }
             },
         });
         this._morphs.set(boxPointer, morph);
