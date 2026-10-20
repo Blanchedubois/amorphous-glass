@@ -125,6 +125,8 @@ const XML = `<node>
   <property name="CanGoPrevious" type="b" access="read"/>
 </interface></node>`;
 const INFO = Gio.DBusNodeInfo.new_for_xml(XML);
+// STRESS_COVERS: cover files, one per track in turn (the swirl test)
+const COVERS = (GLib.getenv('STRESS_COVERS') ?? '').split(',').filter(Boolean);
 
 class FakePlayer {
     constructor(id, {playing = true, delay = 40} = {}) {
@@ -174,6 +176,7 @@ class FakePlayer {
             'xesam:artist': new GLib.Variant('as', []),   // no artist: lyrics never go to lrclib.net
             'xesam:url': new GLib.Variant('s', `file://${OUT}/${this.id}-${this.track}.ogg`),
             'mpris:length': new GLib.Variant('x', 200 * 1e6),
+            ...COVERS.length ? {'mpris:artUrl': new GLib.Variant('s', `file://${COVERS[this.track % COVERS.length]}`)} : {},
         });
         }
         return null;
@@ -385,6 +388,89 @@ async function fullscreenCover() {
         ok: covered && ticks === 0 && after >= 2});
 }
 
+// ---- the album swirl: frames, stage paints and shell CPU per state ----
+function cpuSeconds() {
+    const stat = new TextDecoder().decode(GLib.file_get_contents('/proc/self/stat')[1]);
+    const f = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    return (Number(f[11]) + Number(f[12])) / 100;   // utime + stime, in clock ticks of 1/100 s
+}
+
+async function measure(label, ms, swirlMod) {
+    let paints = 0, frames = 0;
+    const paintId = global.stage.connect('after-paint', () => paints++);
+    const sample = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+        frames += swirlMod.swirlFramesRunning() > 0 ? 1 : 0;
+        return GLib.SOURCE_CONTINUE;
+    });
+    const c0 = cpuSeconds(), t0 = GLib.get_monotonic_time();
+    await sleep(ms);
+    const secs = (GLib.get_monotonic_time() - t0) / 1e6;
+    const cpu = (cpuSeconds() - c0) / secs * 100;
+    GLib.source_remove(sample);
+    global.stage.disconnect(paintId);
+    const r = {state: label, seconds: +secs.toFixed(1), paintsPerSecond: +(paints / secs).toFixed(1),
+        swirlRunningShare: +(frames / (secs * 10)).toFixed(2), shellCpuPercent: +cpu.toFixed(1)};
+    write({swirl: r});
+    return r;
+}
+
+async function swirlTest(players) {
+    const ext = Main.extensionManager.lookup(UUID);
+    const swirlMod = await import(`file://${ext.path}/swirl.js`);
+    const [p] = players;
+    const iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+    const setStatus = st => {
+        p.status = st;
+        p.changed(['PlaybackStatus']);
+    };
+    await sleep(2000);
+    const r = {};
+    r.playing = await measure('playing', 6000, swirlMod);
+    setStatus('Paused');
+    await sleep(500);
+    r.paused = await measure('paused', 6000, swirlMod);
+    // a new track while paused: the cross-fade runs, then everything stops
+    p.track++;
+    p.changed(['Metadata']);
+    r.trackPaused = await measure('track change while paused (first 3 s)', 3000, swirlMod);
+    r.afterFade = await measure('after that cross-fade', 4000, swirlMod);
+    setStatus('Playing');
+    iface.set_boolean('enable-animations', false);
+    await sleep(500);
+    r.noAnimations = await measure('playing, animations off', 6000, swirlMod);
+    iface.set_boolean('enable-animations', true);
+    await sleep(500);
+    r.again = await measure('playing, animations back on', 4000, swirlMod);
+    if (HARNESS) {
+        const proc = Gio.Subprocess.new(['gjs', `${HARNESS}/fullscreen.js`, '12000'], Gio.SubprocessFlags.NONE);
+        let covered = false;
+        for (let i = 0; i < 40 && !covered; i++) {
+            await sleep(100);
+            covered = Main.layoutManager.monitors[Main.layoutManager.primaryIndex].inFullscreen;
+        }
+        await sleep(500);
+        r.fullscreen = covered ? await measure('playing, under a fullscreen window', 6000, swirlMod) : null;
+        proc.force_exit();
+        await sleep(1000);
+    }
+    Main.sessionMode.pushMode('unlock-dialog');
+    await sleep(800);
+    r.locked = await measure('playing, locked (session mode unlock-dialog)', 5000, swirlMod);
+    Main.sessionMode.popMode('unlock-dialog');
+    await sleep(3000);
+    r.unlocked = await measure('playing, unlocked again', 4000, swirlMod);
+    setStatus('Paused');
+    write({swirlOk: {
+        runsWhilePlaying: r.playing.swirlRunningShare > 0.9,
+        stopsWhenPaused: r.paused.swirlRunningShare === 0,
+        fadeThenStops: r.trackPaused.swirlRunningShare > 0 && r.afterFade.swirlRunningShare === 0,
+        stopsWithoutAnimations: r.noAnimations.swirlRunningShare === 0,
+        stopsUnderFullscreen: r.fullscreen ? r.fullscreen.swirlRunningShare === 0 : 'not run',
+        stopsWhenLocked: r.locked.swirlRunningShare === 0,
+        resumes: r.again.swirlRunningShare > 0.9 && r.unlocked.swirlRunningShare > 0.9,
+    }, errors: errors()});
+}
+
 // errors and criticals the shell has logged so far (its stderr is $SHOT_OUT/shell.log)
 function errors() {
     try {
@@ -444,6 +530,21 @@ export default class Stress extends Extension {
             await idle('only minute widgets (digital, glass text, calendar, weather), 65 s', 65000);
             players[0].status = 'Paused';
             players[0].changed(['PlaybackStatus']);
+            return;
+        }
+        if (GLib.getenv('STRESS_ONLY') === 'swirl') {
+            await swirlTest(players);
+            return;
+        }
+        if (GLib.getenv('STRESS_ONLY') === 'baseline') {
+            // the same layout and player, paused from the start: what the desktop costs at rest
+            players[0].status = 'Paused';
+            players[0].changed(['PlaybackStatus']);
+            await sleep(2000);
+            const ext = Main.extensionManager.lookup(UUID);
+            // widgets from before the swirl have no swirl.js
+            const mod = await import(`file://${ext.path}/swirl.js`).catch(() => ({swirlFramesRunning: () => 0}));
+            await measure('paused from the start', 6000, mod);
             return;
         }
         if (GLib.getenv('STRESS_ONLY') === 'drags') {
