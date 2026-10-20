@@ -32,8 +32,15 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   cover (32). No cover: a neutral grey field at half strength. `tools/widgets-stress/covers.js`
   makes the test covers (dark, bright, monochrome, blue and orange) and prints their palettes.
 - **The cover's own colours, the same in every mode** (user, mid-way): no per-mode remapping.
-  The text ink follows the swirl instead of the mode: dark text when the palette's mean luma is
-  over 0.56, white otherwise (the mode's text without a cover), with a 20 % scrim on that side.
+- **Text ink** (user follow-up: black text on vaguely light swirls was hard to read): the glass
+  keeps most of its own lightness under the swirl, so the shown lightness is about
+  0.62 x glass + 0.38 x swirl. Dark text only when that is over 0.70, which in practice means
+  light glass with a light cover; white otherwise. The swirl then guarantees contrast: under white
+  text nothing is lighter than mid grey, under dark text nothing darker than 74 %. Without a cover,
+  the mode's own text.
+- **Controls**: the widget's own filled icons (`icons/`, SF-like), recoloured with the text.
+  Tahoe-Material's media icons have a stroke the shell does not recolour, which left a light
+  outline on dark text. The headless harness now uses the user's icon theme.
 - **Waves, not blobs** (user, mid-way): a three-step sine domain warp folds two smooth waves that
   mix the four colours into long ribbons, the plane turning at 0.04 rad/s; the warps move at
   0.08 to 0.23 rad/s, so a ribbon takes about half a minute to roll over. Dithered.
@@ -60,10 +67,9 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   lines more than 10 away are not drawn. The eases run on the compositor between lines only, and
   end at once with GNOME animations off. Checked frame by frame (`SHOT_BURST=count,ms`).
 - **Liquid Glass lyrics** (`glassink.js`): an OffscreenEffect on the lyrics viewport turns the text
-  into glass from its own coverage, with no mask. The body is translucent in the ink's colour (45 %
-  for light ink, about a third more for dark ink, to read on mid-tone swirls), with a bright rim on
-  the top-left edges and a shade on the bottom-right. Dark ink keeps only the lit-side rim, for
-  contrast. The viewport is rendered again only while lines move.
+  into glass from its own coverage, with no mask. The body is translucent in the ink's colour (62 %,
+  dark ink a quarter more), with a thin, subtle rim lit from the top left and a faint shade (user:
+  "subtle and thinner"). The viewport is rendered again only while lines move.
 - **Fonts** (same follow-up): Apple's SF throughout, Text under 20 px and Display from 20 px. Song
   titles are bigger: small 15, wide 17, lyrics 16, large 22 (SF Pro Display); artists 13 to 16. The
   large card grew to 356 x 504 to fit.

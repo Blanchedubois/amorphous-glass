@@ -27,7 +27,7 @@ import {coverPalette, swirlPalette, wantsDarkInk} from './palette.js';
 // dark, so the rim light and edge shadow stay); `pull`: how far it moves on to the swirl's own
 // colour. The same in every mode, low enough that the wallpaper still shows through.
 const CHROMA = 0.70;
-const PULL = 0.38;
+const PULL = 0.38;            // palette.js SWIRL_PULL follows this
 const NEUTRAL = 0.5;      // a missing cover tints at half strength
 const EDGE_BAND = 14;     // logical px at the edge where only the glass's highlights are kept
 const SPEED = 1.0;        // the swirl's clock against real time
@@ -104,6 +104,13 @@ const SHADER = `
     vec3 c = mix(base, hue, sw_chroma);
     c = mix(c, field, sw_pull);
     c = min(c + light, vec3(1.0));
+    // contrast for the text on top: under white text nothing lighter than mid grey, under dark
+    // text nothing darker than 74 %; areas already on the right side stay as they are
+    float lc = sw_luma(c);
+    if (sw_ink < 0.0)
+        c *= mix(1.0, min(1.0, 0.50 / max(lc, 0.01)), -sw_ink);
+    else if (sw_ink > 0.0)
+        c = mix(c, vec3(1.0), sw_ink * max(0.0, (0.74 - lc) / max(1.0 - lc, 0.01)));
     cogl_color_out = vec4(c * glass.a, glass.a) * cogl_color_in.a;
 `;
 
@@ -189,6 +196,7 @@ export class Swirl {
         this._card = null;
         this._ink = null;
         this._inkFrom = 0;
+        this._mode = 'dark';
         this.onInk = null;          // (dark) true: dark text, false: white, null: as the glass mode
         this._lab = null;           // the cover's colours (OkLab), null: neutral
         this._from = null;          // sRGB palettes, for the cross-fade
@@ -215,8 +223,24 @@ export class Swirl {
         this.check();
     }
 
-    // the swirl is the cover's colours in every glass mode
-    setMode() {}
+    // the swirl is the cover's colours in every glass mode; only the text's ink depends on the mode
+    setMode(mode) {
+        this._mode = mode;
+        this._updateInk(false);
+    }
+
+    _updateInk(fade) {
+        if (fade)
+            this._inkFrom = this._inkValue();
+        const ink = this._lab ? wantsDarkInk(this._to ?? swirlPalette(this._lab), this._mode) : null;
+        if (ink === this._ink)
+            return;
+        if (!fade)
+            this._inkFrom = ink === null ? 0 : ink ? 1 : -1;
+        this._ink = ink;
+        this.onInk?.(ink);
+        this._show();
+    }
 
     setPlaying(playing) {
         this._playing = playing;
@@ -235,9 +259,7 @@ export class Swirl {
             this._lab = lab;
             this._from = this._current();
             this._to = swirlPalette(lab);
-            this._inkFrom = this._inkValue();
-            this._ink = this._lab ? wantsDarkInk(this._to) : null;
-            this.onInk?.(this._ink);
+            this._updateInk(true);
             this._fade = this._animating() ? 0 : 1;
             this._show();
             this.check();
