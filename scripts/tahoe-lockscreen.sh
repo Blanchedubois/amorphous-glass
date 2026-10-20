@@ -36,7 +36,8 @@ case "${1:-}" in
   on)
     # palette.js is a copy of the desktop Music widgets' module: refuse to install a stale copy
     bash "$ROOT/tools/lockscreen/check-shared.sh"
-    fc-list | grep -qi "Space Grotesk" ||
+    # (no grep -q on a pipe here: with pipefail its early exit fails fc-list with SIGPIPE)
+    [[ "$(fc-match -f '%{family}' 'Space Grotesk')" == *"Space Grotesk"* ]] ||
       echo "Note: the clock's font, Space Grotesk, is not installed; the clock falls back to a sans face."
     new=0; [[ -d "$DEST" ]] || new=1
     mkdir -p "$DEST"
