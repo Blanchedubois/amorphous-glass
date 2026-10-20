@@ -19,9 +19,19 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {GlassCard, glassMode, loadBms} from './widgets/glass.js';
-import {MusicMedium} from './widgets/music.js';
+import {MusicLarge, MusicMedium} from './widgets/music.js';
 
-const CARD = [356, 170];   // tahoe-widgets SIZES.medium, logical px
+// Which Music widget, and how big (logical px; the desktop's sizes are tahoe-widgets SIZES).
+// The user chose wide-big (2026-10-20, from docs/lockscreen/shots/np-size-options.png):
+//   wide-big     the wide widget drawn 1.5x (cover, buttons and text; lockscreen.css), 534 x 239
+//   wide         the wide widget as on the desktop, 356 x 170
+//   large        the large widget, cover across the top, 356 x 504
+const STYLES = {
+    'wide': {cls: MusicMedium, type: 'music-medium', size: [356, 170]},
+    'wide-big': {cls: MusicMedium, type: 'music-medium', size: [534, 239], options: {scale: 1.5}, styleClass: 'tahoe-lock-np-big'},
+    'large': {cls: MusicLarge, type: 'music-large', size: [356, 504]},
+};
+export const NOW_PLAYING = {style: 'wide-big'};
 const IDLE_STOP = 30;      // s without input before the swirl and the tick hold still
 
 // GNOME's media cards in the unlock dialog's notifications box
@@ -54,11 +64,16 @@ export function buildNowPlaying(frame, dialog, onResize) {
     layer.add_constraint(new Clutter.BindConstraint({source: dialog, coordinate: Clutter.BindCoordinate.SIZE}));
     frame.addActor(dialog, layer);
 
+    const style = STYLES[NOW_PLAYING.style] ?? STYLES.wide;
+    const CARD = style.size;
     const card = new GlassCard(Main.layoutManager.primaryIndex);
     const mode = glassMode();
     card.setMode(mode);
+    card.actor.add_style_class_name(`tahoe-widget-${style.type}`);
+    if (style.styleClass)
+        card.actor.add_style_class_name(style.styleClass);
     card.actor.set_size(...CARD);
-    const widget = new MusicMedium({swirl: {lockScreen: true, gate}});
+    const widget = new style.cls({swirl: {lockScreen: true, gate}, ...style.options});
     widget.setMode(mode);
     card.content.add_child(widget.actor);
     widget.attachCard(card);

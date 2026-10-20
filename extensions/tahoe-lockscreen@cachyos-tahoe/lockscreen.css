@@ -166,3 +166,14 @@
   background-color: -st-accent-color;
 }
 
+
+/* ---- Now Playing drawn 1.5x (nowplaying.js style wide-big) ----
+   The cover and buttons are sized in code (music.js scale); here the text, spacing and track.
+   The card's padding stays 16, so the cover's 8 px corner stays concentric with the card's 24. */
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-row { spacing: 24px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-title { font-family: "SF Pro Display", sans-serif; font-size: 26px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-artist { font-size: 21px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-progress { padding-top: 15px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-track { height: 6px; border-radius: 3px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-fill { border-radius: 3px; }
+.tahoe-widget.tahoe-lock-np-big .tahoe-music-button { padding: 9px; }
