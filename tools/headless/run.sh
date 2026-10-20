@@ -26,6 +26,12 @@ for dir in ${TAHOE_TEST_EXT_DIRS:-}; do
   extra="$extra, '$(basename "$dir")'"
 done
 export TAHOE_TEST_EXTRA="$extra"
+# TAHOE_TEST_USERLOOK=1: GTK apps look as on the desktop: the user's icons (linked, read only),
+# their GTK 3 and 4 CSS with the glass layers (copied) and their interface settings
+if [ "${TAHOE_TEST_USERLOOK:-}" = 1 ]; then
+  [ -d "$HOME/.local/share/icons" ] && ln -s "$HOME/.local/share/icons" "$XDG_DATA_HOME/icons"
+  for d in gtk-3.0 gtk-4.0; do [ -d "$HOME/.config/$d" ] && cp -r "$HOME/.config/$d" "$XDG_CONFIG_HOME/"; done
+fi
 kf=$XDG_CONFIG_HOME/glib-2.0/settings/keyfile
 python3 - "$kf" <<'PY'
 import os, subprocess, sys
@@ -46,6 +52,8 @@ def dump(path):
             out.append(line)
 dump('/org/gnome/shell/extensions/')
 dump('/org/gnome/desktop/background/')
+if os.environ.get('TAHOE_TEST_USERLOOK') == '1':
+    dump('/org/gnome/desktop/interface/')
 out += ['[org/gnome/shell]',
         "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local'" + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
         'disable-extension-version-validation=true',
