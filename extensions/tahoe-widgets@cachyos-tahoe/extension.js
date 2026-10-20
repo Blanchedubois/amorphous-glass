@@ -16,7 +16,7 @@ import {GlassCard, STATE_FILE, bmsUuid, glassMode, loadBms, scaleFactor} from '.
 import {AnalogClock, AnalogMarksClock, AnalogQuartersClock, DateTimeClock, DigitalClock} from './clocks.js';
 import {GlassTextClock} from './glasstext.js';
 import {CalendarDay, CalendarMedium, CalendarMonth} from './calendar.js';
-import {MusicLarge, MusicLyrics, MusicMedium, MusicSmall} from './music.js';
+import {MusicExtraLargeTall, MusicExtraLargeWide, MusicLarge, MusicLyrics, MusicMedium, MusicSmall} from './music.js';
 import {WeatherLarge, WeatherMedium, WeatherSmall} from './weather.js';
 
 const LAYOUT_FILE = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass', 'widgets.json']);
@@ -24,8 +24,9 @@ const GRID = 8;   // logical px
 const GAP = 16;   // between widgets, logical px
 // Tahoe widget sizes, logical px
 const SIZES = {small: [170, 170], medium: [356, 170], large: [356, 356]};
-// a widget class can be taller than its size (static height, logical px): the large Music widget
-const dims = cls => [SIZES[cls.size][0], cls.height ?? SIZES[cls.size][1]];
+// a widget class can set its own width and height (static width / height, logical px) over its
+// size: the Large and Extra Large Music widgets
+const dims = cls => [cls.width ?? SIZES[cls.size][0], cls.height ?? SIZES[cls.size][1]];
 
 const TYPES = {
     'clock-analog': {name: 'Analog Clock', cls: AnalogClock},
@@ -44,6 +45,8 @@ const TYPES = {
     'music-medium': {name: 'Music: Wide', cls: MusicMedium},
     'music-large': {name: 'Music: Large', cls: MusicLarge},
     'music-lyrics': {name: 'Music: Lyrics', cls: MusicLyrics},
+    'music-xl-wide': {name: 'Music: Extra Large Wide', cls: MusicExtraLargeWide},
+    'music-xl-tall': {name: 'Music: Extra Large Tall', cls: MusicExtraLargeTall},
 };
 
 const DEFAULT_LAYOUT = [

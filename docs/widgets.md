@@ -1,3 +1,100 @@
+# App button and Extra Large music widgets (2026-10-20)
+
+**Status: done.** Your picks: the app button on the Music widgets only; Extra Large Wide with the
+cover and player on the left and lyrics on the right; Extra Large Tall with the player on top and
+lyrics under it. The lyrics are also a bit faster (380 ms drift). Sheets:
+`docs/shots/music-all-{light,dark}.png`. Tests: `STRESS_ONLY=app` (a fake player in its own
+process and window is focused from behind another window, from minimised and from another
+workspace) and `tools/widgets-stress/layout-xl.json` for the big cards. Not checked: whether
+Firefox and Chromium switch to the playing tab on Raise. That needs a real browser playing audio,
+which the headless test shell can't do; the button calls Raise in any case.
+
+The plan as agreed:
+
+## Part A: the app button ("open where the audio comes from")
+
+**What it does.** A small app icon on each Music widget. Clicking it brings the player's window
+to the front and, for browsers, the tab that is playing.
+
+**How (checked against the running Spotify):** MPRIS gives each player `DesktopEntry`
+(`spotify`), `Identity` (`Spotify`), `CanRaise` (true) and a `Raise` method; D-Bus gives the
+process that owns the player's name (`GetConnectionUnixProcessID`).
+- Icon: `Shell.AppSystem` looks up `<DesktopEntry>.desktop`; if there isn't one, the app of the
+  player's process (`Shell.WindowTracker`); else a generic audio icon.
+- Click: call `Raise` first. Firefox and Chromium switch to the playing tab on `Raise`; this is
+  the only way to reach the tab, and it is checked per browser in A3. Then the shell itself
+  activates the window, because Wayland focus-stealing prevention can turn a player's own
+  `Raise` into a "ready" notification. The window chosen is the player's window that just asked
+  for attention, else its most recently used one (by process, else by app). The window is
+  focused on its own workspace, and minimised windows are restored.
+- Shown only while there is a player. The tooltip is the player's name. The button takes the
+  click, so the card is not dragged.
+
+**Where on each widget:**
+
+| Widget | Place | Size |
+|---|---|---|
+| Small | badge on the cover's bottom-right corner, overlapping it (as iOS widgets) | 20 px |
+| Wide | top-right corner of the card, level with the title (title ellipsizes before it) | 20 px |
+| Large | right of the title and artist, level with the title | 24 px |
+| Lyrics | badge on the small cover's corner (the play button keeps the top right) | 18 px |
+| Extra Large Wide / Tall | as Large, on the player column | 24 px |
+
+Phases:
+- **A1** `mpris.js`: per player `desktopEntry`, `identity`, `canRaise`, owner `pid` (read once
+  when the player appears); `raise()` with the focus fallback. Public API only gains fields.
+- **A2** `AppButton` in `music.js`: icon lookup, click, tooltip, hidden with no player.
+- **A3** placement per size, then tests: a fake player in its own process with its own window
+  (headless) proves the click focuses it, minimised and on another workspace too. Firefox and
+  Chromium tab switching is checked on the real players, without touching your session.
+- **A4** (optional, see question) the same idea on the other widgets: clock opens Clocks,
+  calendar opens Calendar, weather opens Weather. A whole-card click would fight dragging, so it
+  would be a small corner icon as well.
+
+## Part B: Extra Large: the Large widget and the Lyrics widget in one card
+
+Two new sizes in Add Widget: "Music: Extra Large Wide" and "Music: Extra Large Tall". Both use
+the same swirl, ink, tint, fonts, lyrics motion and 16 px spacing as the others.
+
+```
+Extra Large Wide, 728 x 504                    Extra Large Tall, 356 x 864
++--------------------+--------------------+    +--------------------+
+| +----------------+ | lyrics (dim)       |    | +----------------+ |
+| |                | | SUNG LINE (big)    |    | |                | |
+| |   cover 324    | | lyrics (dim)       |    | |   cover 324    | |
+| |                | | lyrics (dim)       |    | |                | |
+| |                | | lyrics (dim)       |    | +----------------+ |
+| +----------------+ | lyrics (dim)       |    | Title          [A] |
+| Title          [A] | lyrics (dim)       |    | Artist             |
+| Artist             | lyrics (dim)       |    | ======------ times |
+| ======------ times | lyrics (dim)       |    |   |<<  ||  >>|     |
+|   |<<  ||  >>|     |                    |    |--------------------|
++--------------------+--------------------+    | lyrics (dim)       |
+ left: the Large layout; right: the lyrics,    | SUNG LINE (big)    |
+ full height, 16 px gutter                     | lyrics ...         |
+                                               +--------------------+
+                                                lyrics under the player, ~9 lines
+```
+
+- Sizes on the 8 px grid: Wide 728 (two large widths plus the 16 px gap) x 504 (the Large
+  height); Tall 356 x 864. Both fit the 2560 x 1440 desktop.
+- The lyrics area is bigger, so lyrics are 26 px (Wide) and 24 px (Tall), with more lines shown.
+- Cost: the swirl shader is per pixel, and Wide is about 2.9 times a Large's area: still a few
+  hundred microseconds a frame at 25 fps. Rechecked in the stress run.
+
+Phases:
+- **B1** sizes: `extension.js` gets a free size per class (width as well as height), so
+  placing, snapping and Add Widget's free-spot search work with big cards.
+- **B2** Extra Large Wide layout, reusing the Large column and `LyricsView`.
+- **B3** Extra Large Tall layout.
+- **B4** tests: screenshots per mode and cover, lyrics motion frame by frame, the swirl stress
+  run with Extra Large cards, drags and snapping near the screen edges.
+
+## Part C: docs, merge, install, push
+
+One commit per phase, a light and dark sheet of every music size, merged into main, installed,
+pushed. It loads at the next login, as usual.
+
 # Music widgets: album-colour swirl (2026-10-20)
 
 The Music widgets (small, wide, large, lyrics) tint their glass with a slow swirl made from the
@@ -61,9 +158,9 @@ technique) and Adaptive Palette (MIT, technique) go in the README.
   card now has 16 px padding.
 - **Lyrics drift, Apple Music style** (user, 2026-10-20 follow-ups): every line of the song sits in
   one column. The sung line is full size and bright, the others at 84 % and dim. At each line's
-  time the lines drift up one by one (480 ms, ease-out quart; user: sharper), each 28 ms after the one above it,
+  time the lines drift up one by one (380 ms, ease-out quart; user: sharper, then a bit faster), each 22 ms after the one above it,
   so the text flows like a wave; the old line shrinks and dims as it goes up and the new one grows
-  into its place (340 ms). Only scale, translation and opacity move, so the column never reflows;
+  into its place (270 ms). Only scale, translation and opacity move, so the column never reflows;
   lines more than 10 away are not drawn. The eases run on the compositor between lines only, and
   end at once with GNOME animations off. Checked frame by frame (`SHOT_BURST=count,ms`).
 - **Text in the cover's tint** (user follow-up): the text, artist, times, progress bar, lyrics
