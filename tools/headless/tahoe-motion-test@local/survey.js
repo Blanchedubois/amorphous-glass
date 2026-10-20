@@ -75,7 +75,39 @@ export async function runSurvey(write) {
     await sleep(1500);
     // TAHOE_SURVEY_GRID=1: only the app grid (GNOME's own dash: run without dash-to-dock)
     if (GLib.getenv('TAHOE_SURVEY_GRID') === '1') {
+        if (GLib.getenv('TAHOE_SURVEY_GRID_MOTION') === '1') {
+            // the glass under folder tiles while the overview opens, a page flips and it closes
+            const St = (await import('gi://St')).default;
+            const settings = St.Settings.get();
+            settings.slow_down_factor = 6;
+            Main.overview.showApps();
+            for (let i = 0; i < 6; i++) {
+                await sleep(110 * 6 / 6 * 1.5);
+                await shot(`grid-open-${i}`);
+            }
+            await sleep(2500);
+            const display = Main.overview._overview?.controls?._appDisplay;
+            display?.goToPage?.(1);
+            for (let i = 0; i < 5; i++) {
+                await sleep(150);
+                await shot(`grid-page-${i}`);
+            }
+            await sleep(2500);
+            display?.goToPage?.(0);
+            await sleep(2500);
+            await shot('grid-back');
+            Main.overview.hide();
+            for (let i = 0; i < 5; i++) {
+                await sleep(150);
+                await shot(`grid-close-${i}`);
+            }
+            settings.slow_down_factor = 1;
+            await sleep(2000);
+            await shot('grid-after');
+            return;
+        }
         await step('grid', () => Main.overview.showApps(), 2500);
+        write({ survey: 'grid-glass', debug: globalThis.__tahoeGlass?.debug?.() });
         await step('grid-folder', () => {
             const folder = Main.overview._overview?.controls?._appDisplay?._folderIcons?.[0];
             folder?.open();
