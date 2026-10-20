@@ -4,15 +4,23 @@ Branch `claude/tahoe-lockscreen-7d95b6`. Nothing here is installed on the real d
 is tried in the headless lock harness (`tools/lockscreen/run.sh OUTDIR light|dark`), which locks a
 throwaway shell, never the user's session, and screenshots it in light and dark.
 
+Scope, decided 2026-10-20 after the [risk assessment](lockscreen/widget-risks.md): **the Liquid
+Glass clock and Now Playing only.** No calendar, weather or other widgets. The look to match is
+Apple's macOS Tahoe press image the user picked (see "The target" below).
+
 | Phase | What | Status |
 |---|---|---|
-| 0 | Research and the possibility report (this file) | done, waiting on the questions at the end |
+| 0 | Research, possibility report, risk assessment | done (d225f3a, 24db9fe) |
 | 1 | The unlock arrow covered the password eye | done (7b28b83), not installed |
-| 2 | Tahoe layout: clock and date at the top centre, avatar, name and password capsule at the bottom, blurred wallpaper, notifications and media, bottom-right buttons | waiting on the questions |
-| 3 | The Liquid Glass clock: time and date cut out of the glass | |
-| 4 | Lock screen widgets, with privacy rules | |
-| 5 | Unlock animation (tahoe-motion springs) and polish | |
-| 6 | Shipping: `scripts/tahoe-lockscreen.sh`, tahoe-repair, real-desktop check | needs the user's go-ahead |
+| 2 | Safety frame: guards and tests, nothing visible changes | next |
+| 3 | Tahoe layout with a plain clock: date above time at the top, prompt at the bottom | |
+| 4 | The Liquid Glass clock | |
+| 5 | Now Playing: GNOME's own media card as a Tahoe glass card | |
+| 6 | Motion: lock, page change and unlock animations | |
+| 7 | Shipping: VM check, install, tahoe-repair, merge | each step needs the user's go-ahead |
+
+The detailed plan for phases 2 to 7 is in
+[Implementation plan: clock and Now Playing](#implementation-plan-clock-and-now-playing) at the end.
 
 ## Phase 0: findings
 
@@ -151,7 +159,7 @@ it isn't one of these four.
   rights as in the user session. The extension adds no risk beyond what any installed extension
   already has. The risk it does add is breakage, which the fallback above covers.
 
-### Privacy rules (Phase 4 proposal)
+### Privacy rules (the earlier widget proposal, superseded by the scope above)
 
 The full risk assessment, with fault-injection results, is in
 [lockscreen/widget-risks.md](lockscreen/widget-risks.md).
@@ -164,20 +172,233 @@ The full risk assessment, with fault-injection results, is in
 | Calendar | Date only by default; event titles hidden ("2 events" plus times). Option to show titles. |
 | Notifications | GNOME's own rules (the per-app "show on lock screen" and "show details" switches), restyled only |
 
-## Questions for the user (asked with Phase 0)
+## Questions asked with Phase 0, and where they stand
 
-1. **Route:** a separate `tahoe-lockscreen` extension (recommended; Phase 1 already is one) that
-   reuses the widget modules, copied in from `extensions/tahoe-widgets@cachyos-tahoe` by its
-   install script so the repo keeps one source. The alternative is letting tahoe-widgets itself
-   stay on through the lock, which makes widget bugs lock screen bugs.
-2. **Widgets:** which ones on the lock screen, and where? Tahoe has none. Options:
-   - a row under the clock (iPadOS style);
-   - a column at the left;
-   - only Now Playing above the prompt.
-3. **Privacy:** are the defaults in the table above right (calendar titles hidden, music shown)?
-4. **Clock:** the default face (heavy SF Pro, or SF Pro Rounded as in our Glass Text widget),
-   12 or 24 h, and the date format ("Monday 19 October" above the time). A screenshot of the
-   look you want would help, since the sources don't pin the default face down.
-5. **Phase 1 on the real desktop now?** It needs `tahoe-lockscreen` installed and enabled and a
-   logout, because the running shell does not pick up a new extension. It changes only the
-   password capsule.
+1. Route: a separate `tahoe-lockscreen` extension. Settled by the scope: no widget modules are
+   needed, so nothing is copied from tahoe-widgets except the glass text technique (Phase 4).
+2. Widgets: settled. The clock and Now Playing only.
+3. Privacy: settled by the scope. Now Playing follows GNOME's own per-app switch (see Phase 5).
+4. Clock: the user sent the look (Apple's Tahoe press image). The remaining details are workshop
+   questions in Phase 3 and 4.
+5. Phase 1 on the real desktop: deferred to Phase 7, installed together with the rest.
+
+## Implementation plan: clock and Now Playing
+
+### The target
+
+Apple's macOS Tahoe press image (MacBook Pro, "Tue Apr 1 / 9:41"; [copy](lockscreen/shots/reference-tahoe-press.png), Apple's, for reference only). Measured on it and scaled to
+2560×1440:
+
+| Element | In the image | At 2560×1440 |
+|---|---|---|
+| Date | one short line, "Tue Apr 1", semibold, white, centred; top at about 11 % of the screen height | "Tue Oct 20", about 32 px type, top near 158 px |
+| Time | "9:41", no AM/PM, heavy SF, about 10 % of the screen height tall, about 4 px gap under the date line per 100 px of digit | digits about 140 px tall (about 200 px type) |
+| Time material | milky white glass: the wallpaper's colour shows through, low contrast, the wave line refracts behind the "4", a soft bright rim | the shader in Phase 4 |
+| Avatar | small, round, at about 83 % down | about 64 px |
+| Under it | the name, then a small "Touch ID or Enter Password" line | name plus the password capsule |
+
+### Rules that keep this from breaking anything
+
+What we never touch:
+- GNOME's authentication (`AuthPrompt`, `UserVerifier`, the shield's lock state, key handling);
+- GNOME's layout manager on the dialog. The fault tests showed that replacing it can blank the
+  prompt. We only add our own actors and move GNOME's with `translation_y`, which leaves GNOME's
+  own geometry intact;
+- every other part of this repo the other sessions work on: the Blur My Shell patch, tahoe-motion,
+  tahoe-widgets, `config/gnome-shell-overrides.css`, `tokens/`;
+- the system theme gresource.
+
+Everything lives in `extensions/tahoe-lockscreen@cachyos-tahoe` and `tools/lockscreen`. The
+extension is enabled only while the screen is locked.
+
+What every phase must pass before it is shown to the user (the gates):
+
+| Gate | What it checks | Tool |
+|---|---|---|
+| G1 unlock path | Typing from the clock page puts every key into the password field. The field is visible, on screen, at full opacity, and is what a click at its centre hits; the eye and the arrow hit themselves. Still locked (the fake password is never submitted). | `tools/lockscreen/run.sh` |
+| G2 fault suite | The seven injected faults, plus the same faults raised inside our own extension's code paths. The watchdog must restore GNOME's stock dialog, so G1 passes again. | `TAHOE_LOCK_FAULT=…` |
+| G3 off switch | With our extension absent, the lock screen is pixel-identical to the stock baseline. | harness, image diff |
+| G4 churn | 50 lock and unlock cycles: actors, signal handlers and memory flat, no JS errors. | harness loop |
+| G5 looks | Light and dark screenshots of the clock page and the prompt page. Every corner zoomed, per [STANDARD.md](STANDARD.md). | harness, `docs/lockscreen/shots/` |
+| G6 real machine | Real password unlock, a wrong password (shake), suspend and resume, two monitors, scale 2. | VM, in Phase 7 only |
+
+The real session is never locked by us. Nothing is installed, enabled or merged without the
+user's explicit go-ahead.
+
+### Phase 2: safety frame (nothing visible changes)
+
+The extension gets its JavaScript side, but draws nothing new yet:
+
+- **Version pin:** the extension reads `Config.PACKAGE_VERSION` and does nothing unless the major
+  version is 51. `disable-extension-version-validation` is on, so GNOME's own check doesn't
+  protect us.
+- **Shape check:** before touching anything, it checks that every private member it will use
+  exists (`Main.screenShield._dialog`, `_stack`, `_clock`, `_promptBox`, `_authPrompt`,
+  `_backgroundGroup`). If anything is missing, it does nothing.
+- **Transactional enable:** everything is built inside one try block. On any error, `disable()`
+  runs and removes every actor, signal and translation we added. This fixes the leftover-actor
+  case from the fault tests.
+- **Watchdog:**
+  - When to check: after each page change and each dialog allocation, debounced to one check per
+    frame.
+  - The check: the password field (when shown) must be mapped, inside the monitor, at least
+    200×30, at full opacity, and the actor a click at its centre hits.
+  - If it fails: our actors are removed, GNOME's clock is unhidden and all translations are reset.
+    One warning goes to the journal, and the extension stays dormant until the next lock.
+- **Harness fixes:**
+  - The harness gets its own runtime directory, so it can't leave GNOME's crash-guard file in the
+    real session's runtime directory.
+  - G2 learns to inject faults inside our extension.
+  - G3 and G4 are added.
+
+Exit: G1 to G4 pass, and the screenshots are identical to Phase 1's.
+
+### Phase 3: Tahoe layout with a plain clock
+
+- **Clock always on top:**
+  - Our own clock actor shows the date above the time, at the target sizes and positions. It is a
+    child of the dialog, placed with constraints on the primary monitor.
+  - It stays visible on both pages, as Tahoe's does; GNOME crossfades its own clock away.
+  - GNOME's clock is hidden by hiding its labels, not by removing it from the stack.
+  - In this phase our clock is plain white text, so the layout can be judged before the glass.
+- **Time and date format:** the time comes from GNOME's `WallClock`, so it follows the 12h/24h
+  setting, without AM/PM as in the image. The date is short, "Tue Oct 20", in the locale's order.
+- **Prompt at the bottom:**
+  - The prompt is shifted down with `translation_y` so that the avatar sits at about 83 % of the
+    height.
+  - The shift is recomputed when GNOME re-allocates, for example when notifications appear.
+- **Prompt styling, in CSS:**
+  - avatar 64 px;
+  - the name in semibold;
+  - no blue focus ring;
+  - the capsule as a white glass fill per `tokens/glass.json`;
+  - "Switch User…" as a glass capsule at the bottom right.
+- **Hint:** "Click or press a key" goes, as Tahoe has none. Workshop question below.
+- **Background:** the wallpaper keeps GNOME's (or Blur My Shell's) blur on the prompt page, as
+  today.
+
+Workshop: screenshots of both pages in light and dark against the reference; the user picks the
+sizes and positions. Exit: G1 to G5.
+
+### Phase 4: the Liquid Glass clock
+
+The look: the digits and the date are glass. The wallpaper shows through them, a little lighter
+and milkier, bent at the edges of each stroke, with a soft rim.
+
+- **Starting point:**
+  - We take the technique of our own Glass Text widget (`tahoe-widgets/glasstext.js`), not the
+    module: a new file in the lock screen extension, with credit.
+  - The glyph mask is drawn with cairo and Pango, once a minute: red is coverage, green is how far
+    inside the stroke.
+  - A Cogl shader samples what is behind and refracts it near the stroke edges, using the slope
+    of the green channel.
+- **What is behind:**
+  - A `Clutter.Clone` of the dialog's own background actor, cropped to the clock's box. The shader
+    runs on that clone.
+  - So the glass always shows exactly the lock picture under it: sharp on the clock page, blurred
+    on the prompt page. No copy goes stale.
+  - It repaints only when the background or the time changes.
+- **The recipe**, from the closest open-source match found: Kyant0/AndroidLiquidGlass
+  (Apache-2.0), whose catalog has a lock screen glass clock built from a glyph distance field.
+  We take the idea, written as our own Cogl GLSL and credited:
+  - **The milky base:** the picture behind is darkened slightly (brightness -0.1), flattened
+    (contrast 0.75), made more colourful (saturation 1.5), blurred a little, then about 25 %
+    white is laid over it. This gives the low-contrast, wallpaper-tinted white in the reference.
+  - **Refraction:**
+    - A dome profile across the stroke: `circleMap(x) = 1 - sqrt(1 - x²)` of the distance from
+      the edge.
+    - The sample is pushed along the edge normal by that amount. The normal is the slope of our
+      green channel.
+  - **Rim:** a narrow bevel (3 to 4 px) brighter toward a top-left light and a little on the
+    opposite side.
+  - **Chromatic split:** a slight one, red and blue sampled a pixel apart along the normal. This
+    is an idea from the KDE widgets' glass text shader (GPL-3.0; the idea only, no code).
+  - **Clipping:** everything is multiplied by the red coverage, for clean antialiased edges.
+
+  Other repos looked at: Riu-F/liquid-glass-text (MIT, WebGL),
+  iyinchao/liquid-glass-studio (MIT, Fresnel and dispersion maths), and
+  DanielCrompton123/LiquidGlassText (Apple's own `glassEffect` on a text path; no licence, a visual
+  reference only). None targets GNOME.
+- **Material constants**, tuned with the user against the reference:
+  - the milky mix: how much white over the refracted picture;
+  - how much of the wallpaper tint comes through;
+  - refraction strength and bevel width;
+  - rim strength and direction;
+  - a small chromatic split;
+  - a soft shadow under the digits, so they stay readable on light wallpapers.
+
+  These are kept as named constants in one file during the workshop.
+- **Font:** SF Pro Display in a heavy weight to match the image, with SF Pro Rounded as the
+  alternative. Both are installed.
+- **Fallback:** if the shader or the mask fails, the clock draws as Phase 3's plain white text.
+  If the clock fails as a whole, the watchdog unhides GNOME's clock. It is never blank.
+- **Cost:**
+  - one mask a minute;
+  - the shader only when that box repaints;
+  - nothing ticking while the screen is off (the clock pauses on the shield's lightbox and on
+    monitor power-save).
+
+Workshop: side-by-side sheets (reference, ours on the same Tahoe-like wallpaper, ours on the
+user's fold wallpaper) in light and dark; the material is tuned in rounds. Exit: G1 to G5.
+
+### Phase 5: Now Playing
+
+- **What it is:** GNOME's own lock screen media card (`MediaMessage` in the notifications box),
+  restyled as a Tahoe glass card. No player code of our own and no network.
+- **Safety it inherits from GNOME:**
+  - The card cannot open the music app while locked (`vfunc_clicked` returns early when locked).
+  - It is hidden when the player's app has "Show on lock screen" off in Settings → Notifications.
+    That is the privacy switch, and it already exists.
+- **Glass:** the same background-clone glass as the clock, rounded at the widget radius
+  (`tokens/radius.json`, widget 24). The card gets art, title, artist and the three buttons in
+  Tahoe sizes.
+- **Placement:** a workshop question. Options are under the clock (iPhone style), or just above
+  the avatar. Moving it is again a translation on GNOME's notifications box, guarded by the
+  watchdog, so it can never cover the prompt.
+
+Exit: G1 to G5, with a fake MPRIS player in the harness (the widgets port already has one).
+
+### Phase 6: motion
+
+- **Page change:**
+  - The prompt rises and fades in.
+  - The clock stays put and its glass picks up the blur; it repaints with the background.
+  - The spring numbers are copied from tahoe-motion's tuned curves. Its code is not imported.
+- **Unlock:** the clock and prompt lift and fade while the blur clears.
+  - It only animates our own actors, inside GNOME's existing unlock fade.
+  - It never delays GNOME's `finish()` callback.
+- **Wrong password:** GNOME's own shake, kept as is.
+
+Exit: G1 to G5, plus frame times in the harness (p95 under 8.3 ms at 120 Hz).
+
+### Phase 7: shipping (each step only with the user's go-ahead)
+
+1. **VM (G6):**
+   - a real password;
+   - a wrong password;
+   - fingerprint if available;
+   - suspend and resume;
+   - two monitors;
+   - scale 2.
+2. **Install:** `scripts/tahoe-lockscreen.sh on|off` copies and enables the extension; `off` puts
+   back the stock lock screen.
+3. **First real lock:**
+   - Install, log out, log in, then you lock the screen yourself while I'm here.
+   - Recovery, if anything looks wrong:
+     - type the password blind and press Enter;
+     - or press Ctrl+Alt+F3 and run `loginctl unlock-sessions`;
+     - then `scripts/tahoe-lockscreen.sh off`.
+4. **tahoe-repair:** it learns the switch as an opt-in state key, so a login never enables the
+   lock screen on its own.
+5. **Merge into main.**
+
+### Workshop questions
+
+- **Phase 3:**
+  - Drop the "Click or press a key" hint, as Tahoe has none?
+  - Short date "Tue Oct 20", or long "Tuesday 20 October"?
+  - 12h without AM/PM, as in the image?
+- **Phase 4:**
+  - SF Pro Display heavy (closest to the image) or SF Pro Rounded?
+  - How milky? Picked from screenshots.
+- **Phase 5:** Now Playing under the clock, or above the avatar?
