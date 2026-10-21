@@ -5,6 +5,10 @@ Stills become WebP (whole screens at 1600 px wide, details cropped at full resol
 animated WebP, cropped to where the animation happens. GitHub shows animated WebP inline in a README,
 which it does not do for video files in the repo. Every crop is listed here so a re-shoot republishes
 the same framing. Coordinates are the 2560x1440 screen (lock screen clips: 1920x1080).
+
+Every image and clip comes out 16:9 (user, 2026-10-21: one ratio, so rows and tables line up in a
+browser): each crop box below is the subject, and fit16x9() widens or heightens it around its
+centre, inside the screen.
 """
 import os, subprocess, sys
 
@@ -44,32 +48,49 @@ STILLS = {
 
 # name: (source clip, crop or None, start s, length s, width px, fps)
 CLIPS = {
-    'quick-settings': ('quick-settings-open', (1520, 0, 1040, 800), 0.3, 7.0, 720, 24),
-    'calendar': ('calendar-open', (860, 0, 900, 660), 0.3, 3.6, 720, 24),
-    'menu-slide': ('menu-slide', (860, 0, 1700, 760), 0.3, 7.2, 900, 24),
-    'desktop-menu': ('desktop-menu', (850, 560, 1000, 560), 0.3, 3.2, 720, 24),
-    'dock-menu': ('dock-menu', (720, 760, 1140, 680), 0.3, 4.8, 720, 24),
-    'window-open': ('window-open', None, 0.0, 7.2, 900, 24),
-    'files-menu': ('files-menu', None, 0.0, 4.0, 900, 24),
-    'overview': ('overview', None, 0.2, 6.0, 900, 24),
-    'app-grid': ('app-grid', None, 0.2, 6.8, 900, 24),
-    'volume-osd': ('volume-osd', (880, 1000, 800, 440), 0.0, 3.5, 640, 24),
-    'widget-drag': ('widget-drag', (1600, 0, 960, 900), 0.2, 8.0, 640, 24),
-    'music-swirl': ('music-swirl', (0, 40, 800, 1100), 1.0, 9.0, 480, 20),
-    'lock-screen': ('red3-lock-screen', None, 4.0, 12.0, 900, 20),
-    'lock-menu': ('red3-lock-menu', (1100, 0, 820, 620), 10.0, 12.0, 640, 20),
-    'sign-in': ('red3-sign-in', (560, 560, 800, 520), 0.0, 7.0, 560, 20),
+    'quick-settings': ('quick-settings-open', (1520, 0, 1040, 800), 0.3, 7.0, 960, 24),
+    'calendar': ('calendar-open', (860, 0, 900, 660), 0.3, 3.6, 960, 24),
+    'menu-slide': ('menu-slide', (860, 0, 1700, 760), 0.3, 7.2, 960, 24),
+    'desktop-menu': ('desktop-menu', (850, 560, 1000, 560), 0.3, 3.2, 960, 24),
+    'dock-menu': ('dock-menu', (720, 760, 1140, 680), 0.3, 4.8, 960, 24),
+    'window-open': ('window-open', None, 0.0, 7.2, 960, 24),
+    'files-menu': ('files-menu', None, 0.0, 4.0, 960, 24),
+    'overview': ('overview', None, 0.2, 6.0, 960, 24),
+    'app-grid': ('app-grid', None, 0.2, 6.8, 960, 24),
+    'volume-osd': ('volume-osd', (880, 1000, 800, 440), 0.0, 3.5, 960, 24),
+    'widget-drag': ('widget-drag', (1600, 0, 960, 900), 0.2, 8.0, 960, 24),
+    'music-swirl': ('music-swirl', (0, 40, 800, 1100), 1.0, 9.0, 960, 20),
+    'lock-screen': ('red3-lock-screen', None, 4.0, 12.0, 960, 20),
+    'lock-menu': ('red3-lock-menu', (1100, 0, 820, 620), 10.0, 12.0, 960, 20),
+    'sign-in': ('red3-sign-in', (560, 560, 800, 520), 0.0, 7.0, 960, 20),
 }
+
+
+def fit16x9(box, width, height):
+    """the 16:9 box around `box` (x, y, w, h), inside a width x height screen"""
+    x, y, w, h = box
+    cx, cy = x + w / 2, y + h / 2
+    if w / h < 16 / 9:
+        w = h * 16 / 9
+    else:
+        h = w * 9 / 16
+    if w > width:
+        w, h = width, width * 9 / 16
+    if h > height:
+        w, h = height * 16 / 9, height
+    x = min(max(cx - w / 2, 0), width - w)
+    y = min(max(cy - h / 2, 0), height - h)
+    return round(x), round(y), round(w), round(h)
 
 
 def stills():
     for name, (src, box) in STILLS.items():
         im = Image.open(os.path.join(SRC, f'{src}.png')).convert('RGB')
         if box:
-            x, y, w, h = box
+            x, y, w, h = fit16x9(box, *im.size)
             im = im.crop((x, y, x + w, y + h))
-        else:
-            im = im.resize((1600, 900), Image.LANCZOS)
+        width = min(1600, im.width)
+        im = im.resize((width, round(width * 9 / 16)), Image.LANCZOS)
         im.save(os.path.join(OUT, f'{name}.webp'), quality=88, method=6)
 
 
@@ -79,9 +100,10 @@ def clips():
     import glob, tempfile
     for name, (src, box, start, length, width, fps) in CLIPS.items():
         vf = []
+        screen = (1920, 1080) if src.startswith('red3-') else (2560, 1440)
         if box:
-            vf.append('crop={2}:{3}:{0}:{1}'.format(*box))
-        vf += [f'fps={fps}', f'scale={width}:-2:flags=lanczos']
+            vf.append('crop={2}:{3}:{0}:{1}'.format(*fit16x9(box, *screen)))
+        vf += [f'fps={fps}', f'scale={width}:{round(width * 9 / 16 / 2) * 2}:flags=lanczos']
         with tempfile.TemporaryDirectory() as tmp:
             subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-ss', str(start), '-t', str(length),
                             '-i', os.path.join(SRC, f'{src}.mp4'), '-vf', ','.join(vf), f'{tmp}/%04d.png'], check=True)

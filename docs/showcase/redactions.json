@@ -1,5 +1,5 @@
 {
- "about": "tools/showcase/redact.py: OCR terms blurred everywhere, plus fixed boxes [x, y, w, h, from_s, to_s] per still or clip (2560x1440). The personal terms (names, places, networks) are kept outside the repo, in ~/.config/tahoe-glass/showcase-redact-terms.json, and added at run time.",
+ "about": "tools/showcase/redact.py: OCR terms blurred everywhere, plus fixed boxes [x, y, w, h, from_s, to_s] per still or clip (2560x1440). The personal terms (names, places, networks) are kept outside the repo, in ~/.config/tahoe-glass/showcase-redact-terms.json, and added at run time. The city, the weather widget, the Wi-Fi name and the login name and picture are shown on purpose (user, 2026-10-21).",
  "terms": [
   "/home/",
   "greeter"
@@ -29,48 +29,12 @@
     215
    ]
   ],
-  "quick-settings-submenu": [
-   [
-    2180,
-    340,
-    360,
-    70
-   ],
-   [
-    2222,
-    230,
-    120,
-    30
-   ]
-  ],
-  "quick-settings-open": [
-   [
-    2180,
-    340,
-    360,
-    70
-   ],
-   [
-    2222,
-    230,
-    120,
-    30
-   ]
-  ],
   "search": [
    [
     800,
     280,
     980,
     75
-   ]
-  ],
-  "quick-settings": [
-   [
-    2222,
-    230,
-    120,
-    30
    ]
   ],
   "app-grid": [
@@ -95,6 +59,12 @@
     190,
     180,
     1060
+   ],
+   [
+    1020,
+    288,
+    760,
+    48
    ]
   ],
   "light-calendar": [
