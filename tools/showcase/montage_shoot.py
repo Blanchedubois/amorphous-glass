@@ -19,6 +19,8 @@ It never locks the screen and never types a password (the driver refuses Super+L
 is recorded in a throwaway shell by tools/showcase/lock-video.sh.
 
   --dry-run   print the plan and the layout, change nothing
+  TAHOE_SHOWCASE_SONG=song.json   the song the fake player shows (fakeplayer.py --song): its name
+              and cover, with the placeholder lyrics
 """
 import json, os, shutil, signal, subprocess, sys, time
 
@@ -200,7 +202,8 @@ def setup():
     STATE['playing'] = [n for n in players() if status(n) == 'Playing']
     for n in STATE['playing']:
         player(n, 'Pause')
-    STATE['fake'] = subprocess.Popen([sys.executable, os.path.join(HERE, 'fakeplayer.py')],
+    song = os.environ.get('TAHOE_SHOWCASE_SONG')
+    STATE['fake'] = subprocess.Popen([sys.executable, os.path.join(HERE, 'fakeplayer.py')] + (['--song', song] if song else []),
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     STATE['nautilus'] = (gset('org.gnome.nautilus.window-state', 'maximized'),
                          gset('org.gnome.nautilus.window-state', 'initial-size'))
@@ -421,10 +424,8 @@ def s_desktop_menu():
 
 def s_app_grid():
     with Clip('app-grid'):
-        press('Super_L')
-        pause(700)
-        press('Super_L')
-        pause(1300)
+        press('Super_L', 'a')                   # the app grid (a second Super can land on the windows)
+        pause(1600)
         move(*center('folder:0'), 1000)
         click()
         pause(1800)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A pretend music player for the showcase shoots: no song's words or artwork on camera.
 
-  fakeplayer.py [--make-assets]
+  fakeplayer.py [--song SONG.json] [--make-assets]
 
 Owns org.mpris.MediaPlayer2.showcase on the session bus and says it is Playing a local file,
 fake-track/showcase.flac. The Music widgets follow the player that is playing, read the lyrics from
@@ -11,8 +11,13 @@ and the cover from fake-track/cover.png. The audio file itself does not exist an
 The lyrics are the widget showcase's placeholder text (docs/showcase/widgets/PLAN.md), timed one line
 every 3 s; the cover is an abstract gradient made here (--make-assets writes both).
 
+--song SONG.json shows a real song's name and cover instead ({"title", "artist", "album", "length"
+s, "start" s, "cover": a path, relative to the JSON}), still with the placeholder lyrics: its
+words never reach the screen. The cover stays outside the repository.
+
 Stop it with Ctrl+C or SIGTERM; the name goes with it.
 """
+import json
 import math
 import signal
 import sys
@@ -92,9 +97,14 @@ def make_assets():
     print(LRC, COVER)
 
 
+SONG = {'title': 'Amorphous', 'artist': 'Liquid Glass', 'album': 'Showcase', 'length': LENGTH_S,
+        'start': START_S, 'cover': str(COVER)}
+
+
 class Player:
     def __init__(self):
-        self.started = time.monotonic() - START_S
+        self.length = float(SONG['length'])
+        self.started = time.monotonic() - float(SONG['start'])
         self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         info = Gio.DBusNodeInfo.new_for_xml(XML)
         for iface in info.interfaces:
@@ -102,17 +112,17 @@ class Player:
         Gio.bus_own_name_on_connection(self.bus, 'org.mpris.MediaPlayer2.showcase', Gio.BusNameOwnerFlags.NONE, None, None)
 
     def position_us(self):
-        return int(((time.monotonic() - self.started) % LENGTH_S) * 1e6)
+        return int(((time.monotonic() - self.started) % self.length) * 1e6)
 
     def metadata(self):
         return {
             'mpris:trackid': GLib.Variant('o', '/org/showcase/track/1'),
-            'mpris:length': GLib.Variant('x', LENGTH_S * 1_000_000),
-            'mpris:artUrl': GLib.Variant('s', COVER.as_uri()),
-            'xesam:url': GLib.Variant('s', TRACK.as_uri()),
-            'xesam:title': GLib.Variant('s', 'Amorphous'),
-            'xesam:artist': GLib.Variant('as', ['Liquid Glass']),
-            'xesam:album': GLib.Variant('s', 'Showcase'),
+            'mpris:length': GLib.Variant('x', int(self.length * 1_000_000)),
+            'mpris:artUrl': GLib.Variant('s', Path(SONG['cover']).resolve().as_uri()),
+            'xesam:url': GLib.Variant('s', TRACK.as_uri()),      # its .lrc: the placeholder lines
+            'xesam:title': GLib.Variant('s', SONG['title']),
+            'xesam:artist': GLib.Variant('as', [SONG['artist']]),
+            'xesam:album': GLib.Variant('s', SONG['album']),
         }
 
     def get(self, conn, sender, path, iface, prop):
@@ -140,6 +150,11 @@ def main():
         return
     if not LRC.exists() or not COVER.exists():
         make_assets()
+    if '--song' in sys.argv:
+        path = Path(sys.argv[sys.argv.index('--song') + 1]).resolve()
+        song = json.loads(path.read_text())
+        song['cover'] = str((path.parent / song['cover']).resolve())
+        SONG.update(song)
     Player()
     loop = GLib.MainLoop()
     for sig in (signal.SIGINT, signal.SIGTERM):

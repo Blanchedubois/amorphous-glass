@@ -585,7 +585,8 @@ function write(obj) {
 }
 
 // TAHOE_LOCK_PLAYER=1: a fake MPRIS player (made-up song, generated cover) for Now Playing;
-// TAHOE_LOCK_ART=path|none: another cover; TAHOE_LOCK_STATUS=Playing|Paused
+// TAHOE_LOCK_ART=path|none: another cover; TAHOE_LOCK_STATUS=Playing|Paused;
+// TAHOE_LOCK_TITLE, TAHOE_LOCK_ARTIST: another song's name (the showcase shows the song being played)
 const MPRIS_XML = `<node>
 <interface name="org.mpris.MediaPlayer2"><property name="Identity" type="s" access="read"/><property name="DesktopEntry" type="s" access="read"/></interface>
 <interface name="org.mpris.MediaPlayer2.Player">
@@ -632,8 +633,8 @@ function fakePlayer() {
         PlaybackStatus: new GLib.Variant('s', GLib.getenv('TAHOE_LOCK_STATUS') ?? 'Playing'),
         Metadata: new GLib.Variant('a{sv}', {
             'mpris:trackid': new GLib.Variant('o', '/fake/track/1'),
-            'xesam:title': new GLib.Variant('s', 'Made-Up Song Title'),
-            'xesam:artist': new GLib.Variant('as', ['Test Artist']),
+            'xesam:title': new GLib.Variant('s', GLib.getenv('TAHOE_LOCK_TITLE') ?? 'Made-Up Song Title'),
+            'xesam:artist': new GLib.Variant('as', [GLib.getenv('TAHOE_LOCK_ARTIST') ?? 'Test Artist']),
             ...given === 'none' ? {} : {'mpris:artUrl': new GLib.Variant('s', `file://${art}`)},
         }),
         CanGoNext: new GLib.Variant('b', true),
