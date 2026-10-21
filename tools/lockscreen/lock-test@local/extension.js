@@ -185,6 +185,12 @@ async function runQs() {
     const toggles = []; const w2 = a => { if (a.has_style_class_name?.('quick-toggle') && a.mapped) toggles.push({ toggle: box(a), radius: a.get_theme_node().get_border_radius(0), margin: a.get_theme_node().get_margin?.(St.Side.RIGHT) ?? null }); for (const c of a.get_children()) w2(c); }; w2(menu.box);
     write({ label: 'qs-pieces', glass: pieceDump, toggles, pointer: menu._boxPointer ? { tx: menu._boxPointer.translation_x, ty: menu._boxPointer.translation_y, o: menu._boxPointer.opacity } : null });
     write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
+    { const out = []; const w = a => { if (a.mapped && (a.has_style_class_name?.('quick-toggle-has-menu') || (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu')))) {
+        const b = box(a); let icon = null, arrow = null; const f = x => { if (!icon && x.has_style_class_name?.('quick-toggle-icon') && x.mapped) icon = box(x); if (!arrow && x.has_style_class_name?.('quick-toggle-menu-button') && x.mapped) arrow = box(x); x.get_children().forEach(f); }; f(a);
+        out.push({cls: a.style_class, box: b, icon, arrow,
+            iconGaps: icon ? {left: icon[0] - b[0], top: icon[1] - b[1], bottom: b[1] + b[3] - icon[1] - icon[3]} : null,
+            arrowGaps: arrow ? {right: b[0] + b[2] - arrow[0] - arrow[2], top: arrow[1] - b[1], bottom: b[1] + b[3] - arrow[1] - arrow[3]} : null}); }
+        a.get_children().forEach(w); }; w(menu.box); write({ label: 'qs-insets', toggles: out }); }
     { const t = []; const w = (a, d) => { if (d > 4) return; t.push(`${'  '.repeat(d)}${a.constructor.name}${a.name ? '#' + a.name : ''}.${a.style_class ?? ''} ${box(a)} bin=${!!a.bin}`); a.get_children().forEach(c => w(c, d + 1)); }; w(menu.actor, 0); write({ label: 'qs-tree', t }); }
     { const t = []; const w = (a, d) => { t.push(`${'  '.repeat(d)}${a.constructor.name}.${a.style_class ?? ''} ${box(a)} vis=${a.visible} op=${a.opacity}`); a.get_children().forEach(c => w(c, d + 1)); }; const first = (a => { let f = null; const s = x => { if (!f && x.has_style_class_name?.('quick-toggle-has-menu')) f = x; x.get_children().forEach(s); }; s(a); return f; })(menu.box); if (first) w(first, 0); write({ label: 'qs-split', t }); }
     await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);

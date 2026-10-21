@@ -190,3 +190,8 @@ GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
   on, GNOME's divider (`quick-toggle-separator`) hidden, the menu 420 px wide so the titles fit.
   `#uiGroup` in the selectors outranks the lock theme's !important rules.
   `phaseD-system-menu-os.png`: the desktop's, Super+L's and the login screen's.
+- The user's pick (2026-10-20): E2 on both screens (widgetlayout.js default).
+- The system menu's insets (the user: the icons not evenly inset): toggles 44 px on both screens,
+  the round icon 32 px with 6 px above, below and to its left, the arrow a 32 px circle 6 px from
+  the right, top and bottom (measured on both screens: 6/6/6); the plain toggles' icons on the
+  same centre line. `system-menu-insets.png`.

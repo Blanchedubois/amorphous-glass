@@ -170,6 +170,13 @@ export default class {
                 menu.open(true);
                 await wait(1.2);
                 record(name, d);
+                if (name === 'system') {
+                    const out = []; const w = a => { if (a.mapped && (a.has_style_class_name?.('quick-toggle-has-menu') || (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu')))) {
+                        const b = box(a); let icon = null, arrow = null; const f = x => { if (!icon && x.has_style_class_name?.('quick-toggle-icon') && x.mapped) icon = box(x); if (!arrow && x.has_style_class_name?.('quick-toggle-menu-button') && x.mapped) arrow = box(x); x.get_children().forEach(f); }; f(a);
+                        out.push({box: b, iconGaps: icon ? [icon[0] - b[0], icon[1] - b[1], b[1] + b[3] - icon[1] - icon[3]] : null, arrowGaps: arrow ? [b[0] + b[2] - arrow[0] - arrow[2], arrow[1] - b[1], b[1] + b[3] - arrow[1] - arrow[3]] : null}); }
+                        a.get_children().forEach(w); }; w(menu.box);
+                    const f2 = Gio.File.new_for_path(`${OUT}/${TAG}-insets.json`); f2.replace_contents(new TextEncoder().encode(JSON.stringify(out)), null, false, 0, null);
+                }
                 await shot(name);
                 // the system menu: its first submenu open too (Wi-Fi or Power Mode)
                 if (name === 'system') {

@@ -17,7 +17,8 @@ export const LAYOUTS = {
 };
 
 // the test shells try one (TAHOE_WIDGET_LAYOUT=E1|E2|E3)
-const LAYOUT = GLib.getenv('TAHOE_WIDGET_LAYOUT') || 'now';
+// the user's pick (2026-10-20): E2
+const LAYOUT = GLib.getenv('TAHOE_WIDGET_LAYOUT') || 'E2';
 
 // the rows to show: [[kind, ...], ...]
 export function layoutRows() {
