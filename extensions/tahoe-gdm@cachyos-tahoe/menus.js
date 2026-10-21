@@ -110,8 +110,8 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
                 pane._pieces.set(piece, glass);
                 let glassGone = false;
                 glass.connect('destroy', () => (glassGone = true));
-                const ids = [piece.connect('notify::allocation', () => schedule(pointer, pane)),
-                    piece.connect('notify::visible', () => schedule(pointer, pane))];
+                const ids = ['allocation', 'visible', 'checked'].map(prop =>
+                    piece.connect(`notify::${prop}`, () => schedule(pointer, pane)));
                 const forget = () => {
                     ids.forEach(id => {
                         try {
@@ -127,7 +127,10 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
             }
             const [x, y] = piece.get_transformed_position();
             const [w, h] = piece.get_transformed_size();
-            if (!piece.mapped || !(w >= 1 && h >= 1)) {
+            // a plain toggle that is on is an opaque white pill (stylesheet.css): no glass under
+            // it, whose edge showed a hair outside the pill's own anti-aliased edge
+            const opaque = piece.checked === true && piece.has_style_class_name('quick-toggle');
+            if (!piece.mapped || !(w >= 1 && h >= 1) || opaque) {
                 glass.hide();
                 continue;
             }

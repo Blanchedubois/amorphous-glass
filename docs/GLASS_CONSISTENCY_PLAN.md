@@ -195,3 +195,8 @@ GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
   the round icon 32 px with 6 px above, below and to its left, the arrow a 32 px circle 6 px from
   the right, top and bottom (measured on both screens: 6/6/6); the plain toggles' icons on the
   same centre line. `system-menu-insets.png`.
+- Measured from the pixels (tools/glass/measure-toggle.py, both screens): the icon circle 32 x 32,
+  6 / 6 / 6 px from the button's left, top and bottom; the glass's edge on the button's box (one
+  anti-aliased pixel). A plain toggle that is on (Dark Style): no glass under it any more (its edge
+  showed as a dark ring a hair outside the white pill); now background to white at the button's
+  exact edge on every side (`system-menu-on-pill.png`).
