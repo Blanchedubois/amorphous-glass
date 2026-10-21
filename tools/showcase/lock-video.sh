@@ -17,8 +17,19 @@ out=$(realpath -m "$1"); mode=${2:-dark}
 H=$(cd "$(dirname "$0")" && pwd); R=$(cd "$H/../.." && pwd)
 mkdir -p "$out"
 [ -f "$H/fake-track/cover.png" ] || python3 "$H/fakeplayer.py" --make-assets
+# TAHOE_SHOWCASE_SONG=song.json: the song's name and cover on Now Playing (as montage_shoot.py)
+art=$H/fake-track/cover.png
+if [ -n "${TAHOE_SHOWCASE_SONG:-}" ]; then
+  eval "$(python3 -I - "$TAHOE_SHOWCASE_SONG" <<'PY'
+import json, shlex, sys, os
+s = json.load(open(sys.argv[1]))
+cover = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), s['cover'])
+print(f"art={shlex.quote(cover)}; export TAHOE_LOCK_TITLE={shlex.quote(s['title'])} TAHOE_LOCK_ARTIST={shlex.quote(s['artist'])}")
+PY
+)"
+fi
 TAHOE_TEST_PIPEWIRE=1 TAHOE_TEST_TIMEOUT=${TAHOE_TEST_TIMEOUT:-90} TAHOE_LOCK_MONITOR=2560x1440@60 TAHOE_LOCK_PLAYER=1 \
-  TAHOE_LOCK_ART="$H/fake-track/cover.png" TAHOE_LOCK_GATE=video TAHOE_LOCK_TAG=video \
+  TAHOE_LOCK_ART="$art" TAHOE_LOCK_GATE=video TAHOE_LOCK_TAG=video \
   TAHOE_TEST_EXT_DIRS="${TAHOE_TEST_EXT_DIRS:-$R/extensions/tahoe-lockscreen@cachyos-tahoe}" \
   "$R/tools/lockscreen/run.sh" "$out" "$mode"
 grep '"video' "$out/log-video.jsonl" || { echo "lock-video: no recording (see $out/shell-video.log)" >&2; exit 1; }
