@@ -219,3 +219,19 @@
   icon-size: 18px !important;
   padding: 0 !important;
 }
+/* the round icon and the arrow inset evenly, concentric with the pill (the user, 2026-10-20):
+   a 44 px toggle, a 32 px circle 6 px from its top, bottom and left; the arrow a 32 px circle
+   6 px from the right */
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle { padding: 0 0 0 6px !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle,
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle { min-height: 44px !important; height: 44px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle > StBoxLayout { padding-left: 0 !important; padding-right: 0 !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle .quick-toggle-icon { margin: 6px 0 !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-toggle-has-menu .quick-toggle-menu-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 6px 6px 6px 0 !important;
+}
