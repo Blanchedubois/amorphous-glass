@@ -1,0 +1,138 @@
+{
+  "about": "The montage cut (edit.py). Starts and ends on the home screen at zoom 1, the title's plates. Cursor shots keep the cursor in the middle, zoomed in; the camera breathes out as it travels and back in as it settles. Box shots (no cursor on screen) frame their box; boxes follow tools/showcase/publish.py's crops.",
+  "shots": [
+    {
+      "name": "home-in",
+      "still": "desktop.png",
+      "len": 0.5,
+      "push": false
+    },
+    {
+      "name": "quick-settings",
+      "clip": "quick-settings-open.mp4",
+      "in": 0.5,
+      "cursor": true,
+      "zoom": 2.0,
+      "from_zoom": 1.0,
+      "len": 3.8
+    },
+    {
+      "name": "menu-slide",
+      "clip": "menu-slide.mp4",
+      "cursor": true,
+      "zoom": 1.9,
+      "len": 3.2
+    },
+    {
+      "name": "calendar",
+      "clip": "calendar-open.mp4",
+      "cursor": true,
+      "zoom": 1.8,
+      "len": 2.4
+    },
+    {
+      "name": "dock-menu",
+      "clip": "dock-menu.mp4",
+      "cursor": true,
+      "zoom": 2.0,
+      "len": 2.4
+    },
+    {
+      "name": "desktop-menu",
+      "clip": "desktop-menu.mp4",
+      "cursor": true,
+      "zoom": 2.1,
+      "len": 2.2
+    },
+    {
+      "name": "window-open",
+      "clip": "window-open.mp4",
+      "in": 0.4,
+      "box": [
+        1000,
+        380,
+        560,
+        680
+      ],
+      "len": 2.0
+    },
+    {
+      "name": "window-menu",
+      "clip": "window-open.mp4",
+      "in": 3.3,
+      "cursor": true,
+      "zoom": 2.0,
+      "len": 2.0
+    },
+    {
+      "name": "files-menu",
+      "clip": "files-menu.mp4",
+      "cursor": true,
+      "zoom": 1.8,
+      "len": 2.4
+    },
+    {
+      "name": "overview",
+      "clip": "overview.mp4",
+      "cursor": true,
+      "zoom": 1.25,
+      "len": 2.8
+    },
+    {
+      "name": "app-grid",
+      "clip": "app-grid.mp4",
+      "cursor": true,
+      "zoom": 1.4,
+      "len": 3.0
+    },
+    {
+      "name": "volume-osd",
+      "clip": "volume-osd.mp4",
+      "box": [
+        880,
+        1000,
+        800,
+        440
+      ],
+      "len": 1.8,
+      "in": 0.4
+    },
+    {
+      "name": "widget-drag",
+      "clip": "widget-drag.mp4",
+      "cursor": true,
+      "zoom": 1.8,
+      "len": 3.0
+    },
+    {
+      "name": "music-swirl",
+      "clip": "music-swirl.mp4",
+      "box": [
+        0,
+        40,
+        800,
+        1100
+      ],
+      "len": 3.0
+    },
+    {
+      "name": "lock-screen",
+      "clip": "red3-lock-screen.mp4",
+      "in": 4.0,
+      "box": [
+        480,
+        0,
+        960,
+        820
+      ],
+      "len": 3.0,
+      "end_zoom": 1.0
+    },
+    {
+      "name": "home-out",
+      "still": "desktop.png",
+      "len": 0.8,
+      "push": false
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# Montage: the features and the design (plan, waiting for approval)
+# Montage: the features and the design
 
 The middle of the showcase video. The title (`docs/showcase/title/`) zooms out of the wallpaper onto
 the home screen. The montage takes over from that frame, follows the cursor through the desktop's
@@ -7,6 +7,29 @@ loop. It is about 40 s; title + montage + title-out comes to about 50 s.
 
 Storyboard: `storyboard/footage.webp` (one frame of every usable clip) and `storyboard/zoom-2x.webp`
 (what a 2x cursor camera sees).
+
+## Decisions (2026-10-21)
+
+The user approved everything and asked for it to be finished and published while away, with this
+camera: **zoomed in, the cursor kept in the middle; it zooms out when needed and back in.**
+
+- Footage: **option A**, the shoot's footage, re-redacted the same day: the user asked to show the
+  city, the weather widget, the Wi-Fi name and the login name and picture (the private terms and
+  `docs/showcase/redactions.json` were trimmed; the password field, Claude notifications and windows,
+  the home path and the user's real name stay blurred). Sources: `~/Videos/liquid-glass-showcase/pub2`.
+  Every published image and clip is 16:9 (`fit16x9()` in tools/showcase/publish.py).
+- Earlier note: Option B (a demo-profile reshoot) drives the live
+  desktop and needs the user for the lock screen, so it waits for the user.
+- Camera (edit.py): cursor shots keep the cursor centred at the shot's zoom (1.25 to 2.1); the zoom
+  breathes out as the cursor travels (zoom / (1 + speed / 1800 px/s), smoothed over 0.25 s) and back
+  in as it settles, with a 6 % push-in over the shot; the first shot zooms in from the whole screen
+  and the last zooms back out to it. Shots without a cursor (volume OSD, music, lock screen) frame a
+  box. Springs: critically damped (no overshoot), the camera 60, the zoom 14.
+- The cursor is found by template matching the MacTahoe cursor sprite (track.py); frames where it
+  is hidden keep the last position.
+- The full loop is the title, then the montage; both start and end on the same home screen frame.
+- Captions: none. The design points went into the README's new Design section instead (annotated
+  images from docs/showcase/design/annotate.py).
 
 ## 1. What footage exists
 

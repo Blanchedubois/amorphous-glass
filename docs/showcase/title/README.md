@@ -30,7 +30,7 @@ docs/showcase/title/render.py still 5.4 -o logo.png --theme dark
 ```
 
 ```bash
-docs/showcase/title/render.py clip -o docs/showcase/title/renders/title-dark.mp4 --webp docs/showcase/media/title-dark.webp
+docs/showcase/title/render.py clip -o docs/showcase/title/renders/title-dark.mp4 --webp docs/showcase/title/renders/title-dark.webp
 ```
 
 `renders/` (the 60 fps masters, the logo PNGs, the social preview) is not in git.

@@ -158,6 +158,11 @@ centre crop), so the crossfade changes only the bar, the dock and the widgets.
 | `docs/showcase/title/renders/title-{dark,light}.mp4` | 2.7 / 2.5 MB | 1920x1080, 60 fps, motion blur; masters, not in git (upload by hand) |
 | `docs/showcase/title/renders/social-preview.png` | 0.5 MB | 1280x640, for the repo's Settings → Social preview; not in git |
 
+Later (2026-10-21): the README's hero became the full loop, title + montage
+(`docs/showcase/media/amorphous-glass.webp`, built by `docs/showcase/montage/loop.sh`). The montage
+footage is dark, so the light loop and still were removed; `render.py clip --theme light` still makes
+them.
+
 ffmpeg's `libwebp_anim` was dropped: its output built up blocky smears over the gradients.
 `render.py webp MASTER.mp4 -o LOOP.webp` re-encodes a loop from a master.
 
