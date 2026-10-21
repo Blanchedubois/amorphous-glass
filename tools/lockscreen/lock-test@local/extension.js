@@ -172,19 +172,36 @@ async function runQs() {
     const dialog = await lockAndPrompt();
     await sleep(1000);
     const qs = Main.panel.statusArea.quickSettings;
+    // TAHOE_QS_SLIDERS=1: the sliders GNOME hides in the test shell (no audio device) shown, to
+    // check their size against the toggles
+    if (GLib.getenv('TAHOE_QS_SLIDERS')) {
+        const w = a => { if (a.has_style_class_name?.('quick-slider')) { a.show(); a.get_parent()?.show(); } a.get_children().forEach(w); }; w(qs.menu.box);
+    }
     qs.menu.open(false);
     await sleep(1200);
     const menu = qs.menu;
+    { const out = []; const w = a => { const c = ['quick-toggle-has-menu', 'quick-slider', 'icon-button', 'quick-toggle-menu'].find(k => a.has_style_class_name?.(k)) ?? (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu') ? 'quick-toggle' : null);
+        if (c && a.mapped) { out.push({kind: c, box: box(a)}); if (c !== 'quick-toggle-menu') return; } a.get_children().forEach(w); }; w(menu.actor); write({ label: 'qs-pieces-all', pieces: out }); }
+    { const t = []; let first = null; const f = a => { if (!first && a.has_style_class_name?.('quick-slider') && a.mapped) first = a; a.get_children().forEach(f); }; f(menu.box);
+      const w2 = (a, d) => { t.push(`${'  '.repeat(d)}${a.constructor.name}.${a.style_class ?? ''} ${box(a)}`); a.get_children().forEach(c => w2(c, d + 1)); }; if (first) w2(first, 0); write({ label: 'qs-slider-tree', t }); }
     const chain = []; for (let a = menu.actor; a; a = a.get_parent()) chain.push(`${a.constructor.name}${a.name ? '#' + a.name : ''}${a.style_class ? '.' + a.style_class.split(' ').join('.') : ''}`);
     const mbox = menu.box ?? menu.actor;
     write({ label: 'qs', open: menu.isOpen, actor: mbox ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
         boxStyle: menu.box?.style_class, chain, frame: frameState().frame,
-        glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-lock:menu-glass' || a.name === 'menu-glass') n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
+        glass: (() => { let n = 0; const w = a => { if (a.name === 'tahoe-gdm-glass' && a.visible && a.mapped && !Main.screenShield._dialog?.contains(a)) n++; for (const c of a.get_children()) w(c); }; w(global.stage); return n; })() });
     const [x, y] = menu.box.get_transformed_position(); const [w, h] = menu.box.get_transformed_size();
-    const pieceDump = []; const wg = (a, d) => { if (a.name === 'menu-glass' && a.visible) pieceDump.push({ glass: box(a) }); for (const c of a.get_children()) wg(c, d + 1); }; wg(global.stage, 0);
+    const pieceDump = []; for (const a of [...Main.layoutManager.uiGroup.get_children(), ...(Main.panel.statusArea.quickSettings.menu.actor?.get_children() ?? [])]) if (a.name === 'tahoe-gdm-glass' && a.visible) pieceDump.push({ glass: box(a) });
     const toggles = []; const w2 = a => { if (a.has_style_class_name?.('quick-toggle') && a.mapped) toggles.push({ toggle: box(a), radius: a.get_theme_node().get_border_radius(0), margin: a.get_theme_node().get_margin?.(St.Side.RIGHT) ?? null }); for (const c of a.get_children()) w2(c); }; w2(menu.box);
     write({ label: 'qs-pieces', glass: pieceDump, toggles, pointer: menu._boxPointer ? { tx: menu._boxPointer.translation_x, ty: menu._boxPointer.translation_y, o: menu._boxPointer.opacity } : null });
     write({ label: 'qs-box', box: [x, y, w, h].map(Math.round), boxParent: menu.box.get_parent()?.constructor.name });
+    { const out = []; const w = a => { if (a.mapped && (a.has_style_class_name?.('quick-toggle-has-menu') || (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu')))) {
+        const b = box(a); let icon = null, arrow = null; const f = x => { if (!icon && x.has_style_class_name?.('quick-toggle-icon') && x.mapped) icon = box(x); if (!arrow && x.has_style_class_name?.('quick-toggle-menu-button') && x.mapped) arrow = box(x); x.get_children().forEach(f); }; f(a);
+        out.push({cls: a.style_class, box: b, icon, arrow,
+            iconGaps: icon ? {left: icon[0] - b[0], top: icon[1] - b[1], bottom: b[1] + b[3] - icon[1] - icon[3]} : null,
+            arrowGaps: arrow ? {right: b[0] + b[2] - arrow[0] - arrow[2], top: arrow[1] - b[1], bottom: b[1] + b[3] - arrow[1] - arrow[3]} : null}); }
+        a.get_children().forEach(w); }; w(menu.box); write({ label: 'qs-insets', toggles: out }); }
+    { const t = []; const w = (a, d) => { if (d > 4) return; t.push(`${'  '.repeat(d)}${a.constructor.name}${a.name ? '#' + a.name : ''}.${a.style_class ?? ''} ${box(a)} bin=${!!a.bin}`); a.get_children().forEach(c => w(c, d + 1)); }; w(menu.actor, 0); write({ label: 'qs-tree', t }); }
+    { const t = []; const w = (a, d) => { t.push(`${'  '.repeat(d)}${a.constructor.name}.${a.style_class ?? ''} ${box(a)} vis=${a.visible} op=${a.opacity}`); a.get_children().forEach(c => w(c, d + 1)); }; const first = (a => { let f = null; const s = x => { if (!f && x.has_style_class_name?.('quick-toggle-has-menu')) f = x; x.get_children().forEach(s); }; s(a); return f; })(menu.box); if (first) w(first, 0); write({ label: 'qs-split', t }); }
     await shotRect('qs', [Math.max(0, Math.round(x) - 40), Math.max(0, Math.round(y) - 20), Math.round(w) + 80, Math.round(h) + 60]);
     qs.menu.close(false);
     await sleep(500);
@@ -220,7 +237,7 @@ async function runQsSub() {
         t.menu?.open(true);
         await sleep(1500);
         const [x, y] = qs.menu.box.get_transformed_position(); const [w, h] = qs.menu.box.get_transformed_size();
-        const glass = []; const wg = a => { if (a.name === 'menu-glass' && a.visible) glass.push(box(a)); for (const c of a.get_children()) wg(c); }; wg(global.stage);
+        const glass = []; for (const a of [...Main.layoutManager.uiGroup.get_children(), ...(Main.panel.statusArea.quickSettings.menu.actor?.get_children() ?? [])]) if (a.name === 'tahoe-gdm-glass' && a.visible) glass.push(box(a));
         const subs = []; const ws = a => { if (a.has_style_class_name?.('quick-toggle-menu') && a.mapped) subs.push(box(a)); for (const c of a.get_children()) ws(c); }; ws(qs.menu.actor);
         write({ label: 'qs-sub', i, open: t.menu?.isOpen ?? null, glass, submenus: subs, frame: frameState().frame });
         await shotRect(`qssub-${i}`, [Math.max(0, Math.round(x) - 30), Math.max(0, Math.round(y) - 10), Math.round(w) + 60, Math.round(h) + 40]);
@@ -455,7 +472,7 @@ async function runChurn() {
         await sleep(400);
         if ((i === 1 || i % 25 === 0 || i === N) || locked.frame !== 'running' && locked.extState !== null) {
             write({ label: 'cycle', i, locked, usable: u, unlocked: frameState(), mode: Main.sessionMode.currentMode,
-                actors: countActors(), rssKb: rssKb(), unlockMs,
+                actors: countActors(), census: actorCensus(), rssKb: rssKb(), unlockMs,
                 unlockMsMax: Math.max(...unlockTimes), unlockMsMedian: unlockTimes.slice().sort((a, b) => a - b)[unlockTimes.length >> 1] });
         }
     }
@@ -582,6 +599,58 @@ async function shotRect(name, [x, y, w, h]) {
     await new Promise(resolve => stream.close_async(0, null, () => resolve()));
 }
 
+// every button on screen: its box, its content's box (the label or icon), the gaps on each side
+function buttonGaps() {
+    const out = [];
+    const content = b => {
+        let best = null;
+        const walk = a => {
+            if (!a.mapped) return;
+            if (a instanceof St.Label || a instanceof St.Icon) { best ??= a; return; }
+            a.get_children().forEach(walk);
+        };
+        b.get_children().forEach(walk);
+        return best;
+    };
+    const visit = a => {
+        if (!a.mapped || a.get_paint_opacity() === 0) return;
+        const isButton = a instanceof St.Button || a.has_style_class_name?.('panel-button');
+        if (isButton) {
+            const [bx, by] = a.get_transformed_position();
+            const [bw, bh] = a.get_transformed_size();
+            const c = content(a);
+            let gaps = null;
+            if (c) {
+                // a label's text: its layout's ink width, centred as St draws it
+                const [cx, cy] = c.get_transformed_position();
+                const [cw, ch] = c.get_transformed_size();
+                let tx = cx, tw = cw;
+                if (c instanceof St.Label) {
+                    const [, logical] = c.clutter_text.get_layout().get_pixel_extents();
+                    tw = logical.width;
+                }
+                gaps = {left: Math.round(tx - bx), right: Math.round(bx + bw - (tx + tw)), top: Math.round(cy - by), bottom: Math.round(by + bh - (cy + ch))};
+            }
+            out.push({cls: a.style_class, box: [bx, by, bw, bh].map(Math.round), gaps});
+        }
+        a.get_children().forEach(visit);
+    };
+    visit(global.stage);
+    return out;
+}
+
+// actors on the stage by type and name (to find what a cycle leaves behind)
+function actorCensus() {
+    const n = {};
+    const w = a => {
+        const k = `${a.constructor.name}${a.name ? '#' + a.name : ''}`;
+        n[k] = (n[k] ?? 0) + 1;
+        a.get_children().forEach(w);
+    };
+    w(global.stage);
+    return n;
+}
+
 function box(actor) {
     if (!actor || !actor.mapped) return null;
     const [x, y] = actor.get_transformed_position();
@@ -631,6 +700,12 @@ async function run() {
     await applyMaterial();
     state('unlocked');
     await shotRect('unlocked', [0, 0, global.screen_width, global.screen_height]);
+    // TAHOE_LOCK_NOTIFY=1: two notifications before locking (they show on the lock screen)
+    if (GLib.getenv('TAHOE_LOCK_NOTIFY')) {
+        Main.notify('Calendar', 'Design review at 6:00 PM');
+        Main.notify('Messages', 'See you at the gym');
+        await sleep(500);
+    }
     Main.screenShield.lock(false);
     await sleep(2500);
     state('locked');
@@ -685,6 +760,17 @@ async function run() {
     walk(global.stage, 0);
     write({ label: 'our-actors', ours });
     { const out = []; const w = a => { if (a instanceof St.Button && a.mapped) out.push(`${a.style_class}|${a.name ?? ''}|${box(a)}|${a.get_parent()?.style_class ?? ''}`); a.get_children().forEach(w); }; w(global.stage); write({ label: 'buttons', buttons: out }); }
+    write({ label: 'button-gaps', buttons: buttonGaps() });
+    if (GLib.getenv('TAHOE_LOCK_HOVER')) {
+        const btns = [];
+        const w = a => { if (a.mapped && (a instanceof St.Button || a.has_style_class_name?.('panel-button'))) btns.push(a); a.get_children().forEach(w); };
+        w(global.stage);
+        btns.forEach(b => b.add_style_pseudo_class('hover'));
+        await sleep(600);
+        await shotRect('hover', [0, 0, global.screen_width, global.screen_height]);
+        btns.forEach(b => b.remove_style_pseudo_class('hover'));
+        write({ label: 'button-gaps-after', buttons: buttonGaps() });
+    }
     write({ label: 'background', effects: [...dialog._backgroundGroup].map(b => ({ x: b.x, name: b.name,
         effects: b.get_effects().map(e => `${e.constructor.name}:${e.enabled ? 'on' : 'off'}`) })) });
     const nameLabel = prompt._userWell?.get_child?.()?._label ?? null;
