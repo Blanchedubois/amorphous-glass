@@ -82,8 +82,30 @@ open(sys.argv[1], 'w').write('\n'.join(out) + '\n')
 PY
 . "$H/../gdm/sysbus.sh"
 sysbus_start
-timeout ${TAHOE_TEST_TIMEOUT:-60} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-lock-$$" \
-  --virtual-monitor ${TAHOE_LOCK_MONITOR:-2560x1440@120} > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
+# TAHOE_TEST_PIPEWIRE=1: a private PipeWire and WirePlumber in this shell's own runtime dir, with
+# WirePlumber's device monitors off (no Bluetooth, sound cards or cameras are touched), for
+# GNOME's screencast service (tools/showcase/lock-video.sh records the throwaway shell with it)
+shell_cmd=(gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-lock-$$" \
+  --virtual-monitor ${TAHOE_LOCK_MONITOR:-2560x1440@120})
+if [ -n "${TAHOE_TEST_PIPEWIRE:-}" ]; then
+  mkdir -p "$XDG_CONFIG_HOME/wireplumber/wireplumber.conf.d"
+  cat > "$XDG_CONFIG_HOME/wireplumber/wireplumber.conf.d/90-no-devices.conf" <<'WP'
+wireplumber.profiles = {
+  main = {
+    monitor.alsa = disabled
+    monitor.alsa-midi = disabled
+    monitor.bluez = disabled
+    monitor.bluez-midi = disabled
+    monitor.libcamera = disabled
+    monitor.v4l2 = disabled
+  }
+}
+WP
+  timeout ${TAHOE_TEST_TIMEOUT:-60} dbus-run-session -- sh -c 'pipewire & wireplumber & sleep 1; exec "$@"' sh \
+    "${shell_cmd[@]}" > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
+else
+  timeout ${TAHOE_TEST_TIMEOUT:-60} dbus-run-session -- "${shell_cmd[@]}" > "$out/shell-$TAHOE_LOCK_TAG.log" 2>&1 || true
+fi
 sysbus_stop
 # the test session's document portal mounts a FUSE file system in its runtime dir
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true

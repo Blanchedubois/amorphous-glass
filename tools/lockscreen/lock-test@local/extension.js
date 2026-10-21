@@ -340,6 +340,50 @@ async function runDemo() {
     write({ label: 'demo', frames: n, fps: Math.round(real * 100) / 100, frame: frameState().frame });
 }
 
+// TAHOE_LOCK_GATE=video: a real 60 fps recording of the lock screen for the showcase montage
+// (tools/showcase/lock-video.sh). GNOME's screencast service records this throwaway shell's own
+// screen; locking would stop it (the shell inhibits remote access while locked), so in this shell
+// only that inhibit is a no-op. Super+L's animated lock, the clock and widgets with music playing,
+// the prompt woken and a few dots typed, back to the clock. The output: $TAHOE_TEST_OUT/lock-video.mp4
+async function runVideo() {
+    const controller = global.backend.get_remote_access_controller?.();
+    if (controller)
+        controller.inhibit_remote_access = () => {};
+    Main.overview.hide();                     // a fresh shell starts in the overview
+    await sleep(3000);
+    const bus = Gio.DBus.session;
+    const call = (method, params, type) => new Promise((resolve, reject) => bus.call('org.gnome.Shell.Screencast',
+        '/org/gnome/Shell/Screencast', 'org.gnome.Shell.Screencast', method, params, type, Gio.DBusCallFlags.NONE,
+        -1, null, (b, res) => { try { resolve(b.call_finish(res).deepUnpack()); } catch (e) { reject(e); } }));
+    const file = GLib.build_filenamev([GLib.getenv('TAHOE_TEST_OUT'), 'lock-video']);
+    const opts = {framerate: new GLib.Variant('i', 60), 'draw-cursor': new GLib.Variant('b', true)};
+    const started = await call('Screencast', new GLib.Variant('(sa{sv})', [file, opts]), new GLib.VariantType('(bs)'));
+    const t0 = GLib.get_monotonic_time();
+    const mark = label => write({label: 'video-mark', mark: label, t: (GLib.get_monotonic_time() - t0) / 1e6});
+    await sleep(1500);
+    mark('lock');
+    Main.screenShield.lock(true);            // animated, as Super+L
+    await sleep(700);
+    Main.screenShield._wakeUpScreen();       // as at a desk: no blanking after the lock
+    await sleep(5300);                        // the clock, the widgets, the music swirl
+    mark('wake');
+    Main.screenShield._wakeUpScreen();
+    await sleep(1200);
+    const dialog = Main.screenShield._dialog;
+    const prompt = dialog?._authPrompt;
+    if (prompt && !prompt._entryArea.visible)
+        prompt.setQuestion('Enter Password');
+    mark('type');
+    for (const ch of 'showcase') {           // dots only: nothing reaches GDM or PAM in this shell
+        await typeKeys(ch);
+        await sleep(140);
+    }
+    await sleep(2500);
+    mark('stop');
+    const stopped = await call('StopScreencast', null, new GLib.VariantType('(b)'));
+    write({label: 'video', started, stopped, file: `${file}.mp4`, stillLocked: Main.sessionMode.isLocked});
+}
+
 // TAHOE_LOCK_GATE=lockvideo: frames from the moment Super+L locks (lock(true), animated, as the
 // shortcut) for 5 s, as fast as screenshots go, then the prompt: to see what glitches on locking
 async function runLockVideo() {
@@ -882,7 +926,7 @@ export default class Driver extends Extension {
         isolateFromGdm();
         if (GLib.getenv('TAHOE_LOCK_PLAYER'))
             fakePlayer();
-        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'verifying' ? runVerifying() : GATE === 'lockvideo' ? runLockVideo() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
+        (GATE === 'churn' ? runChurn() : GATE === 'perf' ? runPerf() : GATE === 'np-idle' ? runNpIdle() : GATE === 'music-idle' ? runMusicIdle() : GATE === 'demo' ? runDemo() : GATE === 'verifying' ? runVerifying() : GATE === 'lockvideo' ? runLockVideo() : GATE === 'video' ? runVideo() : GATE === 'motion' ? runMotion() : GATE === 'qs' ? runQs() : GATE === 'qs-sub' ? runQsSub() : GATE === 'dim' ? runDim() : GATE?.startsWith('ours-') ? runOurs(GATE.slice(5)) : FAULT ? runFault() : run()).catch(e => write({ label: 'error', error: String(e), stack: e.stack }))
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     disable() {}
