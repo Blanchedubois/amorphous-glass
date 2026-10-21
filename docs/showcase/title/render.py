@@ -7,6 +7,7 @@ server, then ffmpeg encodes them. The server serves the repository root, because
 imports the desktop's own spring.js from extensions/.
 
   render.py still 5.4 -o logo.png [--theme light]
+  render.py webp title.mp4 -o title.webp    (the README loop, from a master)
   render.py clip -o title.mp4 [--webp title.webp] [--width 1920] [--fps 60] [--blur 6] [--theme light]
              [--plate-in in.png --plate-out out.png]
 """
@@ -67,9 +68,16 @@ def still(args):
     with tempfile.TemporaryDirectory() as profile:
         server = serve(Path(profile), threading.Event())
         url = page_url(server, args, {'t': args.time})
-        subprocess.run([CHROMIUM, *CHROMIUM_FLAGS, f'--user-data-dir={profile}/chromium',
-                        '--virtual-time-budget=20000', f'--screenshot={Path(args.output).resolve()}', url],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        out = Path(args.output).resolve()
+        # under load the screenshot can be taken before WebGL has drawn: a blank frame is a few KB
+        for _ in range(4):
+            subprocess.run([CHROMIUM, *CHROMIUM_FLAGS, f'--user-data-dir={profile}/chromium',
+                            '--virtual-time-budget=20000', f'--screenshot={out}', url],
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if out.stat().st_size > 100_000:
+                break
+        else:
+            sys.exit('render: the still stayed blank')
         server.shutdown()
     print(args.output)
 
@@ -99,16 +107,43 @@ def clip(args):
                             '-pix_fmt', 'yuv420p', '-movflags', '+faststart', args.output], check=True)
             print(args.output, os.path.getsize(args.output))
         if args.webp:
-            webp_scale = f'scale={args.webp_width}:-2:flags=lanczos'
-            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(args.fps), '-i', pattern,
-                            '-vf', webp_scale, '-c:v', 'libwebp_anim', '-quality', '80',
-                            '-compression_level', '6', '-loop', '0', args.webp], check=True)
-            print(args.webp, os.path.getsize(args.webp))
+            encode_webp(sorted(frames.glob('*.png')), args.fps, args)
 
+
+def encode_webp(paths, fps, args):
+    """the README loop: an animated WebP at `args.webp_fps`, `args.webp_width` wide.
+
+    Encoded with Pillow (libwebp's WebPAnimEncoder) rather than ffmpeg's libwebp_anim, whose
+    output built up blocky smears over the wallpaper's gradients (seen when decoding with
+    libwebp). A keyframe every 10 frames keeps it clean and about 2.5 MB."""
+    from PIL import Image
+    step = max(1, round(fps / args.webp_fps))
+    images = []
+    for path in paths[::step]:
+        with Image.open(path) as im:
+            im = im.convert('RGB')
+            height = round(im.height * args.webp_width / im.width / 2) * 2
+            images.append(im.resize((args.webp_width, height), Image.LANCZOS))
+    images[0].save(args.webp, save_all=True, append_images=images[1:], loop=0,
+                   duration=round(1000 * step / fps), quality=args.webp_quality, method=4,
+                   kmin=9, kmax=10, allow_mixed=False)
+    print(args.webp, os.path.getsize(args.webp))
+
+
+def webp(args):
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-i', args.master, f'{tmp}/%05d.png'], check=True)
+        fps = float(subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+                                    'stream=r_frame_rate', '-of', 'csv=p=0', args.master],
+                                   capture_output=True, text=True, check=True).stdout.strip().split('/')[0])
+        encode_webp(sorted(Path(tmp).glob('*.png')), fps, args)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='mode', required=True)
+    w = sub.add_parser('webp', help='re-encode the README loop from an MP4 master')
+    w.add_argument('master')
+    w.add_argument('-o', '--webp', required=True)
     for name in ('still', 'clip'):
         p = sub.add_parser(name)
         p.add_argument('--theme', choices=('dark', 'light'), default='dark')
@@ -126,9 +161,15 @@ def main():
             p.add_argument('--blur', type=int, default=6, help='moments added up per frame (motion blur)')
             p.add_argument('--width', type=int, default=1920, help='MP4 width')
             p.add_argument('--webp-width', type=int, default=1280)
+            p.add_argument('--webp-fps', type=int, default=30, help='the README loop: 30 keeps it small')
+            p.add_argument('--webp-quality', type=int, default=75)
     args = parser.parse_args()
     if not CHROMIUM:
         sys.exit('render: Chromium not found')
+    if args.mode == 'webp':
+        args.webp_fps, args.webp_width, args.webp_quality = 30, 1280, 75
+        webp(args)
+        return
     (still if args.mode == 'still' else clip)(args)
 
 
