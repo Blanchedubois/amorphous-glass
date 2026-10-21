@@ -118,6 +118,51 @@ function fakePlayer() {
     Gio.DBus.session.own_name('org.mpris.MediaPlayer2.fake', Gio.BusNameOwnerFlags.NONE, null, null);
 }
 
+// SHOT_ICS=1: the Schedule widgets read a made-up calendar from ics-server.py on 127.0.0.1, with
+// events placed around the current time (floating local times); never a real feed
+function demoCalendar() {
+    const now = GLib.DateTime.new_now_local();
+    const at = m => {
+        const t = now.add_minutes(m);
+        return t.add_minutes(-(t.get_minute() % 5)).format('%Y%m%dT%H%M00');
+    };
+    const day = d => now.add_days(d).format('%Y%m%d');
+    const ev = (uid, start, end, title, extra = '') => `BEGIN:VEVENT\nUID:${uid}@demo.test\nDTSTAMP:20260101T000000Z\n${start}\n${end}\nSUMMARY:${title}\n${extra}END:VEVENT`;
+    const t = (a, b) => [`DTSTART:${at(a)}`, `DTEND:${at(b)}`];
+    const spec = (GLib.getenv('SHOT_ICS_EVENTS') ?? 'default');
+    const items = [];
+    if (spec === 'default') {
+        items.push(ev('birthday', `DTSTART;VALUE=DATE:${day(0)}`, `DTEND;VALUE=DATE:${day(1)}`, "Sam's birthday"));
+        items.push(ev('gym', ...t(10, 85), 'Gym'));
+        items.push(ev('lunch', ...t(120, 180), 'Lunch with Sam'));
+        items.push(ev('review', ...t(205, 220), 'Design review with the whole team'));
+    } else if (spec === 'now') {
+        items.push(ev('call', ...t(-20, 40), 'Call with Alex'));
+        items.push(ev('dentist', ...t(95, 155), 'Dentist'));
+    }
+    if (spec !== 'none') {
+        items.push(ev('other-1', `DTSTART;VALUE=DATE:${day(1)}`, `DTEND;VALUE=DATE:${day(2)}`, 'Tomorrow'));
+        items.push(ev('other-2', `DTSTART:${now.add_days(3).format('%Y%m%d')}T100000`, `DTEND:${now.add_days(3).format('%Y%m%d')}T110000`, 'Later this week'));
+        items.push(ev('other-3', `DTSTART:${now.add_days(-1).format('%Y%m%d')}T100000`, `DTEND:${now.add_days(-1).format('%Y%m%d')}T110000`, 'Yesterday'));
+    }
+    return `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//tahoe-widgets//demo//EN\n${items.join('\n')}\nEND:VCALENDAR\n`;
+}
+
+async function serveDemo() {
+    const dir = GLib.dir_make_tmp('ics-demo-XXXXXX');
+    GLib.file_set_contents(`${dir}/demo.ics`, demoCalendar());
+    const portFile = `${dir}/port`;
+    const server = Gio.Subprocess.new(['python3', '-I', `${GLib.getenv('STRESS_HARNESS')}/ics-server.py`, portFile, dir], Gio.SubprocessFlags.NONE);
+    for (let i = 0; i < 50 && !GLib.file_test(portFile, GLib.FileTest.EXISTS); i++)
+        await sleep(100);
+    const port = new TextDecoder().decode(GLib.file_get_contents(portFile)[1]).trim();
+    const conf = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass']);
+    GLib.file_set_contents_full(`${conf}/calendar-url`, `http://127.0.0.1:${port}/demo/demo.ics\n`, GLib.FileSetContentsFlags.CONSISTENT, 0o600);
+    GLib.file_set_contents_full(`${conf}/calendar-source`, 'store=file\nchanged=1\n', GLib.FileSetContentsFlags.CONSISTENT, 0o600);
+    log(`demo calendar on port ${port}`);
+    return server;
+}
+
 export default class Shot extends Extension {
     enable() {
         log('enable');
@@ -126,6 +171,15 @@ export default class Shot extends Extension {
             .finally(() => GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => { global.context.terminate(); return GLib.SOURCE_REMOVE; }));
     }
     async _run() {
+        const server = GLib.getenv('SHOT_ICS') && GLib.getenv('SHOT_ICS_EVENTS') !== 'nolink' ? await serveDemo() : null;
+        try {
+            await this._shots();
+        } finally {
+            server?.force_exit();
+        }
+    }
+
+    async _shots() {
         await sleep(WAIT);
         Main.overview.hide();
         await sleep(1500);

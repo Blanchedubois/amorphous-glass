@@ -1,0 +1,1 @@
+{ "uuid": "widget-sched@local", "name": "widget sched", "description": "headless test of the Schedule widgets with a fake clock", "shell-version": ["51"], "session-modes": ["user", "unlock-dialog"] }

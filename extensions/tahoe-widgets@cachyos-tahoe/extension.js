@@ -16,6 +16,7 @@ import {GlassCard, STATE_FILE, bmsUuid, glassMode, loadBms, scaleFactor} from '.
 import {AnalogClock, AnalogMarksClock, AnalogQuartersClock, DateTimeClock, DigitalClock} from './clocks.js';
 import {GlassTextClock} from './glasstext.js';
 import {CalendarDay, CalendarMedium, CalendarMonth} from './calendar.js';
+import {ScheduleLarge, ScheduleSmall} from './schedule.js';
 import {MusicExtraLargeTall, MusicExtraLargeWide, MusicLarge, MusicLyrics, MusicMedium, MusicSmall} from './music.js';
 import {WeatherLarge, WeatherMedium, WeatherSmall} from './weather.js';
 
@@ -38,6 +39,8 @@ const TYPES = {
     'calendar-day': {name: 'Calendar: Today', cls: CalendarDay},
     'calendar-month': {name: 'Calendar: Month', cls: CalendarMonth},
     'calendar-medium': {name: 'Calendar: Today and Month', cls: CalendarMedium},
+    'schedule-small': {name: 'Calendar: Schedule', cls: ScheduleSmall},
+    'schedule-large': {name: 'Calendar: Schedule Large', cls: ScheduleLarge},
     'weather-small': {name: 'Weather', cls: WeatherSmall},
     'weather-medium': {name: 'Weather: Next Hours', cls: WeatherMedium},
     'weather-large': {name: 'Weather: Week', cls: WeatherLarge},
