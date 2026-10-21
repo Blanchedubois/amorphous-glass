@@ -223,3 +223,9 @@ way (a queued menu update, and disconnects from menus GNOME had already disposed
   from the end, round buttons 44 px circles, submenus the menu's full 420 px width. Measured with
   the sliders shown in the test shells (TAHOE_QS_SLIDERS: no audio device there).
   `system-menu-aligned.png` (Super+L, login).
+- The system menu at the desktop control center's size (the user, 2026-10-20: "taller, like the
+  control center"): toggles and sliders 64 px, icon and arrow circles 44 px 10 px from every edge,
+  plain toggles' icons on the circles' centre line (20 px in), round buttons 52 px, titles 15 px,
+  the menu 440 px wide (the titles fit). Measured on both screens. `system-menu-desktop-size.png`.
+- Login Options (the gear that picks GNOME / GNOME on Xorg, GNOME's `login-dialog-auth-menu-button`):
+  a 48 px glass circle with a 20 px glyph on both screens, its Session Type menu on frosted glass.

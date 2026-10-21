@@ -19,6 +19,7 @@ const CLASSES = [
     'cancel-button',
     'login-dialog-session-list-button',
     'a11y-button',
+    'login-dialog-auth-menu-button',   // Login Options: the gear (the session: GNOME, GNOME on Xorg...)
 ];
 
 export function buildButtons(ext, dialog, backdrop) {
