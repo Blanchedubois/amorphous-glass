@@ -151,6 +151,9 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
         pane._tahoeLater = laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
             pending.delete(pane._tahoeLater);
             pane._tahoeLater = 0;
+            // the menu or the pane went in the meantime (the shell shutting down, a rebuilt menu)
+            if (followed.get(pointer) !== pane || pane._tahoeGone)
+                return GLib.SOURCE_REMOVE;
             try {
                 follow(pointer, pane);
             } catch (e) {
@@ -180,7 +183,10 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
         parent.insert_child_below(pane, pointer);
         followed.set(pointer, pane);
         let paneGone = false;   // its parent may destroy it first (the shell shutting down)
-        pane.connect('destroy', () => (paneGone = true));
+        pane.connect('destroy', () => {
+            paneGone = true;
+            pane._tahoeGone = true;
+        });
         const update = () => schedule(pointer, pane);
         const ids = ['mapped', 'opacity', 'allocation', 'translation-x', 'translation-y', 'scale-x', 'scale-y', 'visible']
             .map(prop => [pointer, pointer.connect(`notify::${prop}`, update)]);
