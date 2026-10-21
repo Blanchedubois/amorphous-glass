@@ -86,7 +86,20 @@ def shot(name):
 
 def close_all():
     call('CloseAll')
+    press('Escape')     # menus outside the panel's manager (the desktop menu, the dock menus)
     pause(500)
+
+
+def qs_arrow():
+    """the submenu arrow of the first two-part toggle (Wi-Fi): its right end"""
+    for i in range(12):
+        try:
+            x, y, w, h = locate(f'qs-toggle:{i}')
+        except LookupError:
+            break
+        if w < 300 and h > 60:      # the half-width toggles; the first is Wi-Fi
+            return x + w - 28, y + h // 2
+    raise LookupError('no two-part toggle')
 
 
 class Clip:
@@ -133,6 +146,13 @@ def shot_fn(fn):
 
 
 @shot_fn
+def s_workspace():
+    """an empty workspace, so no open window is on camera"""
+    press('Super_L', 'Page_Down')
+    pause(1200)
+
+
+@shot_fn
 def s_desktop():
     close_all()
     move(1280, 900, 300)
@@ -147,7 +167,7 @@ def s_quick_settings():
         click(x, y)
         pause(1200)
         shot('quick-settings')
-        ax, ay = center('qs-arrow:0')
+        ax, ay = qs_arrow()
         move(ax, ay, 400)
         click(ax, ay)
         pause(1200)
@@ -214,8 +234,26 @@ def s_dock_menu():
 
 
 @shot_fn
+def s_music():
+    """the Music widgets with the album-colour swirl and the synced lyrics (Nude, In Rainbows)"""
+    close_all()
+    move(1280, 1000, 300)
+    shot('music')
+    with Clip('music-swirl'):
+        pause(14000)
+
+
+@shot_fn
 def s_files():
-    launch('org.gnome.Nautilus', 2500)
+    folder = os.environ.get('TAHOE_SHOWCASE_FILES')
+    if folder:
+        env = dict(os.environ)
+        if os.environ.get('TAHOE_TEST_DISPLAY'):
+            env['WAYLAND_DISPLAY'] = os.environ['TAHOE_TEST_DISPLAY']
+        subprocess.Popen(['nautilus', '--new-window', folder], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pause(2500)
+    else:
+        launch('org.gnome.Nautilus', 2500)
     x, y, w, h = locate('window:org.gnome.Nautilus')
     with Clip('files-menu'):
         shot('files')
@@ -225,6 +263,8 @@ def s_files():
         shot('files-context-menu')
         press('Escape')
         pause(600)
+        press('Control_L', 'w')
+        pause(800)
 
 
 @shot_fn
@@ -233,7 +273,7 @@ def s_overview():
         press('Super_L')
         pause(1300)
         shot('overview')
-        type_('set')
+        type_(os.environ.get('TAHOE_SHOWCASE_QUERY', 'calc'))
         pause(1300)
         shot('search')
         press('Escape')
