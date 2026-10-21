@@ -1,0 +1,294 @@
+{
+ "_comment": "Expected occurrences per fixture, worked out by hand (not from the helper). title|local start..end (D: all-day dates, end exclusive)|colour",
+ "cases": [
+  {
+   "name": "UTC daily",
+   "file": "basic.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Daily fixture event|2026-10-20T11:00..2026-10-20T12:00"
+   ]
+  },
+  {
+   "name": "VTIMEZONE, a fold inside a UTF-8 character",
+   "file": "tz.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Berlin standup|2026-10-20T03:30..2026-10-20T04:00",
+    "NY lunch|2026-10-20T12:15..2026-10-20T13:15",
+    "Folded Café title, a long one that goes on past seventy-five octets so it is folded twice|2026-10-20T14:00..2026-10-20T15:00"
+   ]
+  },
+  {
+   "name": "after Berlin leaves summer time (25 Oct), New York not yet",
+   "file": "tz.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-26",
+   "to": "2026-10-27",
+   "exit": 0,
+   "expect": [
+    "Berlin standup|2026-10-26T04:30..2026-10-26T05:00"
+   ]
+  },
+  {
+   "name": "after New York leaves summer time (1 Nov)",
+   "file": "tz.ics",
+   "tz": "America/New_York",
+   "from": "2026-11-03",
+   "to": "2026-11-04",
+   "exit": 0,
+   "expect": [
+    "Berlin standup|2026-11-03T03:30..2026-11-03T04:00",
+    "NY lunch|2026-11-03T12:15..2026-11-03T13:15"
+   ]
+  },
+  {
+   "name": "the same feed seen from Berlin",
+   "file": "tz.ics",
+   "tz": "Europe/Berlin",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Berlin standup|2026-10-20T09:30..2026-10-20T10:00",
+    "NY lunch|2026-10-20T18:15..2026-10-20T19:15",
+    "Folded Café title, a long one that goes on past seventy-five octets so it is folded twice|2026-10-20T20:00..2026-10-20T21:00"
+   ]
+  },
+  {
+   "name": "TZID with no VTIMEZONE, quoted TZID, floating, UTC",
+   "file": "nozone.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Paris no vtimezone|2026-10-20T04:00..2026-10-20T05:00",
+    "Quoted zone|2026-10-20T07:00..2026-10-20T08:00",
+    "Floating|2026-10-20T09:00..2026-10-20T09:30",
+    "Paris weekly|2026-10-20T11:00..2026-10-20T12:00",
+    "UTC|2026-10-20T16:00..2026-10-20T17:00"
+   ]
+  },
+  {
+   "name": "weekly in a zone with no VTIMEZONE, across its DST change",
+   "file": "nozone.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-27",
+   "to": "2026-10-28",
+   "exit": 0,
+   "expect": [
+    "Paris weekly|2026-10-27T12:00..2026-10-27T13:00"
+   ]
+  },
+  {
+   "name": "floating stays local; the day ends at local midnight",
+   "file": "nozone.ics",
+   "tz": "Asia/Tokyo",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Floating|2026-10-20T09:00..2026-10-20T09:30",
+    "Paris no vtimezone|2026-10-20T17:00..2026-10-20T18:00",
+    "Quoted zone|2026-10-20T20:00..2026-10-20T21:00"
+   ]
+  },
+  {
+   "name": "all-day, multi-day, overnight, no DTEND, zero length",
+   "file": "allday.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Trip|D 2026-10-19..2026-10-23",
+    "Overnight|2026-10-19T22:00..2026-10-20T02:00",
+    "Holiday|D 2026-10-20..2026-10-21",
+    "No end all-day|D 2026-10-20..2026-10-21",
+    "Weekly all-day|D 2026-10-20..2026-10-21",
+    "Zero length|2026-10-20T11:00..2026-10-20T11:00"
+   ]
+  },
+  {
+   "name": "EXDATE, overrides moved in from Monday and from December, orphan override, RDATE, BYDAY=3TU, UNTIL, yearly, since 2001",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Yearly birthday|D 2026-10-20..2026-10-21",
+    "Since 2001|2026-10-20T07:00..2026-10-20T07:05",
+    "Until today|2026-10-20T08:00..2026-10-20T08:30",
+    "Orphan override|2026-10-20T11:00..2026-10-20T11:30",
+    "Planning (pulled in)|2026-10-20T13:00..2026-10-20T13:30",
+    "Third Tuesday|2026-10-20T14:00..2026-10-20T15:00",
+    "Standup (from Monday)|2026-10-20T16:00..2026-10-20T16:30",
+    "RDATE extra|2026-10-20T19:00..2026-10-20T19:30"
+   ]
+  },
+  {
+   "name": "moved occurrence gone from Monday; UNTIL in UTC ends on the right day",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-19",
+   "to": "2026-10-20",
+   "exit": 0,
+   "expect": [
+    "Since 2001|2026-10-19T07:00..2026-10-19T07:05",
+    "Until ended|2026-10-19T08:00..2026-10-19T08:30",
+    "Until today|2026-10-19T08:00..2026-10-19T08:30"
+   ]
+  },
+  {
+   "name": "override moved to later the same day",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-21",
+   "to": "2026-10-22",
+   "exit": 0,
+   "expect": [
+    "Since 2001|2026-10-21T07:00..2026-10-21T07:05",
+    "Planning|2026-10-21T10:00..2026-10-21T11:00",
+    "Standup (moved)|2026-10-21T11:00..2026-10-21T11:15"
+   ]
+  },
+  {
+   "name": "cancelled single occurrence",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-22",
+   "to": "2026-10-23",
+   "exit": 0,
+   "expect": [
+    "Since 2001|2026-10-22T07:00..2026-10-22T07:05"
+   ]
+  },
+  {
+   "name": "BYSETPOS=-1: the last weekday of the month",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-30",
+   "to": "2026-10-31",
+   "exit": 0,
+   "expect": [
+    "Since 2001|2026-10-30T07:00..2026-10-30T07:05",
+    "Standup|2026-10-30T09:30..2026-10-30T09:45",
+    "Last weekday|2026-10-30T17:00..2026-10-30T17:30"
+   ]
+  },
+  {
+   "name": "wall clock kept after New York leaves summer time",
+   "file": "recur.ics",
+   "tz": "America/New_York",
+   "from": "2026-11-02",
+   "to": "2026-11-03",
+   "exit": 0,
+   "expect": [
+    "Since 2001|2026-11-02T07:00..2026-11-02T07:05",
+    "Standup|2026-11-02T09:30..2026-11-02T09:45"
+   ]
+  },
+  {
+   "name": "event, calendar and refused colours",
+   "file": "colors.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 0,
+   "expect": [
+    "Own colour|2026-10-20T10:00..2026-10-20T11:00|turquoise",
+    "Calendar colour|2026-10-20T12:00..2026-10-20T13:00|#ff2d55",
+    "Bad colour, so the calendar one|2026-10-20T14:00..2026-10-20T15:00|#ff2d55"
+   ]
+  },
+  {
+   "name": "skip-ahead: every third day since 2015, old EXDATEs",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-21",
+   "to": "2026-10-22",
+   "exit": 0,
+   "expect": [
+    "Every third day|2026-10-21T06:00..2026-10-21T06:10",
+    "Fortnightly|2026-10-21T10:00..2026-10-21T10:30"
+   ]
+  },
+  {
+   "name": "skip-ahead: an EXDATE in the window still applies",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-24",
+   "to": "2026-10-25",
+   "exit": 0,
+   "expect": []
+  },
+  {
+   "name": "skip-ahead: interval 2 weeks keeps its week, DTSTART off its BYDAY days",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-27",
+   "to": "2026-10-28",
+   "exit": 0,
+   "expect": [
+    "Every third day|2026-10-27T06:00..2026-10-27T06:10"
+   ]
+  },
+  {
+   "name": "skip-ahead: after New York leaves summer time",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-11-04",
+   "to": "2026-11-05",
+   "exit": 0,
+   "expect": [
+    "Fortnightly|2026-11-04T10:00..2026-11-04T10:30"
+   ]
+  },
+  {
+   "name": "UNTIL exactly at the last occurrence (UTC)",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-19",
+   "to": "2026-10-20",
+   "exit": 0,
+   "expect": [
+    "Weekly until|2026-10-19T20:00..2026-10-19T21:00"
+   ]
+  },
+  {
+   "name": "UNTIL passed",
+   "file": "skip.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-26",
+   "to": "2026-10-27",
+   "exit": 0,
+   "expect": []
+  },
+  {
+   "name": "not a calendar",
+   "file": "broken.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 2,
+   "expect": []
+  },
+  {
+   "name": "cut off in the middle",
+   "file": "truncated.ics",
+   "tz": "America/New_York",
+   "from": "2026-10-20",
+   "to": "2026-10-21",
+   "exit": 2,
+   "expect": []
+  }
+ ]
+}

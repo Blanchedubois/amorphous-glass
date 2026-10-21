@@ -1,3 +1,362 @@
+# Calendar: Schedule, today's events from a Google Calendar ICS link (2026-10-20)
+
+**Status: done on the branch (phases 0 to 6), not yet merged or installed.** How to set your link:
+README, "Calendar: Schedule: setting your calendar link". Sheets: `docs/shots/schedule-{light,dark,milky}.png`
+and `schedule-states.png` (made-up events only). Tests, all passing:
+
+```bash
+gjs -m tools/widgets-stress/ics-test.js                    # ICS parsing, 24 hand-checked cases
+gjs -m tools/widgets-stress/schedule-test.js               # what the rows say, 19 checks
+bash tools/widgets-stress/ics-feed-test.sh /tmp/ics-feed   # link, fetch, cache, keyring, 32 checks
+DRIVER=widget-sched@local bash tools/widgets-stress/run.sh /tmp/sched tools/widgets-stress/layout-schedule.json
+STRESS_ONLY=schedule DRIVER=widget-stress@local bash tools/widgets-stress/run.sh /tmp/stress tools/widgets-stress/layout-schedule-stress.json
+```
+
+Your picks at Phase 0: small layout A,
+Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
+week strip. Two new widgets, "Calendar:
+Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
+way, which fits most of the iOS Calendars widget). Both show what is left of today from your Google Calendar's
+private ICS address. The existing Calendar widgets (Evolution Data Server) stay as they are.
+It is desktop only: it is not in `tools/lockscreen/shared.list`, so the lock screen never shows it.
+
+## The link is a password
+
+Google's "Secret address in iCal format" lets anyone who has it read the whole calendar. So:
+- It lives only in the GNOME keyring (libsecret, schema `org.cachyos.tahoe.Calendar`, attribute
+  `feed=default`), or, if there is no keyring, in `~/.config/tahoe-glass/calendar-url` (0600). Never
+  in the repo, in `widgets.json`, in logs, in screenshots or in docs.
+- You set it yourself: `scripts/tahoe-widgets.sh calendar-url` asks for it with hidden input (or
+  reads it from a pipe), checks it looks like an `https://` ICS address, stores it and tells the
+  widget to reload. `calendar-url --clear` removes it. Nothing is ever pasted into a chat.
+- Logs and the widget's error line say only "calendar.google.com", the HTTP status or the
+  GLib error code, never the address.
+- The last good copy of the feed is kept in `~/.cache/tahoe-glass/calendar.ics` (0600, it holds
+  your events), with its ETag and Last-Modified next to it.
+- The keyring is read once at start and when the script says the link changed. If the keyring is
+  still locked, the widget does not ask to unlock it; it shows "Calendar locked" and tries again
+  at the next refresh.
+
+## Small layout (170 x 170, 16 px top and bottom, 18 px sides, radius 24)
+
+Mockups (shown in the session; ASCII here):
+
+```
+A: list (recommended)   B: up next             C: big day
++------------------+    +------------------+   +------------------+
+| TUESDAY 20       |    | TUE 20 OCT       |   | 20  October      |
+| | 10:30 · in 8 m |    | | 10:30 · in 8 m |   |     Tuesday      |
+| | Gym            |    | | Gym with the   |   | | 10:30 · in 8 m |
+| | 1:15 PM        |    | | running club   |   | | Gym            |
+| | Lunch with Sam |    |                  |   | | 1:15 PM        |
+| | 2:30 PM        |    | • 1:15 PM Lunch  |   | | Lunch with Sam |
+| | Design review  |    | • 2:30 PM Review |   |                  |
++------------------+    +------------------+   +------------------+
+ 3 events               1 big + 2 short         2 events
+```
+
+Layout A in detail (138 px of height inside the padding):
+- Header, 16 px: the weekday in the widgets' red accent (`.tahoe-widget-accent`, 13 px bold), the
+  day number after it in the text colour, as the Calendar: Today widget's accent line.
+- Up to 3 events, 30 px each, 8 px apart: a 3 px bar in the event's colour (radius 2, as
+  `.tahoe-cal-event-bar`), then two lines: the start time, 11 px secondary (`10:30 AM`, or `10:30`
+  in 24 h), and the title, 13 px semibold, one line, ellipsized. SF Pro Text (all under 20 px).
+- The next event's time line adds the relative time, in italics: `· in 8 min` under an hour,
+  `· in 2 h` up to 6 h, nothing later. Start times only: a range and a relative time do not fit
+  in 134 px at 11 px.
+- An event in progress: its time line reads `Now · until 11:45` in its bar colour, semibold.
+- All-day events come first as one line `All day · Holiday` (bar included), and count as one of
+  the 3 rows; several all-day events give `All day · Holiday +1`.
+- More events than fit: the last row becomes `+2 more`, 11 px secondary.
+- Past events leave the list at their end time.
+
+States:
+- **Empty**: `No more events today`, 13 px semibold, at the bottom; optional second line
+  `Tomorrow 9:30 AM` (question 3).
+- **Offline with a cache**: the cached events as usual and a footer `Can't reach calendar · 9:41`
+  (the time of the last good copy) in place of the third event. After 24 h without a good copy the
+  footer reads `Last updated Mon 9:41`.
+- **Offline, no cache**: `Can't reach calendar` with `Will retry` under it.
+- **No link set**: `No calendar link` with `tahoe-widgets.sh calendar-url` under it.
+- **Keyring locked**: `Calendar locked` with `Unlock to show events`.
+
+## Large layout (356 x 356, same padding and radius)
+
+320 x 324 px inside the padding; the same row style as the small one, bigger:
+
+```
++--------------------------------------+
+| 20  October                          |
+|     Today, Tuesday                   |
+|                                      |
+| MON TUE WED THU FRI SAT SUN          |
+|  19 (20) 21  22  23  24  25          |
+|  .       .       .       .           |
+|--------------------------------------|
+| | 10:30 AM - 11:45 AM   in 8 min     |
+| | Gym                                |
+| | 1:15 - 2:15 PM                     |
+| | Lunch with Sam                     |
+| | 2:30 - 2:45 PM                     |
+| | Design review                      |
+| | 4:00 - 5:00 PM                     |
+| | Dentist                            |
+| +1 more                              |
++--------------------------------------+
+```
+
+- Header, 48 px: the day number, SF Pro Display 46 px semibold; beside it the month (15 px
+  semibold) over `Today, Tuesday` (15 px secondary).
+- Week strip, about 50 px: this week from GNOME's first weekday (as `calendar.js` `weekStart()`),
+  weekday labels 11 px bold, numbers 15 px; today in the widgets' red circle (28 px, as the
+  month widget's today), weekend days dimmer. A small dot under a day that has events, from the
+  helper's 7-day list (days before today in this week: question 5).
+- A separator (the mode's separator colour), then up to 4 events, 38 px each, 10 px apart: a
+  4 px bar, the time range 12 px secondary with the relative time after it in italics, and the
+  title 15 px semibold. A range fits here: `10:30 AM - 11:45 AM   in 8 min` is about 200 px.
+- All-day, in progress, `+N more`, past events and every state: as the small one; the footer
+  (`Can't reach calendar · updated 9:41`, `+1 more`) sits on the bottom line.
+- Empty: `No more events today` (15 px semibold) centred in the event area, with tomorrow's first
+  event under it if question 3 says so. The header and week strip stay.
+
+Both sizes share one feed client, one helper run and one event list; only the rows differ
+(`ScheduleSmall` and `ScheduleLarge` in `schedule.js`).
+
+Colours (both sizes), in order: the event's own `COLOR` (RFC 7986), the calendar's `COLOR`,
+`X-APPLE-CALENDAR-COLOR` or `X-OUTLOOK-COLOR`, then a stable palette of Apple's system colours
+(orange, green, blue, purple, pink, teal, yellow, indigo) picked by a hash of the event's UID, so a
+recurring event always has the same colour. Google's feeds carry no colour, so in practice it is
+the palette (question 2). Colours are the same in light, dark and milky; the text follows the
+mode as on every widget.
+
+## How it is built
+
+New files only: `schedule.js` (the widget), `icsfeed.js` (link, fetch, cache, refresh),
+`ics-expand.js` (a small helper program, below) and `vendor/ical.js`. One rule block is added to
+`stylesheet.css`; it is a shared file, so `tools/lockscreen/sync-shared.sh` runs after it (the
+rules do nothing on the lock screen). `calendar.js`, `clocks.js` and the other shared files are
+not changed.
+
+**Parser: ical.js 2.2.1** (Mozilla/Thunderbird's, MPL-2.0, 268 KB unminified, no dependencies).
+Checked in GJS 1.90 in Phase 0: it loads as an ES module unmodified, and on a fixture it got
+TZID with a VTIMEZONE, a weekly RRULE, EXDATE, a moved RECURRENCE-ID, a folded line and the
+25 October DST change right. MPL-2.0 is file-level and allows a GPL-3.0 larger work (MPL 2.0
+section 3.3), so the file is vendored unmodified with its licence header and credited in the
+README. Writing our own parser for RRULE (BYDAY, BYSETPOS, UNTIL in UTC vs local, COUNT with
+exceptions) would be more code and more risk.
+
+**Parsing happens in a helper process, not in the shell.** A real Google feed holds every event
+since the calendar began, often 1 to 5 MB; ical.js needs hundreds of milliseconds for that, which
+would freeze the shell. So the shell fetches and saves the file, then runs
+`gjs -m ics-expand.js <cache file>` with `Gio.Subprocess` (async, 10 s limit, killed on disable).
+The helper expands every event into its occurrences from yesterday to 7 days ahead in the local
+time zone and prints a small JSON list (start, end, all-day, title, colour, uid). The shell
+keeps that list in memory and in `~/.cache/tahoe-glass/calendar.json` (0600). The helper runs only
+when the feed changed, the day changed past the 7-day window, or the time zone changed. The link
+is never passed to the helper.
+
+Event rules in the helper:
+- Times: TZID from the feed's VTIMEZONE; a TZID with no VTIMEZONE (some feeds) falls back to the
+  system's tz database by name; UTC and floating times as RFC 5545 says.
+- All-day: DTSTART as a DATE; DTEND exclusive (a one-day event on the 20th ends on the 21st).
+- Multi-day: an event that started before today and ends later shows today, `All day` if it
+  covers the whole day, else its time with `until 3 PM` or `from 9 PM`.
+- RRULE with EXDATE, RDATE and RECURRENCE-ID overrides (moved and cancelled single occurrences),
+  `STATUS:CANCELLED` dropped, `TRANSP` ignored. Long-running recurrences are iterated from
+  their start, capped at 20 000 steps a series.
+- Titles: the SUMMARY only, no description, location or attendees.
+
+**Fetching (`icsfeed.js`, one client for all Schedule widgets, made once per shell session like
+the weather client, timers stopped when the last widget goes):**
+- Soup 3 `send_and_read_async` on its own `Soup.Session` (timeout 20 s, a user agent, at most
+  16 MB), with `If-None-Match` and `If-Modified-Since`; 304 keeps the cache. `webcal://` becomes
+  `https://`; plain `http://` is allowed for localhost only (the tests).
+- Every 15 min (with up to 60 s jitter), at start, on resume from suspend (logind
+  `PrepareForSleep`, through the shell's `LoginManager`) and when the network comes back
+  (`Gio.NetworkMonitor`), at most once a minute.
+- On errors: retry after 1, 2, 4, 8 and 15 min, then every 15 min; a 401, 403 or 404 means the
+  link is wrong or was reset, so the widget says `Calendar link not valid` and stops retrying
+  until the link changes.
+- No fetch while the screen is locked (the desktop widgets are off then anyway).
+
+**The minute tick stays cheap:** `tick(now)` runs on the extension's minute tick (the widget wants
+no seconds). It filters the in-memory list for today, picks up to 3 rows and builds a short key
+from them; the labels change only when the key changes. No file reads, no network, no parsing on
+the tick. Under a fullscreen window the extension does not tick at all, as for the other widgets.
+Midnight is a key change (new day), so the list rolls over on the first tick after 00:00.
+
+## Phase 1: what was built (2026-10-20)
+
+- `scripts/tahoe-widgets.sh calendar-url`: hidden prompt (or a pipe), checks for an `https://` or
+  `webcal://` address, stores it with `secret-tool` through stdin (never an argument), else in
+  `calendar-url` (0600), clears the other store and the old calendar's cache, and writes
+  `calendar-source` (`store=keyring|file|none`, 0600), which the widgets watch. `--file` forces the
+  file, `--clear` forgets the link and the cache; `status` says where the link is.
+- `icsfeed.js`: one feed per shell session (`acquireFeed()`, `release()`); signals
+  `status-changed` and `data-changed`; `status` (none, locked, loading, ok, offline, invalid),
+  `updated` (last good answer), `hasCopy`, `cacheFile`. The keyring is searched with
+  `LOAD_SECRETS` and without `UNLOCK`, so a locked keyring gives `locked`, never a prompt; the
+  libsecret proxy is dropped after each lookup. A whole request has a 20 s deadline of its own
+  (Soup's timeout is per read). `message.status_code`, not `get_status()`, which throws on codes
+  Soup has no name for (429). Cache writes are `GLib.Bytes` through `write_bytes_async` (a plain
+  array given to `write_all_async` is not kept alive by GJS).
+- Test: `bash tools/widgets-stress/ics-feed-test.sh OUT` (headless shell, `widget-ics@local`,
+  `ics-server.py` on 127.0.0.1, a throwaway keyring with `TEST_KEYRING=1` in `run.sh`). 25 checks:
+  no link, file link, private cache (0600 files, 0700 folder), validators sent and 304, 500 with
+  backoff, recovery on network change, resume from suspend, at most one try a minute, 429 with
+  Retry-After, a dropped connection, a sign-in page with 200, 404, over 16 MB, a server that never
+  answers (gives up at 20 s), a new link drops the old validators, release and re-acquire,
+  keyring link, locked keyring with no prompt. It fails if the link's test marker shows in a log.
+
+## Phase 2: what was built (2026-10-20)
+
+- `vendor/ical.js`: ical.js 2.2.1 unmodified, with its MPL-2.0 licence and source (`vendor/README.md`).
+- `ics-expand.js FILE --from D --to D`: run by the feed with `Gio.Subprocess` (`TZ` set to the
+  shell's zone, 30 s limit, stopped with the feed); prints the occurrences overlapping the local
+  days [from, to) as JSON. The feed asks for today - 7 to today + 9 (any week holding today, and
+  tomorrow), runs it after each new copy, and again only when today's needs (today - 6 to today + 8)
+  leave that window or the zone changes; the answer is kept in `calendar.events.json` (0600), so
+  a new shell shows events at once. A feed the helper can't read sets `invalid` and keeps nothing.
+- Rules: lines unfolded as bytes (a fold may split a UTF-8 character); TZID through the feed's
+  VTIMEZONE, else the tz database by name, floating times local; DTEND exclusive, all-day without
+  DTEND one day, zero-length events kept; overrides (RECURRENCE-ID) shown on their own, moved,
+  retitled or cancelled, and the occurrence they replace skipped (also when moved in from outside
+  the window, or with no series in the feed); STATUS:CANCELLED dropped; colours: the event's
+  `COLOR`, else the calendar's (`COLOR`, `X-APPLE-CALENDAR-COLOR`, `X-OUTLOOK-COLOR`), hex or a CSS
+  name only.
+- **Speed.** A made-up 5 MB feed (`tools/widgets-stress/ics-bigfeed.py`: 12 290 events since 2012,
+  1 072 series) first took 18.5 s. Two causes: `new ICAL.Event(component)` looks through every
+  VEVENT of the calendar for overrides (quadratic; fixed by passing `{exceptions: []}`, as the
+  helper handles overrides itself), and long series walked from 2012. Simple series (DAILY, or
+  WEEKLY by weekday, no COUNT) now start a whole number of periods before the window, in wall-clock
+  time. **0.62 s** now (161 MB peak, in the helper only), with exactly the same 4 560 occurrences as
+  the full walk. The shell never parses.
+- Tests: `gjs -m tools/widgets-stress/ics-test.js`, 24 cases over 9 fixtures in
+  `tools/widgets-stress/ics/` (made-up events only), expected results worked out by hand in
+  `ics/expected.json`: Berlin and New York summer time ends (25 Oct and 1 Nov 2026), the same feed
+  seen from Berlin and Tokyo, a TZID with no VTIMEZONE, quoted TZID, floating and UTC, all-day and
+  multi-day, overnight, EXDATE, moved and cancelled overrides, an orphan override, RDATE, BYDAY=3TU,
+  BYSETPOS=-1, COUNT, UNTIL in UTC on the boundary, yearly, a series since 2001, the skip-ahead (interval 3
+  days since 2015 with old EXDATEs, every other week from a start day off its BYDAY days), colours,
+  and two broken files. A deliberately wrong skip-ahead fails 3 cases. `ics-feed-test.sh` now has
+  32 checks, the reader's among them (window, re-runs, private cache, a new shell, an unreadable feed).
+
+## Phase 3: what was built (2026-10-20)
+
+- `schedule.js`: `ScheduleSmall` (`schedule-small`, "Calendar: Schedule") and `ScheduleLarge`
+  (`schedule-large`, "Calendar: Schedule Large") in Add Widget. Both sit on the same `GlassCard` as
+  every other widget, so the glass is the same (Blur My Shell blur and tint, rim light, edge shadow,
+  drop shadow, the 1 px edge, radius 24); the mockups above were flat HTML and showed only the edge.
+  Checked: each corner at 4x beside Calendar: Today and Weather: Week, in light and dark.
+- All-day events are one row like the others ("All day" over the title, `+1` for more), not the
+  one-line form planned. The week strip starts on GNOME's first weekday; today is the red circle,
+  the other days with events get a dot.
+- The minute tick: `schedule(events, now)` (pure) picks the rows; the header is rebuilt once a day
+  or when the events change, the rows only when a row's text changes.
+- Screenshots (made-up calendar served from 127.0.0.1, placed around the current time):
+  `docs/shots/schedule-{light,dark,milky}.png`, beside Calendar: Today, the digital clock and
+  Weather: Week. `SHOT_ICS=1` in `widget-shot@local` (with `SHOT_ICS_EVENTS=now|none|nolink` for
+  other states) and `tools/widgets-stress/layout-schedule.json`.
+- `stylesheet.css` gained the `tahoe-sched-*` rules; `tools/lockscreen/sync-shared.sh` copied them
+  to the lock screen's `widgets.css` (they do nothing there; the lock screen has no Schedule widget).
+
+## Phase 4: what was built (2026-10-20)
+
+- `schedule-model.js` (GLib only) says what the rows show; `schedule.js` only draws it.
+  - Rows: one for all-day events (with `+N`), timed events covering the whole day included (a
+    trip), then what has not ended, by start. An event leaves at its end; a zero-length one at its
+    time. Midnight: the header and rows roll over on the first tick after 00:00, multi-day events
+    becoming all-day rows on their middle days.
+  - The next event not yet started gets `in N min` under an hour, then `in N h` (rounded), none
+    from 6 h. Events going on: `Now · until 11:45 AM`, or `until Fri` when they end on a later day
+    than tomorrow; their time line is semibold in the event's colour on dark and milky glass, in the
+    full text colour on light glass (a darker orange was still hard to read on a bright wallpaper),
+    the bar keeping the colour. Large: ranges (`10:30 – 11:45 AM`, `10:30 AM – 12:45 PM`),
+    `From 11:00 PM` for one running past midnight; small: start times.
+  - Footers: offline with a copy `Can't reach calendar` with `updated 8:09 PM` (or `Mon 8:09 PM`
+    from another day; two lines on the small card, one on the Large), `Calendar locked`,
+    `Calendar link not valid`; with nothing left today they go under `No more events today`.
+    Without a copy: `Can't reach calendar / Will retry`, `Calendar locked / Unlock to show events`,
+    `Loading calendar…`; no link: `No calendar link / tahoe-widgets.sh calendar-url`.
+- The widgets refresh on the minute tick and on the feed's signals, reading the time then (after
+  a suspend the next tick can be up to a minute late, as for the clocks). A removed link no longer
+  re-reads the old copy still on disk (found by the test below).
+- Tests: `gjs -m tools/widgets-stress/schedule-test.js` (17 checks, worked out by hand, one made-up
+  Tuesday in New York: before, at and after starts and ends, rounding, multi-day, midnight,
+  24-hour clock, colours, the week dots). `DRIVER=widget-sched@local bash tools/widgets-stress/run.sh
+  OUT tools/widgets-stress/layout-schedule.json` (add `SCHED_SHOTS=1` for screenshots): the real
+  widgets with a fake clock (`setClockForTests`) over a made-up calendar dated today from
+  127.0.0.1, 14 checks: the rows at 09:21:30, 09:30, 09:45, 16:00, 23:59:59 to 00:00:30, overflow,
+  offline, locked, link removed, and an idle tick (100 ticks in one minute rebuild nothing; about
+  47 µs a tick; 12:00 to 12:01 rebuilds nothing, 12:50 to 12:51 once, for "in N min").
+- Sheet: `docs/shots/schedule-states.png` (next event, going on, offline, nothing left, no link;
+  dark and light; Calendar: Today beside them for comparison).
+
+## Phase 5: stress and performance (2026-10-20)
+
+`STRESS_ONLY=schedule DRIVER=widget-stress@local bash tools/widgets-stress/run.sh OUT
+tools/widgets-stress/layout-schedule-stress.json`: six Schedule widgets (3 small, 3 Large), a
+digital clock and Calendar: Today, one 5 MB made-up feed (`ics-bigfeed.py`, 5 046 occurrences in
+the 16-day window: far busier than a real calendar) from 127.0.0.1, the main loop watched by a
+1 ms timeout (the longest gap between its runs is the longest stall).
+
+| Check | Found first | Now |
+|---|---|---|
+| One feed for six widgets | 1 request, 1 reader run | same |
+| Longest main-loop gap, at rest (the headless shell's own) | 21 to 30 ms | same |
+| Longest gap while the 5 MB feed is fetched, saved and read | 24.5 ms: the six widgets rebuilt in one main-loop pass when the events came (GLib runs every ready idle source of one priority in the same pass) | **12.6 ms**: one shared idle source, one widget per pass; the 5 MB body kept as the `GLib.Bytes` chunks it came in, never copied in JS |
+| Idle minute tick, per widget | 285 µs: every event filtered and every row of the day formatted | **65 µs**: the day's events and the week's dots worked out once for all widgets (`feed.memo`), only the rows that can show formatted |
+| The shell's own work on the reader's answer | | `JSON.parse` of 547 KB: 0.8 ms |
+| Idle 65 s | | 1 tick (the minute) |
+| Under a fullscreen window | | 0 ticks |
+| 6 lock cycles, each while a new copy is being read, then 6 disable/enable cycles | | timers 2 and 2 (the clock tick, the feed's refresh), D-Bus subscriptions 0 and 0, match rules 86 and 86, actors 3 234 and 3 230, no reader process left running, events kept |
+
+The reader (`ics-expand.js`) parses outside the shell, so the shell never does: 0.6 s for this
+feed in its own process. What is left in the gaps above is building the rows' actors (about
+3.5 ms per widget, only when the words change) and painting them.
+
+Rerun after the changes, all passing: `ics-test.js` (24), `schedule-test.js` (19), `ics-feed-test.sh`
+(32), `widget-sched@local` (14), and the full widget stress (`layout-all.json`) with the same
+counts as before this work (timers 3, 2, 2, 2, 2; D-Bus subscriptions 1; match rules 89 to 87;
+the logged errors are the date menu's DBusProxy ones listed below, none from the Schedule files).
+
+## Phases (one commit each, on this branch)
+
+0. **Plan and mockups** (this). Your picks, then on.
+1. **Link and fetch.** `calendar-url` in `scripts/tahoe-widgets.sh` (keyring through `secret-tool`,
+   else the 0600 file); `icsfeed.js` with lookup, fetch, ETag and Last-Modified, 0600 cache, refresh,
+   backoff, resume and network triggers. Tested in the headless shell against a local fixture
+   server (`tools/widgets-stress/ics-server.py`, 127.0.0.1 only) that can answer 200, 304, 404,
+   slow and dropped; the test shell has its own D-Bus session, so it never sees the real keyring.
+2. **Parsing.** `vendor/ical.js`, `ics-expand.js`, and fixtures written for this repo with made-up
+   events only, in `tools/widgets-stress/ics/`: folded lines, VTIMEZONE and DST, a TZID without
+   VTIMEZONE, all-day and multi-day, weekly, monthly BYDAY and BYSETPOS, COUNT and UNTIL, EXDATE,
+   moved and cancelled overrides, `STATUS:CANCELLED`, a 5 MB generated feed for timing, a broken
+   file. `tools/widgets-stress/ics-test.js` runs the helper with a fixed "today" and time zone
+   (`TZ=` and a `--today` flag) and compares with expected JSON.
+3. **The widgets, small and Large**, light, dark and milky, in the headless shell with fixture data.
+4. **Live behaviour:** next event and relative time, now and past, midnight rollover, all-day and
+   overflow, empty, offline-with-cache, offline, no link, locked keyring and invalid link states.
+   The harness can set the clock (`STRESS_NOW=`) for the rollover check.
+5. **Performance and stress:** `STRESS_ONLY=schedule` in `tools/widgets-stress`: ticks per minute,
+   timers and subscriptions before and after lock and disable cycles, no shell stall over 5 ms
+   while a 5 MB feed is parsed, a slow and a dropped server, many Schedule widgets sharing one
+   client.
+6. **Docs and screenshots** with fixture data only (`docs/shots/schedule-{light,dark}.png`), the
+   README widget table, ical.js credit, and how to set your link. Then I ask you before merging into
+   main, installing (`tahoe-widgets.sh on`) or logging out.
+
+## Questions at Phase 0 (answered: see the picks at the top)
+
+1. Small layout A, B or C? And the Large one as mocked up, or changes?
+2. Bar colours: one colour per event by its UID (as in the mockup), or one colour for the whole
+   calendar (your Google calendar's colour, which the feed does not include, set by hand)?
+3. Empty state: also show tomorrow's first event (`Tomorrow 9:30 AM`), or only "No more events today"?
+4. One calendar link, or several (work and personal) merged in one list? One is planned; several
+   is small extra work in Phase 1.
+5. Large week strip: dots on days that have events (past days of this week too, which needs the
+   helper to keep the whole week), or no dots?
+
 # App button and Extra Large music widgets (2026-10-20)
 
 **Status: done.** Your picks: the app button on the Music widgets only; Extra Large Wide with the
