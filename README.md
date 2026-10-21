@@ -1,5 +1,14 @@
 # Liquid Glass
 
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)" srcset="docs/showcase/media/title-still-light.webp">
+    <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
+    <source media="(prefers-color-scheme: light)" srcset="docs/showcase/media/title-light.webp">
+    <img src="docs/showcase/media/title-dark.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words, refracting and melting the letters, and settles over the word glass">
+  </picture>
+</p>
+
 **macOS Tahoe's Liquid Glass, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
 dock, every menu, quick settings, the calendar, GTK apps, desktop widgets and the lock screen, with
 macOS-style motion: popups grow out of the icon you clicked as a circle of glass.
@@ -296,7 +305,8 @@ Liquid Glass stands on other people's work. Thank you.
 - [MacTahoe GTK theme, icon theme and wallpapers](https://github.com/vinceliuice/MacTahoe-gtk-theme) by vinceliuice: the GTK and shell base, the cursors and the wallpapers.
 - [GNOME-macOS-Tahoe](https://github.com/kayozxo/GNOME-macOS-Tahoe) by kayozxo: the Open Bar preset the bar starts from.
 - Tahoe-Material icons from this project's parent, [cachyos-tahoe-theme](https://github.com/Blanchedubois/cachyos-tahoe-theme).
-- [Space Grotesk](https://github.com/floriankarsten/space-grotesk) by Florian Karsten (OFL): the lock screen clock.
+- [Space Grotesk](https://github.com/floriankarsten/space-grotesk) by Florian Karsten (OFL): the lock screen clock and the title.
+- Fold, the GNOME 51 wallpaper, by the GNOME Design Team (CC BY-SA 3.0): the background of the title animation.
 - SF Pro and SF Symbols by Apple: used only from your own download, never shipped.
 
 **Libraries and services**
@@ -323,9 +333,11 @@ Liquid Glass stands on other people's work. Thank you.
 | `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
 | `tokens/`, `docs/STANDARD.md` | The glass standard: radius, gap, tint and edge per surface |
 | `docs/` | Plans, measurements and workshop notes for every part |
+| `docs/showcase/title/` | The title animation: a WebGL page with the desktop's glass shader and springs, and its renderer |
 | `tools/` | Headless test shells, stress tests, the repair's drift tests, the showcase shoot |
 
 ## Licence
 
 GPL-3.0, as Blur My Shell and cachyos-tahoe-theme. Glyphs, fonts and brand marks keep their upstream
-licences. macOS, Liquid Glass and SF Pro are Apple's; this project is not affiliated with Apple.
+licences. The title animation's images and videos (`docs/showcase/media/title-*`) show the Fold
+wallpaper and are shared under CC BY-SA 3.0. macOS, Liquid Glass and SF Pro are Apple's; this project is not affiliated with Apple.
