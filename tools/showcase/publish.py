@@ -34,6 +34,12 @@ STILLS = {
     'lock-screen': ('lock-screen', None),
     'lock-menu': ('lock-menu', (1560, 0, 1000, 760)),
     'sign-in-typing': ('sign-in-typing', (780, 160, 1000, 1280)),
+    # the login screen, from the test VM (tools/vm): a throwaway account, nothing to redact
+    'login-screen': ('login-screen', None),
+    'login-prompt': ('login-prompt', (780, 120, 1000, 1080)),
+    'switch-user': ('switch-user', None),
+    'lock-switch-button': ('lock-switch-button', (1700, 700, 860, 740)),
+    'fresh-install': ('fresh-install', None),
 }
 
 # name: (source clip, crop or None, start s, length s, width px, fps)
