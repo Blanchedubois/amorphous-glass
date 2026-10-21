@@ -186,23 +186,24 @@ class IcsFeed extends EventEmitter {
 
     // called on the widgets' minute tick (cheap): the events follow the day and the time zone
     ensureWindow(now) {
-        if (!this.hasCopy || !this._cancellable)
+        // no link: nothing to show, even if an old copy is still on disk
+        if (!this.hasCopy || !this._cancellable || this._status === Status.NONE)
             return;
         const day = n => now.add_days(n).format('%Y-%m-%d');
         const w = this._window;
         if (w && w.tz === localZoneId() && w.changed === this._meta.changed &&
             w.from <= day(-NEED_BEFORE) && w.to >= day(NEED_AFTER))
             return;
-        this._expand();
+        this._expand(now);
     }
 
     // ics-expand.js over the cached copy, in its own process
-    async _expand() {
+    async _expand(now) {
+        this._askedNow = now;
         if (this._helper) {
             this._expandAgain = true;
             return;
         }
-        const now = GLib.DateTime.new_now_local();
         const from = now.add_days(-WINDOW_BEFORE).format('%Y-%m-%d');
         const to = now.add_days(WINDOW_AFTER).format('%Y-%m-%d');
         const tz = localZoneId();
@@ -250,7 +251,7 @@ class IcsFeed extends EventEmitter {
         }
         if (this._expandAgain) {
             this._expandAgain = false;
-            this.ensureWindow(GLib.DateTime.new_now_local());
+            this.ensureWindow(this._askedNow);
         }
     }
 
