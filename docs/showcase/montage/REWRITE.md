@@ -117,6 +117,25 @@ brightness jumps (into the overview, into the lock screen, out of a dark app win
   and picture. Still blurred: the password field, other apps' notifications and windows, the home
   path, the user's real name. redact.py, then scan.py on every clip.
 
+### Phase 3 status (2026-10-21): ready to run
+
+- `tools/showcase/montage_shoot.py OUTDIR`: the screenplay as 13 clips (home, widget drag, quick
+  settings, Files dragged as a window, its window menu, overview search, music, calendar, volume,
+  desktop menu, app grid and folder, Settings dragged as a window, home again), every pointer move,
+  drag and click logged with its time (montage.jsonl). It sets up and puts back: the widget layout
+  (copied aside, restored, the widgets reloaded), the playing player (paused, resumed),
+  `tools/showcase/fakeplayer.py` (placeholder lyrics, an abstract cover), Files' and Settings'
+  window state, an empty workspace, the showcase driver (installed and enabled only for the shoot).
+  `--dry-run` changes nothing. About three minutes; nobody touches the mouse.
+- `tools/showcase/lock-video.sh OUTDIR`: the lock screen at 60 fps from a throwaway headless shell
+  (tools/lockscreen/run.sh with `TAHOE_TEST_PIPEWIRE=1`: a private PipeWire and WirePlumber with no
+  device monitors; GNOME's own screencast; the system-bus filter, so no real GDM or PAM: faillock
+  stayed clean). Tested: Super+L, the glass clock, the widgets, Now Playing with the abstract cover
+  over the colour swirl, the prompt with the name and picture. GNOME blanks the screen for a few
+  seconds after Super+L; the edit starts the shot at the wake mark.
+- Placeholder lyrics: the widget showcase's text word for word (`tools/showcase/fake-track/`),
+  offered to that session to share.
+
 ## Phase 4: the edit
 
 The cut list as edit.json v2 (in and out points from the logged clicks); a contact sheet and a
