@@ -1,96 +1,94 @@
 {
-  "about": "The montage (REWRITE.md): the faster reshoot of 2026-10-21 (montage_shoot.py at tempo 0.7, the user's Spotify playing m.A.A.d city), through the locked camera at 1.6x; cursor paths from the shoot's log (pointer.py). Each shot is cut a beat before its action and ends on its payoff; hard cuts (user: 'sharper cuts and motion'), a short dissolve only into and out of the lock screen. Flow: widget, wallpaper menu, quick settings, two windows dragged around a window menu, the overview (search, apps), the top bar and the dock, the song, the lock screen with the same song.",
+  "about": "The montage, round 3 (user, 2026-10-21: faster and choppier, the OS's own animations, the lock screen full screen with music and a demo sign-in, a slower menu slide, a seamless loop). Sources: the reshoot at tempo 0.5 (menu-slide retaken slower), redacted; the lock screen recorded in a throwaway shell (tools/showcase/lock-video.sh). Desktop shots through the locked 1.6x camera; the lock, sign-in and closing home shots full screen, so the closing frame is the title's first and the loop has no seam.",
   "zoom": 1.6,
   "shots": [
     {
       "name": "home",
       "clip": "home.mp4",
       "in": 0.2,
-      "len": 0.6
+      "len": 0.5
     },
     {
       "name": "D widget-drag",
       "clip": "widget-drag.mp4",
-      "in": 1.2,
-      "len": 2.9
-    },
-    {
-      "name": "M desktop-menu",
-      "clip": "desktop-menu.mp4",
-      "in": 0.95,
-      "len": 2.2
+      "in": 0.85,
+      "len": 1.6
     },
     {
       "name": "P quick-settings",
       "clip": "quick-settings.mp4",
-      "in": 1.0,
-      "len": 3.6
+      "in": 0.8,
+      "len": 2.6
+    },
+    {
+      "name": "P menu-slide",
+      "clip": "menu-slide.mp4",
+      "in": 1.45,
+      "len": 6.75
     },
     {
       "name": "W files-window",
       "clip": "files-window.mp4",
-      "in": 2.75,
-      "len": 4.2
-    },
-    {
-      "name": "M window-menu",
-      "clip": "window-menu.mp4",
-      "in": 0.65,
-      "len": 2.4
+      "in": 2.55,
+      "len": 2.9
     },
     {
       "name": "W settings-window",
       "clip": "settings-window.mp4",
-      "in": 2.65,
-      "len": 4.2
+      "in": 2.55,
+      "len": 2.9
     },
     {
       "name": "O overview-search",
       "clip": "overview-search.mp4",
       "in": 0.2,
-      "len": 3.4
+      "len": 2.8
     },
     {
       "name": "O app-grid",
       "clip": "app-grid.mp4",
-      "in": 1.5,
-      "len": 2.3
-    },
-    {
-      "name": "P calendar",
-      "clip": "calendar.mp4",
-      "in": 1.0,
-      "len": 3.0
-    },
-    {
-      "name": "S volume",
-      "clip": "volume.mp4",
-      "in": 1.1,
-      "len": 1.9
+      "in": 1.55,
+      "len": 1.6
     },
     {
       "name": "D music",
       "clip": "music.mp4",
-      "in": 0.3,
-      "len": 4.2
+      "in": 0.2,
+      "len": 3.6
     },
     {
-      "name": "S lock-screen",
+      "name": "S lock",
       "clip": "lock-screen.mp4",
+      "in": 1.55,
+      "len": 3.0,
+      "zoom": 1.0,
       "cursor": [
         1280,
-        660
-      ],
-      "in": 7.55,
-      "len": 3.2,
-      "dissolve": 8
+        720
+      ]
+    },
+    {
+      "name": "S sign-in",
+      "clip": "lock-screen.mp4",
+      "in": 6.6,
+      "len": 3.3,
+      "zoom": 1.0,
+      "cursor": [
+        1280,
+        720
+      ]
     },
     {
       "name": "home-end",
       "clip": "home-end.mp4",
       "in": 0.2,
-      "len": 0.6,
-      "dissolve": 8
+      "len": 1.0,
+      "zoom": 1.0,
+      "cursor": [
+        1280,
+        720
+      ],
+      "dissolve": 12
     }
   ]
 }
