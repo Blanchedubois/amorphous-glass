@@ -140,10 +140,16 @@ export class GlassCard {
             return;
         const {pipeline, background, managers, rounded} = this._glass;
         this._glass = null;
-        rounded.destroy();
-        managers.forEach(m => m.destroy());
-        pipeline.destroy();
-        background.destroy();
+        // Blur My Shell can already have torn its side down (a mode switch reloads it): a part that is
+        // gone throws "No signal connection", and one throw must not stop the rest, or the widgets'
+        // disable() stops halfway and leaves their actors on screen
+        for (const part of [rounded, ...managers, pipeline, background]) {
+            try {
+                part.destroy();
+            } catch (e) {
+                console.debug(`tahoe-widgets: glass part already gone: ${e.message}`);
+            }
+        }
     }
 
     setMode(mode) {

@@ -407,9 +407,15 @@ export default class TahoeWidgets extends Extension {
         this._menu.destroy();
         this._menu = null;
         this._menuManager = null;
+        // one widget that fails to tear down must not leave the others on screen
         this._entries.forEach(e => {
-            e.widget.destroy();
-            e.card.destroy();
+            for (const part of [e.widget, e.card]) {
+                try {
+                    part.destroy();
+                } catch (err) {
+                    logError(err, 'tahoe-widgets: destroy');
+                }
+            }
         });
         this._entries = null;
         this._lib = null;

@@ -41,7 +41,8 @@ if [[ -f "$BG/MacTahoe-night.jpeg" ]]; then
   gsettings set org.gnome.desktop.screensaver picture-uri "file://$BG/MacTahoe-night.jpeg"
 fi
 # Firefox theme from the same repo, only when Firefox is closed.
-pgrep -x firefox >/dev/null || ( cd "$SRC" && ./tweaks.sh -f >/dev/null 2>&1 ) || true
+# (opt-in: it changes the Firefox profile) TAHOE_FIREFOX=1
+[[ "${TAHOE_FIREFOX:-}" == 1 ]] && { pgrep -x firefox >/dev/null || ( cd "$SRC" && ./tweaks.sh -f >/dev/null 2>&1 ) || true; }
 
 # 2. Extensions from extensions.gnome.org for this shell version.
 say "extensions for GNOME $SHELL_VER"
@@ -82,7 +83,8 @@ gsettings set org.gnome.shell disable-user-extensions false
 gsettings set org.gnome.shell enabled-extensions \
   "['user-theme@gnome-shell-extensions.gcampax.github.com','dash-to-dock@micxgx.gmail.com','blur-my-shell@aunetx','appindicatorsupport@rgcjonas.gmail.com','rounded-window-corners@fxgn','nowplaying@epogonii.github.io','Vitals@CoreCoding.com']"
 gsettings set org.gnome.shell.extensions.user-theme name 'MacTahoe-Dark'
-gsettings set org.gnome.shell favorite-apps \
+# the author's dock apps, only when asked for (TAHOE_FAVORITES=1); everyone else keeps their own
+[[ "${TAHOE_FAVORITES:-}" == 1 ]] && gsettings set org.gnome.shell favorite-apps \
   "['org.gnome.Nautilus.desktop','firefox.desktop','discord.desktop','steam.desktop','com.anthropic.Claude.desktop','spotify.desktop','org.gnome.Console.desktop','org.gnome.Calculator.desktop','org.gnome.TextEditor.desktop','org.gnome.Settings.desktop']"
 
 # 4. Dock: bottom, intellihide, 48 px, themed by the shell theme, glass.
@@ -125,8 +127,13 @@ if [[ -d "$EXT_DIR/blur-my-shell@aunetx/schemas" ]]; then
 fi
 # Icons: the Tahoe-Material theme, SF Symbol watermarks on glass squircles.
 say "icons"
-mkdir -p "$HOME/.local/share/icons"; ln -sfn "$ROOT/icons/Tahoe-Material" "$HOME/.local/share/icons/Tahoe-Material"
-gtk-update-icon-cache -q -t -f "$HOME/.local/share/icons/Tahoe-Material" 2>/dev/null || true
+# the Tahoe-Material icons live in cachyos-tahoe-theme: TAHOE_ICONS is its icons folder (install.sh
+# fetches it); without it the MacTahoe icons stay
+ICONS="${TAHOE_ICONS:-$ROOT/icons}"
+if [[ -f "$ICONS/Tahoe-Material/index.theme" ]]; then
+  mkdir -p "$HOME/.local/share/icons"; ln -sfn "$ICONS/Tahoe-Material" "$HOME/.local/share/icons/Tahoe-Material"
+  gtk-update-icon-cache -q -t -f "$HOME/.local/share/icons/Tahoe-Material" 2>/dev/null || true
+fi
 # Now Playing Card as macOS's Now Playing: an animated icon in the top bar
 # and no track text, a full card with large artwork, progress line and
 # transport only. The look itself is in gnome-shell-overrides.css.
@@ -149,9 +156,13 @@ if [[ -d "$EXT_DIR/Vitals@CoreCoding.com/schemas" ]]; then
 fi
 # Desktop-entry overrides: launchers whose icon name or window class needs fixing (Steam games, HP tools).
 if compgen -G "$ROOT/overrides/*.desktop" >/dev/null; then mkdir -p "$HOME/.local/share/applications"; cp "$ROOT"/overrides/*.desktop "$HOME/.local/share/applications/"; update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true; fi
-gsettings set org.gnome.desktop.interface icon-theme 'Tahoe-Material'
-ln -sfn "$ROOT/icons/Tahoe-Material-KDE" "$HOME/.local/share/icons/Tahoe-Material-KDE"
-kwriteconfig6 --file kdeglobals --group Icons --key Theme Tahoe-Material-KDE
+if [[ -f "$ICONS/Tahoe-Material/index.theme" ]]; then
+  gsettings set org.gnome.desktop.interface icon-theme 'Tahoe-Material'
+  if [[ -d "$ICONS/Tahoe-Material-KDE" ]]; then
+    ln -sfn "$ICONS/Tahoe-Material-KDE" "$HOME/.local/share/icons/Tahoe-Material-KDE"
+    command -v kwriteconfig6 >/dev/null && kwriteconfig6 --file kdeglobals --group Icons --key Theme Tahoe-Material-KDE
+  fi
+fi
 # The shell CSS overrides, rendered with the Liquid Glass tokens into both shell themes
 # (replaces the block, so a rerun picks up new rules).
 bash "$ROOT/scripts/glass-bar.sh" overrides
