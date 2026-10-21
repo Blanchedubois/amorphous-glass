@@ -327,8 +327,8 @@ def _():
     state(repair_skip=None)
 
 
-@scenario('SF Pro missing', 'the fonts folder gone', {'E4': 'action'}, after_ok=False)
-@verify(lambda: (True, 'reported; the font settings are left until it is back'))
+@scenario('SF Pro missing', 'the fonts folder gone', {'E4': 'info'}, after_ok=True)
+@verify(lambda: (True, 'reported, no notification (optional); the font settings are left until it is back'))
 def _():
     os.remove(os.path.join(H, '.local/share/fonts'))
 

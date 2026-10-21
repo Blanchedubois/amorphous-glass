@@ -3074,7 +3074,10 @@
    "check": {
     "type": "symlink",
     "path": "~/.local/share/icons/Tahoe-Material",
-    "target": "~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material",
+    "target": [
+     "~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material",
+     "~/.local/src/cachyos-tahoe-theme/icons/Tahoe-Material"
+    ],
     "need": "index.theme"
    },
    "fix": {
@@ -3087,7 +3090,10 @@
    "check": {
     "type": "symlink",
     "path": "~/.local/share/icons/Tahoe-Material-KDE",
-    "target": "~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material-KDE",
+    "target": [
+     "~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material-KDE",
+     "~/.local/src/cachyos-tahoe-theme/icons/Tahoe-Material-KDE"
+    ],
     "need": "index.theme"
    },
    "fix": {
@@ -3096,26 +3102,18 @@
   },
   {
    "id": "E4",
-   "feature": "SF Pro installed (from your own Apple download)",
+   "feature": "SF Pro installed (optional: your own Apple download, bash scripts/sf-fonts.sh)",
    "check": {
     "type": "font",
     "family": "SF Pro Text"
-   },
-   "fix": {
-    "type": "notify",
-    "text": "SF Pro is missing: download SF-Pro.dmg from developer.apple.com/fonts and run bash {ROOT}/scripts/sf-fonts.sh"
    }
   },
   {
    "id": "E5",
-   "feature": "Space Grotesk installed (lock screen clock)",
+   "feature": "Space Grotesk installed (optional: the lock screen clock)",
    "check": {
     "type": "font",
     "family": "Space Grotesk"
-   },
-   "fix": {
-    "type": "notify",
-    "text": "Space Grotesk is missing: the lock screen clock falls back to a sans face"
    },
    "when": {
     "lockscreen": "on"
