@@ -4,6 +4,6 @@
   "description": "macOS Tahoe style login screen (GDM greeter): Liquid Glass under GNOME's own password field and account rows. Never replaces GDM's authentication. Prototype.",
   "shell-version": ["51"],
   "session-modes": ["gdm"],
-  "url": "https://github.com/Blanchedubois/liquid-glass",
+  "url": "https://github.com/Blanchedubois/amorphous-glass",
   "version": 1
 }
