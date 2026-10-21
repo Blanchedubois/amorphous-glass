@@ -5,6 +5,7 @@
 //   theme=dark|light        the wallpaper and the stand-in plates (default: the viewer's scheme)
 //   plateIn=URL, plateOut=URL   the montage's last frame (the loop starts on it) and first frame
 //                           (it ends on it); default: the stand-in desktop screenshots
+//   follow=DAMPING,STIFFNESS, jelly=DAMPING,STIFFNESS   other springs for the glass (timeline.js)
 //   t=SECONDS               draw one frame and stop
 //   render=1&fps=N&blur=M   render.py: draw every frame and POST it to /frame/<n>, then /done;
 //                           each frame adds up M moments across half the frame's time (a 180
@@ -14,6 +15,11 @@ import { SEQ, timeline } from './timeline.js';
 
 const Q = new URLSearchParams(location.search);
 const THEME = Q.get('theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+const spring = key => {
+    const [damping, stiffness] = (Q.get(key) ?? '').split(',').map(Number);
+    return stiffness > 0 ? { damping, stiffness } : undefined;
+};
+const SPRINGS = { follow: spring('follow'), jelly: spring('jelly') };
 const W = 1920;
 const H = 1080;
 
@@ -142,7 +148,7 @@ function bind(prog, name, unit, t) {
 
 /// draws the moment `t`, into the canvas or (`gain` < 1) added into the accumulation texture
 function drawMoment(t, gain) {
-    const s = timeline(t, CAP);
+    const s = timeline(t, CAP, SPRINGS);
     gl.viewport(0, 0, W, H);
 
     gl.disable(gl.BLEND);

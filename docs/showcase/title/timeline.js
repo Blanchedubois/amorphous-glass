@@ -49,9 +49,9 @@ const span = ([a, b], t) => clamp01((t - a) / (b - a));
 /// one glide of the glass from `from` to `to` (px), `t` seconds after it sets off: the guide
 /// travels an ease in-out path in `dur` seconds; returns the glass's x, its velocity and its
 /// stretch (positive: longer along the motion, negative: squashed)
-export function glide(t, from, to, dur) {
-    const x = new Spring(from, FOLLOW);
-    const d = new Spring(0, JELLY);
+export function glide(t, from, to, dur, { follow = FOLLOW, jelly = JELLY } = {}) {
+    const x = new Spring(from, follow);
+    const d = new Spring(0, jelly);
     let vPrev = 0;
     for (let k = 0; k * DT < t; k++) {
         x.retarget(from + (to - from) * easeInOut(clamp01((k * DT) / dur)), 1000);
@@ -68,8 +68,9 @@ export function glide(t, from, to, dur) {
     return { x: x.value, v: x.velocity, stretch: Math.max(-0.3, Math.min(0.55, d.value)) };
 }
 
-/// the state of frame `t`. `cap`: the glass's rest shape over "glass" ({ cx, cy, w, h }, px)
-export function timeline(t, cap) {
+/// the state of frame `t`. `cap`: the glass's rest shape over "glass" ({ cx, cy, w, h }, px);
+/// `springs`: { follow, jelly } to try other feels (default FOLLOW, JELLY)
+export function timeline(t, cap, springs = {}) {
     const s = {
         cam: 1 + (CAM_ZOOM - 1) * (easeInOutSine(span(SEQ.zoomIn, t)) - easeInOutSine(span(SEQ.zoomOut, t))),
         // 1: the bare wallpaper; 0: the plate (the montage's frame, with bar, dock and widgets)
@@ -85,13 +86,13 @@ export function timeline(t, cap) {
     if (t < SEQ.passB) {
         // the clearing pass: the letters melt under the lens and in its wake, and heal as it lands
         const ta = Math.max(0, t - SEQ.passA);
-        g = glide(ta, -cap.w * 1.2, cap.cx, SEQ.passADur);
+        g = glide(ta, -cap.w * 1.2, cap.cx, SEQ.passADur, springs);
         s.melt = 1 - smooth(SEQ.passADur + 0.3, SEQ.passADur + 1.3, ta);
         s.wake = 260 * (1 - smooth(SEQ.passADur - 0.3, SEQ.passADur + 0.5, ta)) + 1;
     } else {
         // the dissolving pass: what it has passed is gone
         const tb = t - SEQ.passB;
-        g = glide(tb, cap.cx, -cap.w * 1.6, SEQ.passBDur);
+        g = glide(tb, cap.cx, -cap.w * 1.6, SEQ.passBDur, springs);
         s.melt = smooth(0, SEQ.passBIn, tb);
         s.gone = s.melt;
         s.dir = -1;
