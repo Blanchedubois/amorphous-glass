@@ -17,7 +17,9 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `config/gnome-shell-overrides.css` | Shell CSS on top of MacTahoe (menu rows, quick settings, Now Playing) |
 | `config/rwc-gnome51/` | Rounded Window Corners fixes for GNOME 51 |
 | `scripts/glass-bar.sh` | Apply, rebuild and mode switching for all glass surfaces |
-| `scripts/tahoe-repair.sh` | Runs at login and puts drifted settings back |
+| `scripts/tahoe-repair.sh` | Keeps the design through updates: `check` (read-only) and `repair` (at login); see Keeping the design below |
+| `scripts/tahoe_repair.py`, `scripts/repair_manifest.py`, `config/repair-manifest.json` | The repair engine and its expected state, generated from `tokens/` |
+| `config/systemd/`, `config/pacman/` | Optional triggers for the repair: a user path unit and a pacman hook that only records changes |
 | `scripts/glass-app-ids.py` | Which apps get window glass |
 | `scripts/gnome-setup.sh`, `scripts/sf-fonts.sh` | Base GNOME setup and SF Pro from the user's own Apple download |
 | `extensions/tahoe-widgets@cachyos-tahoe` | Desktop widgets in glass (live): clocks, calendar, weather, music; see Widgets below |
@@ -29,6 +31,7 @@ tint, blur, rim light and edge shadow for every surface, in light, dark and milk
 | `docs/gnome-tahoe/` | Refraction shader study, menu bar and Control Center port, animation plan |
 | `docs/GLASS_MENUS_PLAN.md` | Plan for glass menus in GTK apps |
 | `docs/HANDOVER.md` | Where things stand and what to standardise next |
+| `docs/REPAIR.md` | tahoe-repair: how to run it, the inventory of what the design depends on, and the drift test results |
 | `tools/` | Frame probe extension and A/B script used to measure menu smoothness; `tools/widgets-stress/` headless widget screenshots and stress test |
 
 ## Widgets
@@ -58,6 +61,23 @@ The Music widgets' album-colour swirl follows the technique of the background re
 (AGPL-3.0) and of [Adaptive Palette](https://pub.dev/documentation/adaptive_palette/latest/) (MIT):
 dominant colours by k-means, a heavily blurred field turning slowly, a cross-fade per track. The
 shader and the colour code here are written for this repo (GPL-3.0); no code is taken from either.
+
+## Keeping the design
+
+GNOME, extension and theme updates undo parts of the design (GNOME's updater swaps the patched Blur
+My Shell for the stock one, a gnome-shell update replaces the login screen theme, a MacTahoe
+reinstall drops the CSS overrides). `scripts/tahoe-repair.sh` checks about 190 items against
+`config/repair-manifest.json` and puts back what drifted at every login. A feature you switched off
+stays off, and it never runs sudo; a root step or a logout it cannot do comes as a notification.
+
+```bash
+bash scripts/tahoe-repair.sh check    # read-only report, exit 0 ok / 1 drift / 2 needs you
+bash scripts/tahoe-repair.sh repair   # fix only the drift, logged and backed up
+bash scripts/tahoe-repair.sh status   # versions, switches, hold mode
+```
+
+On a GNOME major it was not tested on, it holds back the 51-only patches instead of forcing them.
+Details, switches and the test results: `docs/REPAIR.md`.
 
 ## Where this came from
 
