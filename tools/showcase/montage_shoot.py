@@ -70,9 +70,9 @@ def log(**kv):
     LOG.flush()
 
 
-# the shoot's tempo (user, 2026-10-21: "sharper cuts and motion"): glides, drags and ordinary pauses
+# the shoot's tempo (user, 2026-10-21: "sharper cuts and motion", then "faster ... choppier and faster"): glides, drags and ordinary pauses
 # at this fraction of their written length; waits for an app to open (settle) are not scaled
-TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.7'))
+TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.5'))
 
 
 def pause(ms):
@@ -373,6 +373,9 @@ def s_files_window():
         pause(500)
         drag(POS[0] - 700, POS[1] + 120, 1500)
         pause(800)
+        press('Control_L', 'w')
+        settle(700)
+        move(*HOME_XY, 700)
 
 
 def s_window_menu():
@@ -389,6 +392,26 @@ def s_window_menu():
         press('Control_L', 'w')
         pause(900)
         move(*HOME_XY, 900)
+
+
+def s_menu_slide():
+    """the top bar's menus: the calendar opens, then a glide right hands it over to quick settings (one
+    glass surface morphing), and back to the calendar"""
+    with Clip('menu-slide'):
+        dx, dy = center('date')
+        qx, qy = center('quick-settings')
+        move(dx, dy + 300, 600)
+        move(dx, dy, 600)
+        click()
+        pause(1000)
+        move(qx - 300, qy, 900)
+        pause(400)
+        move(qx, qy, 700)
+        pause(1100)
+        move(dx, dy, 1000)
+        pause(900)
+        close_all()
+        move(*HOME_XY, 700)
 
 
 def s_overview_search():
@@ -502,9 +525,11 @@ def s_settings_window():
         move(*HOME_XY, 900)
 
 
-# in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left
-SHOTS = [s_home, s_widget_drag, s_desktop_menu, s_quick_settings, s_files_window, s_window_menu, s_settings_window,
-         s_overview_search, s_app_grid, s_calendar, s_volume, s_music, s_home_end]
+# in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left;
+# the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
+# of the desktop menu, window menu and volume shots
+SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
+         s_overview_search, s_app_grid, s_music, s_home_end]
 
 
 def main():
