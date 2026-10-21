@@ -303,7 +303,7 @@ def s_app_grid():
 
 @shot_fn
 def s_widget_drag():
-    x, y, w, h = locate('widget:0')
+    x, y, w, h = locate(f"widget:{os.environ.get('TAHOE_SHOWCASE_DRAG', '0')}")
     with Clip('widget-drag'):
         call('Drag', (x + w // 2, y + 30, x + w // 2 + 240, y + 150, 1200), '(iiiiu)')
         pause(900)
