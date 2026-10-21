@@ -124,6 +124,15 @@ function primaryBackground(dialog) {
 
 // ---- the clock: our own actor over the primary monitor, above GNOME's dialog contents ----
 
+// The clock's size, as its areas are laid out (MonitorConstraint on the primary monitor). Not the
+// areas' own width and height: while a relayout is pending (a new clock text) Clutter reports an
+// actor's preferred size instead, and a clock-format change then laid the clock out for a 475 px
+// high screen, small at the top left (2026-10-21).
+function clockAreaSize() {
+    const monitor = Main.layoutManager.primaryMonitor;
+    return monitor ? [monitor.width, monitor.height] : [0, 0];
+}
+
 function buildClock(frame, dialog) {
     const area = new St.Widget({
         name: 'clock-area',
@@ -162,7 +171,7 @@ function buildClock(frame, dialog) {
 
     // sizes and place follow the monitor's height
     const size = () => {
-        const height = area.height;
+        const [, height] = clockAreaSize();
         if (!(height > 0))
             return;
         const px = f => Math.round(f * height);
@@ -239,7 +248,7 @@ function buildGlass(frame, dialog, labels) {
         last = [dateString, timeString];
         if (failed || !dateString || !timeString)
             return;
-        const height = area.height, width = area.width;
+        const [width, height] = clockAreaSize();
         if (!(height > 0 && width > 0))
             return;
         try {
