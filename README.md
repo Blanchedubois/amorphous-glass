@@ -2,12 +2,12 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: light)" srcset="docs/showcase/media/title-still-light.webp">
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
-    <source media="(prefers-color-scheme: light)" srcset="docs/showcase/media/title-light.webp">
-    <img src="docs/showcase/media/title-dark.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words, refracting and melting the letters, and settles over the word glass">
+    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words and refracts them, then the camera zooms out onto the desktop and follows the cursor through quick settings, the calendar, menus, windows, the overview, widgets and the lock screen, and back to the title">
   </picture>
 </p>
+
+<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/liquid-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a> · <a href="docs/showcase/title/">how the title is made</a></sub></p>
 
 **macOS Tahoe's Liquid Glass, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
 dock, every menu, quick settings, the calendar, GTK apps, desktop widgets and the lock screen, with
@@ -22,11 +22,69 @@ macOS-style motion: popups grow out of the icon you clicked as a circle of glass
 
 Built and tested on CachyOS with GNOME 51.1, an NVIDIA RTX 3090 at 2560x1440 and 120 Hz. Everything
 installs into your home folder; only the optional login screen needs `sudo`. Screenshots and clips
-are of the real desktop, recorded with GNOME's own screencast. Personal details are blurred.
+are of the real desktop, recorded with GNOME's own screencast. Other apps' notifications and windows are blurred.
 
-- [Tour](#tour) · [Animations](#animations) · [Widgets](#widgets) · [Lock screen](#lock-and-login-screens)
+- [Design](#design) · [Tour](#tour) · [Animations](#animations) · [Widgets](#widgets) · [Lock screen](#lock-and-login-screens)
 - [Requirements](#requirements) · [Install](#install) · [Keeping it through updates](#keeping-it-through-updates)
 - [Credits and inspirations](#credits-and-inspirations) · [Licence](#licence)
+
+## Design
+
+### One glass
+
+![The glass's anatomy, on the title's capsule: a rim light lit from the top left, a refraction band at the edge that bends the letters under it, clear glass with no tint, an edge shadow inside and a drop shadow under it](docs/showcase/media/design-glass.webp)
+
+Every glass surface is the same material, drawn by one shader with one set of values
+(`glass_params()` in `scripts/glass-bar.sh`): blur, a refraction band at the edge, a rim light lit
+from the top left, an edge shadow just inside the rim and a soft drop shadow. Only the blur
+strength and the tint change, per surface and per mode (light, dark, milky). The title above is that
+same shader, ported to WebGL, with the tint taken out.
+
+| | Value |
+|---|---|
+| Refraction | strength 0.8, edge 12 px, chromatic dispersion 0.06 |
+| Rim light | 0.55, over 0.45 of the edge band, light at 45° |
+| Edge shadow / drop shadow | 0.30 over 0.20 of the band / 0.20 |
+| Tint | light: white 0.18 · dark: rgb(34, 34, 38) 0.42 · milky: white 0.12 |
+| Blur | bar 12 · menus and dock 18 · app windows 24 |
+
+### Concentric corners
+
+![The calendar's bottom corners: the 32 px panel corner and the 20 px corners of the Clear button and the Weather card share one centre, 12 px in](docs/showcase/media/design-corners.webp)
+
+A row, card or button inside a glass surface is rounded at the surface's radius minus the gap
+around it, so their corners share a centre. A row can be no rounder than a capsule, so the surface
+follows the row: radius = min(row, row height / 2) + gap. The calendar is 32: its cards are 20, 12 px
+in; its Clear button is a 40 px capsule, 12 px from both edges. Shell menus are 18 with 14 px rows,
+GTK menus 17 with 13, quick settings submenus 32 with 16. One table in
+[docs/STANDARD.md](docs/STANDARD.md) holds every surface, and `tokens/` writes the CSS from it.
+
+### Springs, not curves
+
+Motion is physics: a damped spring with a mass, a stiffness and a damping ratio (Material 3
+Expressive's tokens), advanced by real elapsed time (`extensions/tahoe-motion@cachyos-tahoe/spring.js`).
+An interrupted popup carries on from where, and how fast, it was moving; small things move fast and
+large things slow; a dropped frame does not change the path. Popups open as a circle of glass
+growing out of the icon you clicked, and the glass's own edge, rim and refraction follow the shape
+at every frame.
+
+| Token | Damping | Stiffness | Used for |
+|---|---|---|---|
+| spatial fast | 0.6 | 800 | small popups, a little bounce |
+| spatial default | 0.8 | 380 | menus and panels |
+| spatial slow | 0.8 | 200 | large surfaces |
+| effects | 1.0 | 800 to 3800 | fades and blur, no overshoot |
+
+### Details
+
+- **One shape.** The CSS shape (rows, hit area) and the glass under it come from the same radius
+  token. No surface paints a fill of its own over the glass.
+- **Capsules where it is a capsule.** Quick settings toggles, sliders, the volume OSD, dock labels,
+  the run dialog and search rows are true capsules (radius 9999), real glass where the shell allows.
+- **Edges per mode.** In light and milky, dropdowns have no outline: the rim light is their only
+  edge. In dark mode they get a 1 px white line at 16 %, drawn inside the shape so rows keep their gap.
+- **Type.** SF Pro for the interface (from your own download), Space Grotesk for the title and the
+  lock screen clock.
 
 ## Tour
 
@@ -333,7 +391,7 @@ Liquid Glass stands on other people's work. Thank you.
 | `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
 | `tokens/`, `docs/STANDARD.md` | The glass standard: radius, gap, tint and edge per surface |
 | `docs/` | Plans, measurements and workshop notes for every part |
-| `docs/showcase/title/` | The title animation: a WebGL page with the desktop's glass shader and springs, and its renderer |
+| `docs/showcase/title/`, `docs/showcase/montage/`, `docs/showcase/design/` | The video at the top: the title (a WebGL page with the desktop's glass shader and springs), the montage's cursor camera and cut list, the annotated design images |
 | `tools/` | Headless test shells, stress tests, the repair's drift tests, the showcase shoot |
 
 ## Licence

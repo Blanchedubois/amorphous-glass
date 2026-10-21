@@ -126,7 +126,7 @@ def encode_webp(paths, fps, args):
             images.append(im.resize((args.webp_width, height), Image.LANCZOS))
     images[0].save(args.webp, save_all=True, append_images=images[1:], loop=0,
                    duration=round(1000 * step / fps), quality=args.webp_quality, method=4,
-                   kmin=9, kmax=10, allow_mixed=False)
+                   kmin=args.webp_kmax - 1, kmax=args.webp_kmax, allow_mixed=False)
     print(args.webp, os.path.getsize(args.webp))
 
 
@@ -144,6 +144,10 @@ def main():
     w = sub.add_parser('webp', help='re-encode the README loop from an MP4 master')
     w.add_argument('master')
     w.add_argument('-o', '--webp', required=True)
+    w.add_argument('--webp-width', type=int, default=1280)
+    w.add_argument('--webp-fps', type=int, default=30)
+    w.add_argument('--webp-quality', type=int, default=75)
+    w.add_argument('--webp-kmax', type=int, default=10, help='frames between keyframes')
     for name in ('still', 'clip'):
         p = sub.add_parser(name)
         p.add_argument('--theme', choices=('dark', 'light'), default='dark')
@@ -163,11 +167,11 @@ def main():
             p.add_argument('--webp-width', type=int, default=1280)
             p.add_argument('--webp-fps', type=int, default=30, help='the README loop: 30 keeps it small')
             p.add_argument('--webp-quality', type=int, default=75)
+            p.add_argument('--webp-kmax', type=int, default=10, help='frames between keyframes')
     args = parser.parse_args()
     if not CHROMIUM:
         sys.exit('render: Chromium not found')
     if args.mode == 'webp':
-        args.webp_fps, args.webp_width, args.webp_quality = 30, 1280, 75
         webp(args)
         return
     (still if args.mode == 'still' else clip)(args)
