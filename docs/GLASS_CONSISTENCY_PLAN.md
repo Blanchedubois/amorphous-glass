@@ -229,3 +229,12 @@ way (a queued menu update, and disconnects from menus GNOME had already disposed
   the menu 440 px wide (the titles fit). Measured on both screens. `system-menu-desktop-size.png`.
 - Login Options (the gear that picks GNOME / GNOME on Xorg, GNOME's `login-dialog-auth-menu-button`):
   a 48 px glass circle with a 20 px glyph on both screens, its Session Type menu on frosted glass.
+- The Schedule widget (the calendar session's, 2 x 2) in place of Calendar Medium: layout E2S
+  (Weather Medium over Schedule Large), the default on both screens. The user's choices
+  (2026-10-20): event titles shown on Super+L; today's events shared with the login screen.
+  Super+L runs the real widget and feed (copies: schedule.js, schedule-model.js, icsfeed.js,
+  ics-expand.js, vendor/; the feed does not fetch while locked, it shows the desktop's cache) and
+  writes this week's events to /run/tahoe-nowplaying/schedule.json with its pid, removed on
+  unlock. The login screen runs the same widget over its own stand-in feed (widgets/icsfeed.js):
+  the shared events only while the writer's gnome-shell runs, else "Calendar locked".
+  `schedule-both.png`: Super+L, the login screen (session locked), the login screen (no session).

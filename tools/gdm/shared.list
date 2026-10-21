@@ -8,3 +8,7 @@ stylesheet.css widgets.css
 palette.js palette.js
 # the lock screen's background swirl (music mode), for the song on the login screen
 ../tahoe-lockscreen@cachyos-tahoe/bgswirl.js bgswirl.js
+# the Schedule widget, drawn from what the locked session shares (widgets/icsfeed.js here is the
+# login screen's own stand-in, not a copy)
+schedule.js schedule.js
+schedule-model.js schedule-model.js

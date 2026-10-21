@@ -700,6 +700,29 @@ async function run() {
     await applyMaterial();
     state('unlocked');
     await shotRect('unlocked', [0, 0, global.screen_width, global.screen_height]);
+    // TAHOE_LOCK_ICS_URL=http://127.0.0.1:...: the test shell's own calendar link (its own config
+    // dir, a 0600 file), so the Schedule widget reads a test calendar; never the real link
+    const icsUrl = GLib.getenv('TAHOE_LOCK_ICS_URL');
+    if (icsUrl) {
+        const dir = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass']);
+        GLib.mkdir_with_parents(dir, 0o700);
+        GLib.file_set_contents(GLib.build_filenamev([dir, 'calendar-source']), 'store=file\n');
+        GLib.file_set_contents(GLib.build_filenamev([dir, 'calendar-url']), `${icsUrl}\n`);
+        GLib.chmod(GLib.build_filenamev([dir, 'calendar-url']), 0o600);
+        // the copy the desktop widget would have fetched before the lock (the feed does not fetch
+        // while locked): TAHOE_LOCK_ICS_FILE into the test shell's own cache
+        const icsFile = GLib.getenv('TAHOE_LOCK_ICS_FILE');
+        if (icsFile) {
+            const cache = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-glass']);
+            GLib.mkdir_with_parents(cache, 0o700);
+            const [, bytes] = GLib.file_get_contents(icsFile);
+            GLib.file_set_contents(GLib.build_filenamev([cache, 'calendar.ics']), bytes);
+            const t = Math.floor(Date.now() / 1000);
+            GLib.file_set_contents(GLib.build_filenamev([cache, 'calendar.meta.json']), JSON.stringify({
+                link: GLib.compute_checksum_for_string(GLib.ChecksumType.SHA256, icsUrl, -1),
+                etag: null, lastModified: null, fetched: t, changed: t}));
+        }
+    }
     // TAHOE_LOCK_NOTIFY=1: two notifications before locking (they show on the lock screen)
     if (GLib.getenv('TAHOE_LOCK_NOTIFY')) {
         Main.notify('Calendar', 'Design review at 6:00 PM');
