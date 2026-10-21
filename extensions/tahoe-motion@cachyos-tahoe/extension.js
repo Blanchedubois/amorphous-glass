@@ -17,6 +17,7 @@
 // first menu) has no glass yet: Blur My Shell makes it a frame later, so it joins in the first
 // frames. GNOME's destroy of a closing window menu waits for the close to play out.
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
@@ -135,15 +136,27 @@ export default class TahoeMotion extends Extension {
         this._submenuClose = proto.close;
         const motion = this;
         proto.open = function (params = {}) {
+            motion.debugSubmenu(this, 'open called', params);
             const opened = motion._submenuOpen.call(this, params);
             if (opened && (params.animate ?? true))
                 motion.submenu(this, true);
+            else
+                motion.releaseBox(this.box);
+            motion.debugSubmenu(this, opened ? 'opened' : 'open refused', params);
             return opened;
         };
         proto.close = function (params = {}) {
+            motion.debugSubmenu(this, 'close called', params);
             const closed = motion._submenuClose.call(this, params);
-            if (closed && (params.animate ?? true))
+            if (closed && (params.animate ?? true)) {
                 motion.submenu(this, false);
+            } else {
+                // closed at once by GNOME (quick settings closing): any animation of it ends here
+                motion._morphs?.get(this.box)?.stopTimeline();
+                motion._morphs?.delete(this.box);
+                motion.releaseBox(this.box);
+            }
+            motion.debugSubmenu(this, closed ? 'closed' : 'close refused', params);
             return closed;
         };
     }
@@ -159,8 +172,11 @@ export default class TahoeMotion extends Extension {
             return;
         const target = menu.box;
         const surface = api.surfaces(root).find(candidate => candidate.target === target);
-        if (!surface)
+        if (!surface) {
+            this.debugSubmenu(menu, 'no glass for its box: GNOME animates it');
+            this.releaseBox(target);
             return;
+        }
         const container = menu.actor;
         const previous = this.takeOver(target);
         container.remove_transition('height');
@@ -216,6 +232,47 @@ export default class TahoeMotion extends Extension {
             },
         });
         this._morphs.set(target, morph);
+    }
+
+    /// Temporary diagnostics (2026-10-20, a submenu broken on the user's desktop only): while
+    /// ~/.cache/tahoe-motion-debug exists, each quick settings submenu open and close is logged to
+    /// ~/.cache/tahoe-motion-debug.jsonl, then again 60, 400 and 1000 ms later.
+    debugSubmenu(menu, what, params = null) {
+        const flag = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-motion-debug']);
+        if (!GLib.file_test(flag, GLib.FileTest.EXISTS))
+            return;
+        const snap = tag => {
+            try {
+                const c = menu.actor;
+                const b = menu.box;
+                const morph = this._morphs?.get(b);
+                const line = JSON.stringify({
+                    t: GLib.get_monotonic_time() / 1000 | 0, what: tag,
+                    source: menu.sourceActor?.constructor?.name, params: params ? { animate: params.animate } : null,
+                    isOpen: menu.isOpen,
+                    container: { h: Math.round(c.height), alloc_h: Math.round(c.allocation.get_height()), visible: c.visible, mapped: c.mapped, clip: c.clip_to_allocation, layout: c.layout_manager?.constructor?.name, transitions: c.get_transition('height') ? 'height' : null },
+                    box: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), opacity: b.opacity, held: Boolean(this._heldBoxes?.has(b)) },
+                    morph: morph ? { opening: morph.opening, frames: morph.frames ?? 0, timeline: Boolean(morph.timeline), ready: morph.pieces?.map(p => p.ready) } : null,
+                    glass: Boolean(glassApi()?.surfaces(Main.panel.statusArea.quickSettings?.menu?._boxPointer)?.find(g => g.target === b)),
+                    qs: Main.panel.statusArea.quickSettings?.menu?.isOpen,
+                });
+                const file = Gio.File.new_for_path(GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-motion-debug.jsonl']));
+                const stream = file.append_to(Gio.FileCreateFlags.NONE, null);
+                stream.write_all(new TextEncoder().encode(`${line}\n`), null);
+                stream.close(null);
+            } catch (e) {
+                console.error(`[tahoe-motion] debug: ${e}`);
+            }
+        };
+        snap(what);
+        if (what === 'opened' || what === 'closed') {
+            for (const ms of [60, 400, 1000]) {
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+                    snap(`${what} +${ms} ms`);
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+        }
     }
 
     /// a submenu's box held at its full height, clipped by its container, for the motion: the
