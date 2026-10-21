@@ -314,15 +314,16 @@ gs('D12-icon', 'Kiwi Menu: the Apple logo', KW, 'icon', '10', {'menubar': 'on'},
 gs('D12-act', 'Kiwi Menu: no Activities', KW, 'activity-menu-visibility', 'false', {'menubar': 'on'}, ext=KIWI)
 
 # ---- E. icons and fonts ----------------------------------------------------------------------------
+# the icons live in cachyos-tahoe-theme: the author's checkout, or the copy install.sh fetches
+ICON_HOMES = ['~/Projects/cachyos-tahoe-theme/icons', '~/.local/src/cachyos-tahoe-theme/icons']
 item('E1', 'Tahoe-Material icon theme link', {'type': 'symlink', 'path': '~/.local/share/icons/Tahoe-Material',
-     'target': '~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material', 'need': 'index.theme'}, {'type': 'symlink'})
+     'target': [f'{h}/Tahoe-Material' for h in ICON_HOMES], 'need': 'index.theme'}, {'type': 'symlink'})
 item('E2', 'Tahoe-Material-KDE icon theme link', {'type': 'symlink', 'path': '~/.local/share/icons/Tahoe-Material-KDE',
-     'target': '~/Projects/cachyos-tahoe-theme/icons/Tahoe-Material-KDE', 'need': 'index.theme'}, {'type': 'symlink'})
-item('E4', 'SF Pro installed (from your own Apple download)', {'type': 'font', 'family': 'SF Pro Text'},
-     {'type': 'notify', 'text': 'SF Pro is missing: download SF-Pro.dmg from developer.apple.com/fonts and run bash {ROOT}/scripts/sf-fonts.sh'})
-item('E5', 'Space Grotesk installed (lock screen clock)', {'type': 'font', 'family': 'Space Grotesk'},
-     {'type': 'notify', 'text': 'Space Grotesk is missing: the lock screen clock falls back to a sans face'},
-     {'lockscreen': 'on'})
+     'target': [f'{h}/Tahoe-Material-KDE' for h in ICON_HOMES], 'need': 'index.theme'}, {'type': 'symlink'})
+# optional fonts: reported, never a notification (SF Pro is the user's own download)
+item('E4', 'SF Pro installed (optional: your own Apple download, bash scripts/sf-fonts.sh)', {'type': 'font', 'family': 'SF Pro Text'})
+item('E5', 'Space Grotesk installed (optional: the lock screen clock)', {'type': 'font', 'family': 'Space Grotesk'},
+     when={'lockscreen': 'on'})
 
 # ---- F. tahoe extensions -----------------------------------------------------------------------------
 for key, uuid, script in [('widgets', 'tahoe-widgets@cachyos-tahoe', 'tahoe-widgets.sh'),
