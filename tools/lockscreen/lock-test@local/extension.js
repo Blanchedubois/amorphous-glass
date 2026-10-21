@@ -172,9 +172,18 @@ async function runQs() {
     const dialog = await lockAndPrompt();
     await sleep(1000);
     const qs = Main.panel.statusArea.quickSettings;
+    // TAHOE_QS_SLIDERS=1: the sliders GNOME hides in the test shell (no audio device) shown, to
+    // check their size against the toggles
+    if (GLib.getenv('TAHOE_QS_SLIDERS')) {
+        const w = a => { if (a.has_style_class_name?.('quick-slider')) { a.show(); a.get_parent()?.show(); } a.get_children().forEach(w); }; w(qs.menu.box);
+    }
     qs.menu.open(false);
     await sleep(1200);
     const menu = qs.menu;
+    { const out = []; const w = a => { const c = ['quick-toggle-has-menu', 'quick-slider', 'icon-button', 'quick-toggle-menu'].find(k => a.has_style_class_name?.(k)) ?? (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu') ? 'quick-toggle' : null);
+        if (c && a.mapped) { out.push({kind: c, box: box(a)}); if (c !== 'quick-toggle-menu') return; } a.get_children().forEach(w); }; w(menu.actor); write({ label: 'qs-pieces-all', pieces: out }); }
+    { const t = []; let first = null; const f = a => { if (!first && a.has_style_class_name?.('quick-slider') && a.mapped) first = a; a.get_children().forEach(f); }; f(menu.box);
+      const w2 = (a, d) => { t.push(`${'  '.repeat(d)}${a.constructor.name}.${a.style_class ?? ''} ${box(a)}`); a.get_children().forEach(c => w2(c, d + 1)); }; if (first) w2(first, 0); write({ label: 'qs-slider-tree', t }); }
     const chain = []; for (let a = menu.actor; a; a = a.get_parent()) chain.push(`${a.constructor.name}${a.name ? '#' + a.name : ''}${a.style_class ? '.' + a.style_class.split(' ').join('.') : ''}`);
     const mbox = menu.box ?? menu.actor;
     write({ label: 'qs', open: menu.isOpen, actor: mbox ? (() => { const [x, y] = menu.actor.get_transformed_position(); const [w, h] = menu.actor.get_transformed_size(); return [x, y, w, h].map(Math.round); })() : null,
@@ -691,6 +700,12 @@ async function run() {
     await applyMaterial();
     state('unlocked');
     await shotRect('unlocked', [0, 0, global.screen_width, global.screen_height]);
+    // TAHOE_LOCK_NOTIFY=1: two notifications before locking (they show on the lock screen)
+    if (GLib.getenv('TAHOE_LOCK_NOTIFY')) {
+        Main.notify('Calendar', 'Design review at 6:00 PM');
+        Main.notify('Messages', 'See you at the gym');
+        await sleep(500);
+    }
     Main.screenShield.lock(false);
     await sleep(2500);
     state('locked');
