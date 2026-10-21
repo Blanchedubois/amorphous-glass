@@ -94,13 +94,14 @@ PY
 snapshot() {
   local d="$OWN/before"; mkdir -p "$d"
   dconf dump /org/gnome/ > "$d/org-gnome.dconf"
-  { ls -1 "$HOME/.themes" 2>/dev/null | sed 's|^|theme |'
-    ls -1 "$EXT" 2>/dev/null | sed 's|^|extension |'
-    ls -1 "$HOME/.local/share/icons" 2>/dev/null | sed 's|^|icons |'
-    [[ -e "$HOME/.config/gtk-4.0" ]] && echo "gtk4"
-    [[ -e "$HOME/.config/gtk-3.0/gtk.css" ]] && echo "gtk3css"; } > "$d/files.txt"
-  for f in "$HOME/.config/gtk-3.0/gtk.css"; do [[ -f "$f" ]] && cp -a "$f" "$d/"; done
-  [[ -d "$HOME/.config/gtk-4.0" ]] && cp -a "$HOME/.config/gtk-4.0" "$d/gtk-4.0"
+  # a new account has none of these folders yet: every listing may come back empty
+  local f
+  : > "$d/files.txt"
+  for f in "$HOME"/.themes/*; do if [[ -e "$f" ]]; then echo "theme $(basename "$f")" >> "$d/files.txt"; fi; done
+  for f in "$EXT"/*; do if [[ -e "$f" ]]; then echo "extension $(basename "$f")" >> "$d/files.txt"; fi; done
+  for f in "$HOME"/.local/share/icons/*; do if [[ -e "$f" || -L "$f" ]]; then echo "icons $(basename "$f")" >> "$d/files.txt"; fi; done
+  if [[ -f "$HOME/.config/gtk-3.0/gtk.css" ]]; then cp -a "$HOME/.config/gtk-3.0/gtk.css" "$d/"; fi
+  if [[ -d "$HOME/.config/gtk-4.0" ]]; then cp -a "$HOME/.config/gtk-4.0" "$d/gtk-4.0"; fi
   date -Is > "$d/when"
 }
 
