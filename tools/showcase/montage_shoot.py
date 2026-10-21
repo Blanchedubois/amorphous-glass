@@ -21,6 +21,10 @@ is recorded in a throwaway shell by tools/showcase/lock-video.sh.
   --dry-run   print the plan and the layout, change nothing
   TAHOE_SHOWCASE_SONG=song.json   the song the fake player shows (fakeplayer.py --song): its name
               and cover, with the placeholder lyrics
+  TAHOE_SHOWCASE_PLAYER=spotify   no fake player: the user's own Spotify plays on, so the widgets show
+              the real song, cover and synced lyrics (the Lyrics widget fetches them from lrclib.net
+              itself, user's choice 2026-10-21); it is moved to TAHOE_SHOWCASE_SEEK seconds (default
+              60) so the track does not end mid-shoot
 """
 import json, os, shutil, signal, subprocess, sys, time
 
@@ -167,6 +171,18 @@ def status(name):
                          Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
 
 
+def seek_real(name, seconds):
+    """the user's player, playing, at `seconds` into its track (so it does not end mid-shoot)"""
+    if status(name) != 'Playing':
+        raise RuntimeError(f'{name} is not playing: start the song first')
+    meta = BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'Get',
+                         GLib.Variant('(ss)', ('org.mpris.MediaPlayer2.Player', 'Metadata')), None,
+                         Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+    BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'SetPosition',
+                  GLib.Variant('(ox)', (meta['mpris:trackid'], int(seconds * 1e6))), None, Gio.DBusCallFlags.NONE, 5000, None)
+    log(real_player=name, title=meta.get('xesam:title'), seek=seconds)
+
+
 def gset(schema, key, value=None):
     if value is None:
         return subprocess.run(['gsettings', 'get', schema, key], capture_output=True, text=True).stdout.strip()
@@ -199,12 +215,16 @@ def setup():
     with open(LAYOUT, 'w') as fh:
         json.dump(SHOOT_LAYOUT, fh, indent=2)
     reload_widgets()
-    STATE['playing'] = [n for n in players() if status(n) == 'Playing']
-    for n in STATE['playing']:
-        player(n, 'Pause')
-    song = os.environ.get('TAHOE_SHOWCASE_SONG')
-    STATE['fake'] = subprocess.Popen([sys.executable, os.path.join(HERE, 'fakeplayer.py')] + (['--song', song] if song else []),
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    real = os.environ.get('TAHOE_SHOWCASE_PLAYER')
+    if real:
+        seek_real(f'org.mpris.MediaPlayer2.{real}', float(os.environ.get('TAHOE_SHOWCASE_SEEK', '60')))
+    else:
+        STATE['playing'] = [n for n in players() if status(n) == 'Playing']
+        for n in STATE['playing']:
+            player(n, 'Pause')
+        song = os.environ.get('TAHOE_SHOWCASE_SONG')
+        STATE['fake'] = subprocess.Popen([sys.executable, os.path.join(HERE, 'fakeplayer.py')] + (['--song', song] if song else []),
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     STATE['nautilus'] = (gset('org.gnome.nautilus.window-state', 'maximized'),
                          gset('org.gnome.nautilus.window-state', 'initial-size'))
     gset('org.gnome.nautilus.window-state', 'maximized', 'false')
@@ -450,6 +470,10 @@ def s_settings_window():
         drag(POS[0] + 560, POS[1] - 60, 1400)
         pause(800)
         press('Control_L', 'q')
+        pause(900)
+        # closing the last window here once switched to the user's own workspace: back to the empty
+        # one (from the empty last workspace this does nothing)
+        press('Super_L', 'Page_Down')
         pause(900)
         move(*HOME_XY, 900)
 
