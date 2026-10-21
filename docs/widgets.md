@@ -1,6 +1,6 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phases 1 to 3 done (link, fetch, parsing, the two widgets); Phase 4 (live behaviour) next.** Your picks: small layout A,
+**Status: Phases 1 to 4 done (link, fetch, parsing, the widgets, live behaviour); Phase 5 (stress) next.** Your picks: small layout A,
 Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
 week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
@@ -247,6 +247,38 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
   other states) and `tools/widgets-stress/layout-schedule.json`.
 - `stylesheet.css` gained the `tahoe-sched-*` rules; `tools/lockscreen/sync-shared.sh` copied them
   to the lock screen's `widgets.css` (they do nothing there; the lock screen has no Schedule widget).
+
+## Phase 4: what was built (2026-10-20)
+
+- `schedule-model.js` (GLib only) says what the rows show; `schedule.js` only draws it.
+  - Rows: one for all-day events (with `+N`), timed events covering the whole day included (a
+    trip), then what has not ended, by start. An event leaves at its end; a zero-length one at its
+    time. Midnight: the header and rows roll over on the first tick after 00:00, multi-day events
+    becoming all-day rows on their middle days.
+  - The next event not yet started gets `in N min` under an hour, then `in N h` (rounded), none
+    from 6 h. Events going on: `Now · until 11:45 AM`, or `until Fri` when they end on a later day
+    than tomorrow; their time line is semibold in the event's colour on dark and milky glass, in the
+    full text colour on light glass (a darker orange was still hard to read on a bright wallpaper),
+    the bar keeping the colour. Large: ranges (`10:30 – 11:45 AM`, `10:30 AM – 12:45 PM`),
+    `From 11:00 PM` for one running past midnight; small: start times.
+  - Footers: offline with a copy `Can't reach calendar` with `updated 8:09 PM` (or `Mon 8:09 PM`
+    from another day; two lines on the small card, one on the Large), `Calendar locked`,
+    `Calendar link not valid`; with nothing left today they go under `No more events today`.
+    Without a copy: `Can't reach calendar / Will retry`, `Calendar locked / Unlock to show events`,
+    `Loading calendar…`; no link: `No calendar link / tahoe-widgets.sh calendar-url`.
+- The widgets refresh on the minute tick and on the feed's signals, reading the time then (after
+  a suspend the next tick can be up to a minute late, as for the clocks). A removed link no longer
+  re-reads the old copy still on disk (found by the test below).
+- Tests: `gjs -m tools/widgets-stress/schedule-test.js` (17 checks, worked out by hand, one made-up
+  Tuesday in New York: before, at and after starts and ends, rounding, multi-day, midnight,
+  24-hour clock, colours, the week dots). `DRIVER=widget-sched@local bash tools/widgets-stress/run.sh
+  OUT tools/widgets-stress/layout-schedule.json` (add `SCHED_SHOTS=1` for screenshots): the real
+  widgets with a fake clock (`setClockForTests`) over a made-up calendar dated today from
+  127.0.0.1, 14 checks: the rows at 09:21:30, 09:30, 09:45, 16:00, 23:59:59 to 00:00:30, overflow,
+  offline, locked, link removed, and an idle tick (100 ticks in one minute rebuild nothing; about
+  47 µs a tick; 12:00 to 12:01 rebuilds nothing, 12:50 to 12:51 once, for "in N min").
+- Sheet: `docs/shots/schedule-states.png` (next event, going on, offline, nothing left, no link;
+  dark and light; Calendar: Today beside them for comparison).
 
 ## Phases (one commit each, on this branch)
 
