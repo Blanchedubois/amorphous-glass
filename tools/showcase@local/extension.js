@@ -24,6 +24,7 @@ const IFACE = `
     <method name="Type"><arg type="s" name="text"/></method>
     <method name="Locate"><arg type="s" name="what"/><arg type="(iiii)" direction="out" name="box"/></method>
     <method name="Shot"><arg type="s" name="path"/></method>
+    <method name="Frames"><arg type="s" name="dir"/><arg type="u" name="count"/><arg type="u" name="interval_ms"/><arg type="u" name="taken" direction="out"/></method>
     <method name="CloseAll"/>
     <method name="Notify"><arg type="s" name="title"/><arg type="s" name="body"/></method>
   </interface>
@@ -110,12 +111,27 @@ function findAncestor(a, test) {
     return null;
 }
 
+// On the lock screen the driver only takes screenshots: no pointer, no keys, no menus
+// (metadata.json keeps it alive in the unlock-dialog session mode for the lock screen shots).
+const INPUT = new Set(['Move', 'Click', 'Scroll', 'Drag', 'Keys', 'Type', 'CloseAll', 'Notify']);
+
 export default class Showcase extends Extension {
     enable() {
         const seat = (global.stage.get_context?.()?.get_backend?.() ?? global.backend).get_default_seat();
         this._mouse = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
         this._keyboard = seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
-        this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
+        const self = this;
+        const guarded = new Proxy(this, {
+            get(target, prop) {
+                const name = String(prop).replace(/Async$/, '');
+                if (INPUT.has(name) && Main.sessionMode.isLocked)
+                    return (params, invocation) => invocation.return_error_literal(Gio.DBusError, Gio.DBusError.ACCESS_DENIED,
+                        'the screen is locked: the showcase driver only takes screenshots here');
+                const v = Reflect.get(target, prop);
+                return typeof v === 'function' ? v.bind(self) : v;
+            },
+        });
+        this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, guarded);
         this._dbus.export(Gio.DBus.session, '/org/cachyos/TahoeShowcase');
         this._name = Gio.bus_own_name_on_connection(Gio.DBus.session, 'org.cachyos.TahoeShowcase',
             Gio.BusNameOwnerFlags.NONE, null, null);
@@ -237,6 +253,29 @@ export default class Showcase extends Extension {
                 invocation.return_error_literal(Gio.DBusError, Gio.DBusError.FAILED, `${e}`);
             }
         });
+    }
+
+    // count screenshots into dir (f00000.png, ...), one every interval_ms; returns how many were taken
+    FramesAsync([dir, count, interval], invocation) {
+        (async () => {
+            let taken = 0;
+            for (let i = 0; i < count; i++) {
+                const t0 = GLib.get_monotonic_time();
+                const file = Gio.File.new_for_path(`${dir}/f${String(i).padStart(5, '0')}.png`);
+                const stream = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
+                try {
+                    await new Promise((resolve, reject) => new Shell.Screenshot().screenshot(false, stream,
+                        (o, res) => { try { o.screenshot_finish(res); resolve(); } catch (e) { reject(e); } }));
+                    taken++;
+                } catch (e) {
+                    logError(e, 'showcase frame');
+                }
+                stream.close(null);
+                const spent = (GLib.get_monotonic_time() - t0) / 1000;
+                await sleep(Math.max(0, interval - spent));
+            }
+            return taken;
+        })().then(n => invocation.return_value(new GLib.Variant('(u)', [n])));
     }
 
     CloseAllAsync(params, invocation) {
