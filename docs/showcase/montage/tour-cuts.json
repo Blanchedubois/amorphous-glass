@@ -1,0 +1,65 @@
+{
+  "about": "The one-take tour cut into clips, in the order and feel of the README video the user liked (2026-10-21: 'mould the current clip choices to make something similar ... the locking clip and unlocking clip smoother'): one fixed zoom per clip (1.6 for small things, 1.0 for the overview and the app grid), the camera following the cursor inside a clip, the travel between sections cut out.",
+  "clips": [
+    {
+      "name": "home",
+      "in": 0.5,
+      "out": 1.9,
+      "zoom": 1.0
+    },
+    {
+      "name": "widget-drag",
+      "in": 2.7,
+      "out": 6.5,
+      "zoom": 1.6
+    },
+    {
+      "name": "quick-settings",
+      "in": 8.85,
+      "out": 12.85,
+      "zoom": 1.6
+    },
+    {
+      "name": "files",
+      "in": 26.9,
+      "out": 32.7,
+      "zoom": 1.4
+    },
+    {
+      "name": "overview-search",
+      "in": 44.25,
+      "out": 47.25,
+      "zoom": 1.0
+    },
+    {
+      "name": "music",
+      "in": 55.3,
+      "out": 60.55,
+      "zoom": 1.6
+    },
+    {
+      "name": "menu-slide",
+      "in": 14.85,
+      "out": 24.3,
+      "zoom": 1.35
+    },
+    {
+      "name": "app-grid",
+      "in": 50.15,
+      "out": 52.45,
+      "zoom": 1.0
+    },
+    {
+      "name": "settings-drag",
+      "in": 36.4,
+      "out": 41.1,
+      "zoom": 1.4
+    },
+    {
+      "name": "home-end",
+      "in": 62.2,
+      "out": 63.4,
+      "zoom": 1.0
+    }
+  ]
+}
