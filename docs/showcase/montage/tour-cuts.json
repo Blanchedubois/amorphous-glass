@@ -1,65 +1,75 @@
 {
-  "about": "The one-take tour cut into clips, in the order and feel of the README video the user liked (2026-10-21: 'mould the current clip choices to make something similar ... the locking clip and unlocking clip smoother'): one fixed zoom per clip (1.6 for small things, 1.0 for the overview and the app grid), the camera following the cursor inside a clip, the travel between sections cut out.",
+  "about": "Round 7 (user, 2026-10-21: choppier; cut in with the mouse already moving and out before it slows; no flicker on the lock; neighbours always different). Each clip enters on a glide already at speed (moves start at full speed: ease-out) and leaves just as the next glide sets off; the order alternates the place on screen and the kind of thing (where).",
   "clips": [
     {
       "name": "home",
       "in": 0.5,
       "out": 1.9,
-      "zoom": 1.0
+      "zoom": 1.0,
+      "where": "whole screen"
     },
     {
       "name": "widget-drag",
-      "in": 2.7,
-      "out": 6.5,
-      "zoom": 1.6
+      "in": 3.45,
+      "out": 5.65,
+      "zoom": 1.6,
+      "where": "left: the clock pulled out across the wallpaper"
     },
     {
       "name": "quick-settings",
-      "in": 8.85,
-      "out": 12.85,
-      "zoom": 1.6
+      "in": 8.3,
+      "out": 11.72,
+      "zoom": 1.6,
+      "where": "top right: the panel grows from its icon, Wi-Fi submenu"
     },
     {
-      "name": "files",
-      "in": 26.9,
-      "out": 32.7,
-      "zoom": 1.4
+      "name": "files-drag",
+      "in": 28.2,
+      "out": 31.2,
+      "zoom": 1.4,
+      "where": "middle: the Files window grabbed and dragged"
     },
     {
       "name": "overview-search",
       "in": 44.25,
-      "out": 47.25,
-      "zoom": 1.0
+      "out": 45.92,
+      "zoom": 1.0,
+      "where": "whole screen: search"
     },
     {
       "name": "music",
-      "in": 55.3,
-      "out": 60.55,
-      "zoom": 1.6
+      "in": 54.86,
+      "out": 58.35,
+      "zoom": 1.6,
+      "where": "left: cover, controls, lyrics"
     },
     {
       "name": "menu-slide",
-      "in": 14.85,
-      "out": 24.3,
-      "zoom": 1.35
-    },
-    {
-      "name": "app-grid",
-      "in": 50.15,
-      "out": 52.45,
-      "zoom": 1.0
+      "in": 14.64,
+      "out": 21.3,
+      "zoom": 1.35,
+      "where": "top: the calendar slides into quick settings"
     },
     {
       "name": "settings-drag",
-      "in": 36.4,
-      "out": 41.1,
-      "zoom": 1.4
+      "in": 37.95,
+      "out": 39.8,
+      "zoom": 1.4,
+      "where": "middle: Settings dragged"
+    },
+    {
+      "name": "app-grid",
+      "in": 50.35,
+      "out": 52.4,
+      "zoom": 1.0,
+      "where": "whole screen: a folder opens"
     },
     {
       "name": "home-end",
       "in": 62.2,
       "out": 63.4,
-      "zoom": 1.0
+      "zoom": 1.0,
+      "where": "whole screen: to the lock screen"
     }
   ]
 }
