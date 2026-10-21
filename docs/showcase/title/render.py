@@ -7,7 +7,7 @@ server, then ffmpeg encodes them. The server serves the repository root, because
 imports the desktop's own spring.js from extensions/.
 
   render.py still 5.4 -o logo.png [--theme light]
-  render.py clip -o title.mp4 [--webp title.webp] [--width 1280] [--fps 30] [--theme light]
+  render.py clip -o title.mp4 [--webp title.webp] [--width 1920] [--fps 60] [--blur 6] [--theme light]
              [--plate-in in.png --plate-out out.png]
 """
 
@@ -43,7 +43,7 @@ def serve(frames_dir, done):
             if self.path.startswith('/frame/'):
                 n = int(self.path.rsplit('/', 1)[1])
                 (frames_dir / f'{n:05d}.png').write_bytes(body)
-                if n % 30 == 0:
+                if n % 60 == 0:
                     print(f'  frame {n}', file=sys.stderr)
             elif self.path == '/done':
                 done.set()
@@ -80,7 +80,7 @@ def clip(args):
         frames.mkdir()
         done = threading.Event()
         server = serve(frames, done)
-        url = page_url(server, args, {'render': 1, 'fps': args.fps})
+        url = page_url(server, args, {'render': 1, 'fps': args.fps, 'blur': args.blur})
         browser = subprocess.Popen([CHROMIUM, *CHROMIUM_FLAGS, f'--user-data-dir={tmp}/chromium', url],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -120,7 +120,8 @@ def main():
         else:
             p.add_argument('-o', '--output', help='MP4')
             p.add_argument('--webp', help='looping animated WebP')
-            p.add_argument('--fps', type=int, default=30)
+            p.add_argument('--fps', type=int, default=60)
+            p.add_argument('--blur', type=int, default=6, help='moments added up per frame (motion blur)')
             p.add_argument('--width', type=int, default=1920, help='MP4 width')
             p.add_argument('--webp-width', type=int, default=1280)
     args = parser.parse_args()

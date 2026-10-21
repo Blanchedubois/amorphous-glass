@@ -13,16 +13,17 @@ const DT = 1 / 240;
 /// the beats of the loop, in seconds: in from the montage's last frame, the clearing pass, the
 /// logo, the dissolving pass back, out to the montage's first frame
 export const SEQ = {
-    zoomIn: [0, 1.3],        // the camera zooms in from the plate to the bare wallpaper
-    uiOut: [0, 0.7],         // bar, dock and widgets fade out
-    textIn: [1.0, 1.4],      // the word fades in, crisp
-    passA: 1.4,              // the clearing pass sets off, left to right
+    zoomIn: [0, 1.8],        // the camera zooms in from the plate to the bare wallpaper
+    uiOut: [0.15, 1.2],      // bar, dock and widgets fade out as it moves
+    textIn: [1.4, 2.0],      // the word fades in, crisp, as the zoom settles
+    passA: 1.9,              // the clearing pass sets off, left to right
     passADur: 2.3,           // how long its guide takes to reach "glass"
-    passB: 5.8,              // the dissolving pass sets off from "glass", right to left
+    passB: 6.2,              // the dissolving pass sets off from "glass", right to left
     passBDur: 1.6,
-    zoomOut: [7.3, 8.8],     // the camera zooms back out to the plate
-    uiIn: [7.9, 8.8],        // bar, dock and widgets fade back in
-    end: 9.0,
+    passBIn: 0.35,           // the melt eases in as it sets off (no jump on the letters under it)
+    zoomOut: [7.2, 9.0],     // the camera zooms back out to the plate as the glass leaves
+    uiIn: [7.9, 8.9],        // bar, dock and widgets fade back in
+    end: 9.4,                // the plate, still, until the montage takes over
 };
 
 /// how far the camera is zoomed into the wallpaper while the title is on
@@ -41,6 +42,8 @@ export const smooth = (a, b, x) => {
     return t * t * (3 - 2 * t);
 };
 const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+// the camera: a gentler curve (peak speed 1.57x the average, against the cubic's 3x)
+const easeInOutSine = t => (1 - Math.cos(Math.PI * t)) / 2;
 const span = ([a, b], t) => clamp01((t - a) / (b - a));
 
 /// one glide of the glass from `from` to `to` (px), `t` seconds after it sets off: the guide
@@ -68,7 +71,7 @@ export function glide(t, from, to, dur) {
 /// the state of frame `t`. `cap`: the glass's rest shape over "glass" ({ cx, cy, w, h }, px)
 export function timeline(t, cap) {
     const s = {
-        cam: 1 + (CAM_ZOOM - 1) * (easeInOut(span(SEQ.zoomIn, t)) - easeInOut(span(SEQ.zoomOut, t))),
+        cam: 1 + (CAM_ZOOM - 1) * (easeInOutSine(span(SEQ.zoomIn, t)) - easeInOutSine(span(SEQ.zoomOut, t))),
         // 1: the bare wallpaper; 0: the plate (the montage's frame, with bar, dock and widgets)
         wallpaper: smooth(SEQ.uiOut[0], SEQ.uiOut[1], t) * (1 - smooth(SEQ.uiIn[0], SEQ.uiIn[1], t)),
         // the plate faded to: the montage's last frame at the start, its first at the end
@@ -76,7 +79,7 @@ export function timeline(t, cap) {
         textIn: smooth(SEQ.textIn[0], SEQ.textIn[1], t),
         melt: 0, wake: 1, gone: 0, dir: 1,
         cx: cap.cx, cy: cap.cy, w: cap.w, h: cap.h,
-        strength: 1, blur: 0, show: t > SEQ.passA && t < SEQ.zoomOut[0] + 0.5,
+        strength: 1, blur: 0, show: t > SEQ.passA && t < SEQ.zoomOut[1],
     };
     let g;
     if (t < SEQ.passB) {
@@ -87,9 +90,10 @@ export function timeline(t, cap) {
         s.wake = 260 * (1 - smooth(SEQ.passADur - 0.3, SEQ.passADur + 0.5, ta)) + 1;
     } else {
         // the dissolving pass: what it has passed is gone
-        g = glide(t - SEQ.passB, cap.cx, -cap.w * 1.6, SEQ.passBDur);
-        s.melt = 1;
-        s.gone = 1;
+        const tb = t - SEQ.passB;
+        g = glide(tb, cap.cx, -cap.w * 1.6, SEQ.passBDur);
+        s.melt = smooth(0, SEQ.passBIn, tb);
+        s.gone = s.melt;
         s.dir = -1;
     }
     // the shape keeps its area: height = rest height / sqrt(1 + stretch)
@@ -98,6 +102,6 @@ export function timeline(t, cap) {
     s.h = cap.h / Math.sqrt(1 + g.stretch);
     const speed = Math.abs(g.v);
     s.strength = 1 + 0.6 * Math.min(speed / 2500, 1);
-    s.blur = Math.min(speed / 2000, 1);
+    s.blur = 0;   // motion blur comes from the frames (render.py), not from a mip level
     return s;
 }

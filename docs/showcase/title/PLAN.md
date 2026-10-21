@@ -135,6 +135,20 @@ centre crop), so the crossfade changes only the bar, the dock and the widgets.
   light runs, each take starting and ending on about 2 s of the clean home screen with the cursor
   still, a fixed theme mode per take.
 
+## Phase 2 fixes (user, 2026-10-21: "choppy, artifacts in the refraction, jumpy between scenes")
+
+- **Refraction artifacts.** At 8x the desktop's edge band, the shader's quartz profile (steep at the
+  rim) folded the image back on itself and mirrored the letters above and below the capsule. The
+  title uses a quadratic edge displacement capped so it cannot fold (`edgeDisplacement()` in
+  glass.glsl); the mip-level speed blur, which looked boxy, is gone.
+- **Choppy.** 60 fps, and each frame adds up 6 moments across half its time (a 180 degree shutter):
+  real motion blur. The sum is kept in a float texture and dithered, so the gradients don't band.
+- **Jumpy.** The dissolving pass melted the right half of "glass" in one frame; its melt now eases
+  in over 0.35 s. The camera zooms on a sine ease (peak speed half the cubic's) over 1.8 s, the bar,
+  dock and widgets fade while it moves, and the word appears only as the zoom settles. Measured on
+  the render: no frame-to-frame change stands out from its neighbours; the loop seam is at
+  encoding noise. The loop is now 9.4 s.
+
 ## 6. Phases, and what I show at each
 
 | # | Phase | Show the user |
