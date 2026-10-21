@@ -149,6 +149,18 @@ centre crop), so the crossfade changes only the bar, the dock and the widgets.
   the render: no frame-to-frame change stands out from its neighbours; the loop seam is at
   encoding noise. The loop is now 9.4 s.
 
+## Phase 4: the renders (2026-10-21)
+
+| File | Size | Notes |
+|---|---|---|
+| `docs/showcase/media/title-dark.webp`, `title-light.webp` | 2.5 MB each | 1280x720, 30 fps, 9.4 s, loops forever; encoded with Pillow (libwebp), checked by decoding with libwebp |
+| `docs/showcase/media/title-still-dark.webp`, `title-still-light.webp` | 22 to 24 KB | the logo frame (t = 5.8 s), for `prefers-reduced-motion` |
+| `docs/showcase/title/renders/title-{dark,light}.mp4` | 2.7 / 2.5 MB | 1920x1080, 60 fps, motion blur; masters, not in git (upload by hand) |
+| `docs/showcase/title/renders/social-preview.png` | 0.5 MB | 1280x640, for the repo's Settings → Social preview; not in git |
+
+ffmpeg's `libwebp_anim` was dropped: its output built up blocky smears over the gradients.
+`render.py webp MASTER.mp4 -o LOOP.webp` re-encodes a loop from a master.
+
 ## 6. Phases, and what I show at each
 
 | # | Phase | Show the user |
