@@ -12,7 +12,7 @@ import St from 'gi://St';
 
 import {acquireFeed, Status} from './icsfeed.js';
 import {use24h} from './clocks.js';
-import {nowColor, schedule, timeLine, updatedAt, week} from './schedule-model.js';
+import {dayEvents, nowColor, schedule, timeLine, updatedAt, week} from './schedule-model.js';
 
 const esc = s => GLib.markup_escape_text(s, -1);
 
@@ -24,6 +24,23 @@ function weekStart() {
             return day % 7;
     } catch {}
     return Shell.util_get_week_start();
+}
+
+// refreshes asked for by the feed's signals: one widget per main-loop pass when the shell is
+// idle (idle sources of one priority all run in the same pass, so one source for all of them)
+const pending = new Set();
+let pendingId = 0;
+function refreshSoon(widget) {
+    pending.add(widget);
+    pendingId ||= GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        const next = pending.values().next().value;
+        pending.delete(next);
+        next?._refresh();
+        if (pending.size)
+            return GLib.SOURCE_CONTINUE;
+        pendingId = 0;
+        return GLib.SOURCE_REMOVE;
+    });
 }
 
 // the time the widgets see; the headless tests set another one (setClockForTests)
@@ -42,8 +59,8 @@ class ScheduleWidget {
         this._version = 0;   // of the events, for the header's dots
         this._feed.connectObject('events-changed', () => {
             this._version++;
-            this._refresh();
-        }, 'status-changed', () => this._refresh(), this);
+            this._refreshSoon();
+        }, 'status-changed', () => this._refreshSoon(), this);
 
         this.actor = new St.BoxLayout({
             style_class: `tahoe-sched ${this.constructor.styleClass}`,
@@ -75,12 +92,18 @@ class ScheduleWidget {
         this._refresh();
     }
 
+    // new events or a new status: when the shell is idle, one widget at a time
+    _refreshSoon() {
+        refreshSoon(this);
+    }
+
     _refresh() {
         if (!this._feed)
             return;
         const now = clockNow();
         this._feed.ensureWindow(now);
-        const rows = schedule(this._feed.events, now);
+        const day = now.format('%Y-%m-%d');
+        const rows = schedule(this._feed.memo(`day ${day}`, events => dayEvents(events, now)), now);
         const h24 = use24h();
         const state = this._state(rows, now, h24);
         // actors change only when what they say changes: the header once a day (and with new
@@ -90,9 +113,11 @@ class ScheduleWidget {
             this._headerKey = headerKey;
             this._header(now);
         }
+        // only the rows that can show get their words (a busy day can have hundreds)
         const large = this.constructor.large;
-        const lines = rows.map(r => timeLine(r, now, {h24, large}));
-        const key = JSON.stringify([state, rows.map((r, i) => [r.title, r.color, r.now, lines[i]])]);
+        const shown = rows.slice(0, this.constructor.maxRows);
+        const lines = shown.map(r => timeLine(r, now, {h24, large}));
+        const key = JSON.stringify([state, rows.length, shown.map((r, i) => [r.title, r.color, r.now, lines[i]])]);
         if (key === this._key)
             return;
         this._key = key;
@@ -187,6 +212,7 @@ class ScheduleWidget {
     }
 
     destroy() {
+        pending.delete(this);
         this._feed.disconnectObject(this);
         this._feed.release();
         this._feed = null;
@@ -254,7 +280,8 @@ export class ScheduleLarge extends ScheduleWidget {
         // this week from GNOME's first weekday; a dot under the other days that have events
         this._week.destroy_all_children();
         const grid = this._week.layout_manager;
-        week(this._feed.events, now, weekStart()).forEach((day, i) => {
+        const first = weekStart();
+        this._feed.memo(`week ${now.format('%Y-%m-%d')} ${first}`, events => week(events, now, first)).forEach((day, i) => {
             const weekend = day.weekend ? ' tahoe-sched-weekend' : '';
             grid.attach(new St.Label({style_class: `tahoe-sched-weekday${weekend}`,
                 text: day.date.format('%a').toUpperCase(), x_align: Clutter.ActorAlign.CENTER}), i, 0, 1, 1);

@@ -517,6 +517,135 @@ async function appButtonTest(players) {
     proc.force_exit();
 }
 
+// ---- the Schedule widgets: one feed for all, a 5 MB calendar, no stalls, no leaks ----
+// the longest gap between 1 ms timeouts on the shell's main loop: a stall shows as a long gap
+const marks = [];
+const mark = what => marks.push([what, GLib.get_monotonic_time()]);
+function stallMeter() {
+    let last = GLib.get_monotonic_time(), max = 0, over5 = 0, n = 0;
+    const t0 = last, gaps = [];
+    const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1, () => {
+        const t = GLib.get_monotonic_time();
+        const gap = (t - last) / 1000;
+        last = t;
+        max = Math.max(max, gap);
+        over5 += gap > 5 ? 1 : 0;
+        if (gap > 5)
+            gaps.push([Math.round((last - t0) / 1000), +gap.toFixed(1)]);
+        n++;
+        return GLib.SOURCE_CONTINUE;
+    });
+    return () => {
+        GLib.source_remove(id);
+        return {maxGapMs: +max.toFixed(1), gapsOver5ms: over5, samples: n, gaps,
+            marks: marks.splice(0).map(([w, t]) => [w, Math.round((t - t0) / 1000)])};
+    };
+}
+
+async function helpersRunning(cacheDir) {
+    const [, out] = GLib.spawn_command_line_sync('pgrep -af ics-expand.js');
+    return new TextDecoder().decode(out).split('\n').filter(l => l.includes(cacheDir)).length;
+}
+
+async function scheduleTest() {
+    const ext = Main.extensionManager.lookup(UUID);
+    const {acquireFeed, Status} = await import(`file://${ext.path}/icsfeed.js`);
+    const sched = () => ext.stateObj._entries.filter(e => e.spec.type.startsWith('schedule-')).map(e => e.widget);
+    const conf = GLib.build_filenamev([GLib.get_user_config_dir(), 'tahoe-glass']);
+    const cacheDir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-glass']);
+    const dir = GLib.dir_make_tmp('ics-stress-XXXXXX');
+    GLib.spawn_command_line_sync(`python3 -I ${HARNESS}/ics-bigfeed.py ${dir}/big.ics 5`);
+    const server = Gio.Subprocess.new(['python3', '-I', `${HARNESS}/ics-server.py`, `${dir}/port`, dir], Gio.SubprocessFlags.NONE);
+    for (let i = 0; i < 50 && !GLib.file_test(`${dir}/port`, GLib.FileTest.EXISTS); i++)
+        await sleep(100);
+    const port = new TextDecoder().decode(GLib.file_get_contents(`${dir}/port`)[1]).trim();
+    const get = path => new TextDecoder().decode(GLib.spawn_command_line_sync(
+        `python3 -I -c "import urllib.request,sys; sys.stdout.write(urllib.request.urlopen('http://127.0.0.1:${port}${path}').read().decode())"`)[1]);
+    const r = {widgets: sched().length};
+
+    const feed = acquireFeed();
+    let expands = 0, eventsChanged = 0;
+    const orig = feed._expand.bind(feed);
+    feed._expand = now => {
+        expands += feed._helper ? 0 : 1;   // a call while one runs only asks for another check
+        return orig(now);
+    };
+    feed.connect('events-changed', () => {
+        eventsChanged++;
+        mark(`events-changed (${feed.events.length})`);
+    });
+    feed.connect('status-changed', () => mark(`status ${feed.status}`));
+    feed.connect('data-changed', () => mark('data-changed (copy saved)'));
+
+    // the first fetch of a 5 MB feed and its reading, with the main loop watched throughout
+    const idleMeter = stallMeter();
+    await sleep(3000);
+    r.stallsIdle = idleMeter();
+    get('/_log');
+    const meter = stallMeter();
+    const t0 = GLib.get_monotonic_time();
+    GLib.file_set_contents_full(`${conf}/calendar-url`, `http://127.0.0.1:${port}/stress/big.ics\n`, GLib.FileSetContentsFlags.CONSISTENT, 0o600);
+    GLib.file_set_contents_full(`${conf}/calendar-source`, 'store=file\nchanged=1\n', GLib.FileSetContentsFlags.CONSISTENT, 0o600);
+    for (let i = 0; i < 300 && !(feed.events.length && feed._helper === null); i++)
+        await sleep(100);
+    r.loadSeconds = +((GLib.get_monotonic_time() - t0) / 1e6).toFixed(2);
+    await sleep(1000);
+    r.stallsWhileLoading = meter();
+    r.requests = JSON.parse(get('/_log')).length;
+    r.helperRuns = expands;
+    r.events = feed.events.length;
+    r.eventsChanged = eventsChanged;
+
+    // what the shell itself does with the answer, timed alone
+    const out = JSON.stringify({events: feed.events});
+    let t = GLib.get_monotonic_time();
+    JSON.parse(out);
+    r.parseAnswerMs = +((GLib.get_monotonic_time() - t) / 1000).toFixed(1);
+    r.answerKB = Math.round(out.length / 1024);
+    t = GLib.get_monotonic_time();
+    for (const w of sched()) {
+        w._key = null;   // force a full rebuild of the rows
+        w._headerKey = null;
+        w.tick();
+    }
+    r.rebuildAllMs = +((GLib.get_monotonic_time() - t) / 1000).toFixed(1);
+    t = GLib.get_monotonic_time();
+    for (let i = 0; i < 20; i++)
+        sched().forEach(w => w.tick());
+    r.idleTickPerWidgetUs = Math.round((GLib.get_monotonic_time() - t) / 20 / r.widgets);
+    write({schedule: 'load', ...r, status: feed.status});
+
+    // idle: the Schedule widgets want no seconds
+    await idle('Schedule widgets, clock and calendar, 65 s', 65000);
+    await fullscreenCover();
+
+    // lock and disable cycles, some while the reader runs (a new copy every time)
+    const before = await counts('schedule: before cycles');
+    for (let i = 0; i < 6; i++) {
+        GLib.spawn_command_line_sync(`touch ${dir}/big.ics`);   // a new ETag: a new copy, read again
+        feed._lastAttempt = 0;
+        feed._soon(0);
+        await sleep(1200 + (i % 3) * 200);   // the fetch done, the reader just started
+        Main.sessionMode.pushMode('unlock-dialog');
+        await sleep(i % 2 ? 50 : 300);
+        Main.sessionMode.popMode('unlock-dialog');
+        await sleep(400);
+    }
+    await sleep(2500);
+    await offOnCycles(6);
+    await sleep(3000);
+    const after = await counts('schedule: after 6 lock and 6 disable cycles');
+    const leftover = await helpersRunning(cacheDir);
+    feed.release();
+    await sleep(500);
+    const released = {timer: feed._timerId, helper: feed._helper, users: feed._users};
+    write({schedule: 'cycles', timers: [before.timers, after.timers], dbusSubs: [before.dbusSubs, after.dbusSubs],
+        actors: [before.actors, after.actors], matchRules: [before.matchRules, after.matchRules],
+        helpersLeftRunning: leftover, widgetsAfter: sched().length, eventsAfter: feed.events.length, statusAfter: feed.status,
+        feedUsersAfterOurRelease: released.users, errors: errors()});
+    server.force_exit();
+}
+
 // errors and criticals the shell has logged so far (its stderr is $SHOT_OUT/shell.log)
 function errors() {
     try {
@@ -595,6 +724,10 @@ export default class Stress extends Extension {
             // widgets from before the swirl have no swirl.js
             const mod = await import(`file://${ext.path}/swirl.js`).catch(() => ({swirlFramesRunning: () => 0}));
             await measure('paused from the start', 6000, mod);
+            return;
+        }
+        if (GLib.getenv('STRESS_ONLY') === 'schedule') {
+            await scheduleTest();
             return;
         }
         if (GLib.getenv('STRESS_ONLY') === 'drags') {
