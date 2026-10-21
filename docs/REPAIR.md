@@ -241,3 +241,91 @@ Keep every fix today's script has (they are all deterministic and mostly right),
   longer applies;
 - tell the user with a desktop notification when a logout or a sudo step is needed;
 - keep the on/off switches: a feature switched off stays off; the manifest decides what "on" means.
+
+## Phase 2: design of the new repair
+
+### Pieces
+
+| File | What it is |
+|---|---|
+| `scripts/repair_manifest.py` | The expected state as code: every item of the inventory that can be checked, with the state-file condition it applies under. Radii, edge alpha and the GTK block markers come from `tokens/` through `glass-tokens.py`. `python3 scripts/repair_manifest.py > config/repair-manifest.json` |
+| `config/repair-manifest.json` | The generated manifest, committed. `check` reports it as stale when the tokens or the generator changed and it was not regenerated |
+| `scripts/tahoe_repair.py` | The engine: reads the state file and the manifest, probes versions, runs `check` or `repair` |
+| `scripts/tahoe-repair.sh` | The entry point the autostart already runs. No argument = `repair` (as today); `check`, `repair`, `status`, `units on|off`, `--gdm` |
+| `config/systemd/tahoe-repair.{service,path}` | Optional user units: run `repair` when the pacman hook's stamp or GNOME's pending extension updates change |
+| `config/pacman/95-tahoe-repair.hook` | Optional root hook: after gnome-shell, mutter, gtk3/4, libadwaita, gdm or gnome-shell-extensions change, it only writes `/var/lib/tahoe-repair/packages-changed` (package names and time). It never touches the user session |
+
+### Modes and exit codes
+
+- `check`: read-only. Prints one line per item (`ok`, `drift`, `action`, `held`, `info`) and exits
+  with the worst: 0 all good, 1 drift that `repair` can fix, 2 something needs the user (a logout,
+  a sudo step, a held update), 3 the check itself failed.
+- `repair`: runs `check`, fixes only the items in drift, then checks again and reports what is
+  left. Every change is logged to the journal and `~/.local/state/tahoe-repair/log`. Every file is
+  copied to `~/.local/state/tahoe-repair/backup/<time>/` before anything rewrites it (the Blur My
+  Shell folder as a tar). A lock (`flock`) stops two runs at once (autostart and the path unit).
+- Neither ever runs `sudo`. Root items (login screen) are checked and reported with the exact
+  command for the user.
+
+### The user's switches
+
+- `~/.config/tahoe-glass/state` stays the source of the switches, read the same way as today
+  (`enabled`, `bar`, `menus`, `dock`, `apps`, `mode`, old `tint`, `widgets`, `motion`,
+  `lockscreen`, `controlcenter`, `menubar`). A feature whose key is `off` is kept off (its uuid
+  is removed from `enabled-extensions` if it comes back); a key that is absent leaves the extension
+  as the user has it.
+- `enabled-extensions` is compared as a set, and only the design's own uuids are added or removed;
+  other extensions and the order are the user's.
+- New, optional: `repair-skip=C2,D6` in the state file leaves those manifest items alone (a user
+  choice made in GNOME's own settings that should stick); `repair=off` stops the repair entirely.
+
+### Version guards
+
+- The manifest names the GNOME major it was tested on (`tested_shell: ["51"]`). On another major
+  the repair goes into **hold**: it turns extension version validation back on (so only extensions
+  that say they support the running shell load), does not reapply 51-only patches and ports (the
+  RWC port, Kiwi's fix, the BMS build), does not enable tahoe-* extensions that do not list the
+  running shell, and notifies the user once with what was held back.
+- `~/.local/state/tahoe-repair/versions.json` records gnome-shell, mutter, gtk3, gtk4, libadwaita,
+  gdm and the extension versions at the last run, so a change is reported once ("gnome-shell
+  51.1 → 51.2"), and the running shell is compared with the installed package ("log out to finish
+  the GNOME update").
+- Blur My Shell: the build is stamped with the upstream commit and the patch's sha256
+  (`glass-bar.sh build_bms` writes `tahoe-glass-commit` and `tahoe-glass-patch-sha256` to its
+  metadata). Drift: the patch markers are missing (EGO swapped the build), or the stamp differs from
+  the repo's patch. Before rebuilding, the patch is tried with `git apply --check` on the pinned
+  commit; if it no longer applies, nothing is removed and the user is told. A build with no stamp
+  (made before this) is reported as unverified, not rebuilt.
+- GNOME's own updater downloads updates to `~/.local/share/gnome-shell/extension-updates/<uuid>` and
+  installs them at the next login. For the patched extensions (Blur My Shell, Rounded Window
+  Corners, Kiwi Menu) a pending update would drop the patch, so `repair` moves it to the backup
+  folder and tells the user that a new upstream version is waiting for the patch to be rebased.
+- The login screen: when `/etc/dconf/db/gdm.d/90-tahoe-gdm` exists (the user installed it), the
+  system gresource must still hold `tahoe-gdm-background.png`; if a gnome-shell update replaced it,
+  the user is notified with `bash scripts/gdm-theme.sh install`. After a major bump the old
+  `.pre-gdm-tahoe` base is reported stale instead.
+
+### Triggers
+
+1. Login autostart, as now (`~/.config/autostart/tahoe-repair.desktop`). The engine waits up to
+   60 s for the shell's extension system on the session bus before it checks extension state, and
+   only toggles the shell theme when a theme file was rewritten or the name was wrong.
+2. Optional `tahoe-repair.path` (user): watches `/var/lib/tahoe-repair/packages-changed` and
+   `~/.local/share/gnome-shell/extension-updates`, starts `tahoe-repair.service` (`repair`).
+   `bash scripts/tahoe-repair.sh units on` installs and enables them (asks nothing of root).
+3. Optional pacman hook (root, the user installs it with sudo): only writes the stamp file.
+
+### Notifications
+
+`notify-send` (app name "Tahoe repair"), one per run, only for things the user has to do: log out
+(a rebuilt Blur My Shell, a reinstalled extension, a GNOME update), run a sudo command (login
+screen), or a held update (new GNOME major, patch no longer applies). The same message is not
+repeated within a day (`~/.local/state/tahoe-repair/notified`).
+
+### What stays from today's script
+
+Every fix in the Phase 1 table, with the same commands (glass-bar.sh subcommands for the glass,
+gsettings for keys), except: step 5c (v75 modal dialogs) and 5b2 (pre-v76 patch markers) become
+checks with no automatic fix; step 8's `rm -rf` and refetch becomes "fetch only when the folder is
+missing, and never for the patched extensions"; MacTahoe is rebuilt only when its theme folder is
+missing, not when `gtk.css` is merely not a link.
