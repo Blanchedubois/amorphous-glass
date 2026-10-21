@@ -1,0 +1,7 @@
+# files tahoe-nowplaying carries as exact copies in its shared/ folder (an installed extension must
+# be self-contained): source (relative to extensions/), dest (in shared/). Sync with
+# sync-shared.sh after changing a source; check-shared.sh fails on drift.
+# the clock: the lock screen's glass clock (date and time panes, B2 clear blur), the login screen's
+tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
+# its glass: the SDF Liquid Glass pane the clock's glyph panes are drawn with
+tahoe-gdm@cachyos-tahoe/glass.js paneglass.js

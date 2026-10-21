@@ -5,6 +5,7 @@
 # shell.log. Exit status 0 when every test passed and the shell logged no unexpected JS error.
 #   NP_ONLY=prefix   run only the tests whose name starts with it
 #   EXT_DIR=path     the extension to test (default: this checkout's)
+#   NP_MONITOR=WxH   the virtual monitor (default 2560x1440)
 set -eu
 out=$(realpath -m "$1")
 H=$(cd "$(dirname "$0")" && pwd)
@@ -15,6 +16,7 @@ root=$(mktemp -d -t tahoe-nowplaying-test.XXXX)
 # creates or deletes the real session's crash guard file in /run/user
 export XDG_RUNTIME_DIR=$(mktemp -d "/tmp/nprun.XXXX")
 chmod 700 "$XDG_RUNTIME_DIR"
+"$H/check-shared.sh" >/dev/null
 mkdir -p "$out"; rm -f "$out"/*.png "$out"/results.jsonl "$out"/driver.log
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
 export GSETTINGS_BACKEND=keyfile NP_OUT=$out
@@ -38,7 +40,7 @@ idle-activation-enabled=false
 idle-delay=uint32 0
 KF
 timeout ${NP_TIMEOUT:-180} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "nptest-$$" \
-  --virtual-monitor 2560x1440@60 > "$out/shell.log" 2>&1 || true
+  --virtual-monitor ${NP_MONITOR:-2560x1440}@60 > "$out/shell.log" 2>&1 || true
 # the test session's document portal mounts a FUSE file system in its runtime dir
 fusermount3 -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || fusermount -uz "$XDG_RUNTIME_DIR/doc" 2>/dev/null || true
 rm -rf "$root" "$XDG_RUNTIME_DIR"

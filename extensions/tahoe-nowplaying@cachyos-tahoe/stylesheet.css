@@ -1,9 +1,8 @@
-/* Tahoe Now Playing (docs/NOWPLAYING_PLAN.md). Phase 1: a plain dark field (the blurred desktop
-   and the swirl come in Phases 4 and 6) and the chevron, here a CSS stand-in for the widgets' dark
-   glass (tokens/glass.json "dark": tint rgb 34,34,38 at 0.42, 1 px white edge at 0.16); Phase 5
-   puts the real glass (the widgets' glass.js) under it. */
+/* Tahoe Now Playing (docs/NOWPLAYING_PLAN.md). The chevron here is a CSS stand-in for the widgets'
+   dark glass (tokens/glass.json "dark": tint rgb 34,34,38 at 0.42, 1 px white edge at 0.16);
+   Phase 5 puts the real glass (the widgets' glass.js) under it. */
 
-.tahoe-np-overlay { background-color: rgba(12, 12, 16, 0.92); }
+.tahoe-np-overlay { background-color: #000000; }
 
 .tahoe-np-chevron {
   border-radius: 9999px;
@@ -15,3 +14,21 @@
 .tahoe-np-chevron:active { background-color: rgba(64, 64, 70, 0.58); }
 
 .tahoe-np-symbol { color: inherit; }
+
+/* Phase 2: the backdrop stand-in (Phase 4 puts the swirl over the blurred desktop here) */
+.tahoe-np-backdrop {
+  background-gradient-direction: vertical;
+  background-gradient-start: #8a3a52;
+  background-gradient-end: #1f5a68;
+}
+
+/* the cover's stand-in: the Music widget's empty art */
+.tahoe-np-cover { background-color: rgba(255, 255, 255, 0.12); }
+
+/* the controls float, no plate; hover and press are the Music widget's (.tahoe-music-ink-white) */
+.tahoe-np-control { border-radius: 9999px; padding: 0; }
+.tahoe-np-control:hover { background-color: rgba(255, 255, 255, 0.14); }
+.tahoe-np-control:active { background-color: rgba(255, 255, 255, 0.20); }
+
+/* the lyrics: the widget's .tahoe-music-lyric, larger (the size is set in code) */
+.tahoe-np-lyric { font-family: "SF Pro Display", sans-serif; font-weight: 700; }

@@ -306,6 +306,90 @@ test('hotkey spam', async () => {
     assertClean('after 40 toggles');
 });
 
+// ---- Phase 2: the layout ----
+
+async function shot(name) {
+    const file = Gio.File.new_for_path(`${OUT}/${name}.png`);
+    const stream = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
+    const shooter = new Shell.Screenshot();
+    await new Promise((resolve, reject) => shooter.screenshot_area(0, 0, global.stage.width, global.stage.height, stream,
+        (o, res) => {
+            try {
+                o.screenshot_area_finish(res);
+                resolve();
+            } catch (e) {
+                reject(e);
+            }
+        }));
+    await new Promise(resolve => stream.close_async(0, null, () => resolve()));
+}
+
+const overlaps = (a, b) => a.x < b.x + b.width - 1 && b.x < a.x + a.width - 1 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
+
+// every part on the monitor, nothing overlapping, the group centred, the clock above the column
+// and its glass painted; returns the numbers for the log
+function checkLayout(view, blend) {
+    const problems = [];
+    const g = view.geometry;
+    const m = Main.layoutManager.primaryMonitor;
+    const boxes = view.boxes();
+    for (const [name, b] of Object.entries(boxes)) {
+        if (b.x < m.x - 1 || b.y < m.y - 1 || b.x + b.width > m.x + m.width + 1 || b.y + b.height > m.y + m.height + 1)
+            problems.push(`${name} off the monitor ${JSON.stringify(b)}`);
+    }
+    const names = ['cover', 'title', 'artist', 'progress', 'times', 'transport', 'volume', 'chevron', 'lyrics'].filter(n => boxes[n]);
+    for (let i = 0; i < names.length; i++) {
+        for (let j = i + 1; j < names.length; j++) {
+            if (overlaps(boxes[names[i]], boxes[names[j]]))
+                problems.push(`${names[i]} overlaps ${names[j]}`);
+        }
+    }
+    if (blend === 1 && !boxes.lyrics)
+        problems.push('no lyrics in the two-column layout');
+    if (blend === 0 && boxes.lyrics)
+        problems.push('lyrics shown in the centred layout');
+    // the group's middle (two columns: the column's left to the lyrics' right) on the screen's
+    const left = boxes.cover.x;
+    const right = blend === 1 ? boxes.lyrics.x + boxes.lyrics.width : boxes.cover.x + boxes.cover.width;
+    const middle = (left + right) / 2;
+    const centre = m.x + m.width / 2;
+    if (Math.abs(middle - centre) > 1)
+        problems.push(`group middle ${middle} vs screen centre ${centre}`);
+    // the column's rows centred on the cover's axis
+    const axis = boxes.cover.x + boxes.cover.width / 2;
+    for (const n of ['title', 'artist', 'progress', 'times', 'transport', 'volume']) {
+        const mid = boxes[n].x + boxes[n].width / 2;
+        if (Math.abs(mid - axis) > 1)
+            problems.push(`${n} off the cover's axis by ${(mid - axis).toFixed(1)}`);
+    }
+    // the chevron and the clock on the screen's centre line; the clock above the column
+    const chev = boxes.chevron;
+    if (Math.abs(chev.x + chev.width / 2 - centre) > 1)
+        problems.push('the chevron is off centre');
+    if (g.clock.bottom > boxes.cover.y - 1)
+        problems.push(`the clock (bottom ${g.clock.bottom}) runs into the cover (${boxes.cover.y})`);
+    if (view.clockFailed || view.clockPaints < 1)
+        problems.push(`the glass clock did not paint (failed ${view.clockFailed}, paints ${view.clockPaints})`);
+    log(`  layout ${m.width}x${m.height} blend ${blend}: u ${g.u.toFixed(3)} k ${g.k.toFixed(3)} middle ${middle.toFixed(1)} centre ${centre} cover ${JSON.stringify(boxes.cover)} chevron y ${chev.y}`);
+    if (problems.length)
+        throw new Error(problems.join('; '));
+}
+
+test('layout: both layouts', async () => {
+    const ov = await openView();
+    await sleep(1500);   // the clock's glyph masks are drawn after the first layout
+    const tag = `${global.stage.width}x${global.stage.height}`;
+    await shot(`layout-lyrics-${tag}`);
+    checkLayout(ov.view, 1);
+    ov.view.setBlend(0);
+    await sleep(300);
+    await shot(`layout-nolyrics-${tag}`);
+    checkLayout(ov.view, 0);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the layout test');
+});
+
 async function run() {
     await sleep(Number(GLib.getenv('NP_WAIT') ?? 3000));
     Main.overview.hide();
