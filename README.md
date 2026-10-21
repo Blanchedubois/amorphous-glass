@@ -3,7 +3,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
-    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words and refracts them, then the camera zooms out onto the desktop and follows the cursor through quick settings, the calendar, menus, windows, the overview, widgets and the lock screen, and back to the title">
+    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words and refracts them; then the desktop, seen close up with the cursor always in the middle: a widget dragged, the desktop menu, quick settings, Files and Settings dragged as windows, a window menu, search and the app grid, the calendar, the volume, the music widgets and the lock screen, and back to the title">
   </picture>
 </p>
 
