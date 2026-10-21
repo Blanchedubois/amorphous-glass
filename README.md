@@ -90,11 +90,7 @@ at every frame.
 
 ### The glass
 
-One recipe draws every surface: tint, blur, refraction, rim light and an inner edge shadow, from
-`glass_params()` in `scripts/glass-bar.sh`. The radii and colours come from `tokens/`, and
-`docs/STANDARD.md` is the standard every surface follows.
-
-The glass is drawn by a patched [Blur My Shell](https://github.com/aunetx/blur-my-shell) v76
+The glass described [above](#design) is drawn by a patched [Blur My Shell](https://github.com/aunetx/blur-my-shell) v76
 (`config/bms-tahoe-glass.patch`). CSS draws only the rows and the text.
 
 | Quick settings | Calendar and notifications |
@@ -131,9 +127,10 @@ same glass, rounded concentrically with their rows.
 
 The motion comes from the `tahoe-motion` extension.
 
-- **Popups:** they grow from the icon you clicked as a circle of glass, with a calm ease and no
-  overshoot.
-- **Glass under motion:** the glass stays live while a popup moves or resizes.
+- **Popups:** a drop of glass pours out of the icon you clicked (or the pointer, for right-click
+  menus), grows into the card, overshoots by about 2 % and settles; closing pours it back, faster.
+- **Glass under motion:** the glass stays live while a popup moves or resizes; only quick settings
+  holds its blur for the moment the panel grows, then goes live again.
 - **Menu to menu:** moving between top bar menus hands one over to the next.
 - **Windows:** they open with a short spring.
 
@@ -179,7 +176,6 @@ synced lyrics, from a `.lrc` next to a local file or from lrclib.net. Above: *Nu
 | Calendar: Schedule, Schedule Large | small, large | `schedule.js`, `schedule-model.js`, `icsfeed.js`, `ics-expand.js` | today's events from a calendar's private ICS link (Google Calendar's "Secret address in iCal format"), refreshed every 15 min, cached for offline; desktop only, not on the lock screen (sheets `docs/shots/schedule-{light,dark,milky}.png`, `schedule-states.png`) |
 | Weather, Next Hours, Week | small, medium, large | `weather.js` | the shell's WeatherClient (libgweather), location from GNOME Weather, refreshed every 30 min |
 | Music, Wide, Large (356 x 504), Lyrics, Extra Large Wide (728 x 504), Extra Large Tall (356 x 864) | small, medium, large, large, extra large | `music.js`, `mpris.js`, `swirl.js`, `palette.js` | MPRIS; synced lyrics from a `.lrc` next to a local file, else lrclib.net (Lyrics widget only, once per track); the glass is tinted by a slow swirl of the cover's colours; the app icon raises the player's window (sheets `docs/shots/music-all-{light,dark}.png`) |
-
 
 ### Schedule widgets: setting your calendar link
 
@@ -338,7 +334,6 @@ something needs you. `repair` fixes only the drift, logged and backed up.
 
 On a GNOME major it was not tested on, it holds back the 51-only patches instead of forcing them.
 Details, the switches and the drift test results: `docs/REPAIR.md`.
-
 
 ## Credits and inspirations
 
