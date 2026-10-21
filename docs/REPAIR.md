@@ -1,8 +1,83 @@
-# Keeping the design through updates: inventory and impact analysis
+# Keeping the design through updates: tahoe-repair
 
-Written 2026-10-20 for a new `tahoe-repair`. Phase 0 is the inventory of everything the design
-depends on; Phase 1 measures today's `scripts/tahoe-repair.sh` against it. The design of the new
-repair (Phase 2) follows after the user's review of these two.
+`scripts/tahoe-repair.sh` keeps every feature and design choice of the Liquid Glass desktop in place
+when pacman, GNOME's extension updater, a MacTahoe reinstall or a settings change undoes one. It
+runs at every login (`~/.config/autostart/tahoe-repair.desktop`). It only fixes what drifted, and a
+feature you switched off stays off. It never runs sudo.
+
+## Running it by hand
+
+```bash
+bash ~/Projects/liquid-glass/scripts/tahoe-repair.sh check
+```
+
+`check` is read-only: one line per item that is not ok, then a summary. Exit 0 = all as designed,
+1 = drift that `repair` fixes, 2 = something needs you (a logout, a sudo command, a held update),
+3 = a check failed. Add `--verbose` to see every item, `--only D2-menu,A3` for some of them.
+
+```bash
+bash ~/Projects/liquid-glass/scripts/tahoe-repair.sh repair
+```
+
+`repair` fixes the drifted items, then checks again. Every change goes to the journal and to
+`~/.local/state/tahoe-repair/log`. Every file is copied to `~/.local/state/tahoe-repair/backup/<time>/`
+before it changes. If anything needs you, one desktop notification says what (at most once a day for
+the same message). With no argument the script does a `repair` after waiting up to 60 s for the
+shell, which is what the autostart runs.
+
+```bash
+bash ~/Projects/liquid-glass/scripts/tahoe-repair.sh status
+```
+
+`status` prints the switches, the installed versions and whether the repair is in hold mode (a GNOME
+major the design was not tested on). Other entry points: `tahoe-repair` (the `~/.local/bin` link,
+item H2), and `--gdm`, which prints the root commands for the login screen.
+
+**Your switches** live in `~/.config/tahoe-glass/state`, as before. `tahoe-motion.sh off`,
+`tahoe-widgets.sh off` and the others set `<feature>=off`, and repair keeps that feature off. A
+switch that is absent leaves the extension as you have it. Two new keys:
+
+- `repair-skip=C2,D6`: repair leaves those items alone, so a change made in GNOME's own settings
+  sticks. The ids are the second column of `check`. A prefix such as `D6` skips the group.
+- `repair=off`: repair does nothing (`check` still reports).
+
+**Adding a feature:** add its items to `scripts/repair_manifest.py`, then regenerate:
+
+```bash
+python3 scripts/repair_manifest.py > config/repair-manifest.json
+```
+
+`check` reports a stale manifest (item H8) and then uses the current tokens anyway.
+
+**Optional triggers.** Both are off until you turn them on. The user unit runs the repair when
+packages or GNOME's pending extension updates change:
+
+```bash
+bash ~/Projects/liquid-glass/scripts/tahoe-repair.sh units on
+```
+
+The pacman hook only writes `/var/lib/tahoe-repair/packages-changed`. It needs root, and you
+install it yourself:
+
+```bash
+sudo install -m644 ~/Projects/liquid-glass/config/pacman/95-tahoe-repair.hook /etc/pacman.d/hooks/
+```
+
+**Testing changes to the repair:** `python3 tools/repair-test/drift_test.py <new folder>` runs the
+33 drift scenarios of Phase 4 in a throwaway home on its own D-Bus session. It never touches the
+live desktop.
+
+**When GNOME's major version changes** (51 to 52), repair goes into hold:
+
+- it turns extension version checks back on, so only extensions built for the new GNOME load;
+- it does not reapply the 51-only patches and ports;
+- it tells you once.
+
+The design comes back by updating it for the new GNOME and adding the major to `TESTED_SHELL` in
+`scripts/repair_manifest.py`.
+
+The rest of this file is how it was built: Phase 0 is the inventory, Phase 1 measures the old script
+(now `scripts/tahoe-repair-legacy.sh`) against it, Phase 2 is the design, Phase 4 the test results.
 
 Machine at the time: GNOME Shell 51.1, mutter 51.0, gtk3 3.24.52, gtk4 4.24.1, libadwaita 1.10.0,
 gdm 51.1, glib2 2.90.1, gjs 1.90.1 (CachyOS). Live state file:

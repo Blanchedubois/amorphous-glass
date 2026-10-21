@@ -52,6 +52,12 @@ The user chose the circle-from-the-icon morph for the open animation, a calm eas
 overshoot, frozen glass during the animation, and wants it on the dock menus and the desktop
 right-click menu too. Phases 1 to 5 are in `docs/gnome-tahoe/animations.md`.
 
+## Keeping it through updates (2026-10-20)
+
+`scripts/tahoe-repair.sh` is now a check and repair against a manifest generated from `tokens/`
+(`docs/REPAIR.md`). A new feature needs its items added to `scripts/repair_manifest.py`, or the repair
+will not keep it.
+
 ## Rules the user set
 
 - Leave the menu bar contents and icons alone; keep the quick settings layout.
