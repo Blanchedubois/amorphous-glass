@@ -86,10 +86,20 @@ def settle(ms):
 
 
 def move(x, y, ms=700):
-    """an eased glide (the driver's ease in-out), at least 0.6 s for a long way: the camera follows"""
+    """a glide that starts at full speed and settles into place (ease-out quart), steered from here
+    in 8 ms steps (the installed driver's own glide eases in, which read as the whole frame speeding
+    up under the locked camera; GNOME keeps the old driver code until the user logs out)"""
     x, y, ms = int(x), int(y), max(300, int(ms * TEMPO))
-    log(move=[POS[0], POS[1], x, y, ms])
-    call('Move', (x, y, ms), '(iiu)')
+    x0, y0 = POS
+    log(move=[x0, y0, x, y, ms])
+    start = time.monotonic()
+    while True:
+        t = min(1.0, (time.monotonic() - start) * 1000 / ms)
+        e = 1 - (1 - t) ** 4
+        call('Move', (round(x0 + (x - x0) * e), round(y0 + (y - y0) * e), 0), '(iiu)')
+        if t >= 1:
+            break
+        time.sleep(0.008)
     POS[:] = [x, y]
 
 
@@ -286,7 +296,7 @@ def restore():
         steps.append(lambda: shutil.copy2(LAYOUT + '.before-showcase', LAYOUT))
         steps.append(reload_widgets)
     if STATE.get('driver'):
-        steps.append(lambda: subprocess.run(['gnome-extensions', 'disable', 'showcase@local'], check=True))
+        steps.append(lambda: subprocess.run(['gnome-extensions', 'disable', DRIVER], check=True))
     if STATE.get('driver_copied'):
         steps.append(lambda: shutil.rmtree(STATE['driver_copied']))
     for step in steps:
@@ -575,18 +585,22 @@ def main():
         log(restored=True)
 
 
+DRIVER = 'showcase@local'
+
+
 def driver_on():
     """the driver is on only for the shoot (it can move the pointer and press keys)"""
-    installed = os.path.expanduser('~/.local/share/gnome-shell/extensions/showcase@local')
+    installed = os.path.expanduser(f'~/.local/share/gnome-shell/extensions/{DRIVER}')
     if not os.path.isdir(installed):
         shutil.copytree(os.path.join(os.path.dirname(HERE), 'showcase@local'), installed)
         STATE['driver_copied'] = installed
-    if 'Enabled: Yes' not in subprocess.run(['gnome-extensions', 'info', 'showcase@local'], capture_output=True, text=True).stdout:
-        subprocess.run(['gnome-extensions', 'enable', 'showcase@local'], check=True)
+        pause(1500)                           # the shell notices the new folder
+    if 'Enabled: Yes' not in subprocess.run(['gnome-extensions', 'info', DRIVER], capture_output=True, text=True).stdout:
+        subprocess.run(['gnome-extensions', 'enable', DRIVER], check=True)
         STATE['driver'] = True
     for _ in range(40):
         try:
-            log(driver=call('Ping', out='(s)'))
+            log(driver=call('Ping', out='(s)'), moves='out-quart (stepped here)', drags='driver in-out')
             return
         except GLib.Error:
             pause(500)

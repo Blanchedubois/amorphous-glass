@@ -1,60 +1,60 @@
 {
-  "about": "The montage, round 3 (user, 2026-10-21: faster and choppier, the OS's own animations, the lock screen full screen with music and a demo sign-in, a slower menu slide, a seamless loop). Sources: the reshoot at tempo 0.5 (menu-slide retaken slower), redacted; the lock screen recorded in a throwaway shell (tools/showcase/lock-video.sh). Desktop shots through the locked 1.6x camera; the lock, sign-in and closing home shots full screen, so the closing frame is the title's first and the loop has no seam.",
+  "about": "The montage, round 3 (user, 2026-10-21: faster and choppier, the OS's own animations, the lock screen full screen with music and a demo sign-in, a slower menu slide, a seamless loop). Sources: the reshoot of 2026-10-21 evening (moves start at full speed and settle: ease-out, no speed-up; tempo 0.5, the menu slide slower), redacted; the lock screen recorded in a throwaway shell (tools/showcase/lock-video.sh). Desktop shots through the locked 1.6x camera; the lock, sign-in and closing home shots full screen, so the closing frame is the title's first and the loop has no seam. Every shot starts on the frame its first glide begins and ends after its payoff settles, before the next move: each cut joins two resting cursors at the centre.",
   "zoom": 1.6,
   "shots": [
     {
       "name": "home",
       "clip": "home.mp4",
       "in": 0.2,
-      "len": 0.5
+      "len": 0.6
     },
     {
       "name": "D widget-drag",
       "clip": "widget-drag.mp4",
-      "in": 0.85,
-      "len": 1.6
+      "in": 1.22,
+      "len": 0.93
     },
     {
       "name": "P quick-settings",
       "clip": "quick-settings.mp4",
-      "in": 0.8,
-      "len": 2.6
+      "in": 0.92,
+      "len": 2.18
     },
     {
       "name": "P menu-slide",
       "clip": "menu-slide.mp4",
-      "in": 1.45,
-      "len": 6.75
+      "in": 1.05,
+      "len": 6.55
     },
     {
       "name": "W files-window",
       "clip": "files-window.mp4",
-      "in": 2.55,
-      "len": 2.9
+      "in": 2.58,
+      "len": 3.02
     },
     {
       "name": "W settings-window",
       "clip": "settings-window.mp4",
-      "in": 2.55,
-      "len": 2.9
+      "in": 2.59,
+      "len": 3.01
     },
     {
       "name": "O overview-search",
       "clip": "overview-search.mp4",
-      "in": 0.2,
-      "len": 2.8
+      "in": 1.25,
+      "len": 1.95
     },
     {
       "name": "O app-grid",
       "clip": "app-grid.mp4",
-      "in": 1.55,
-      "len": 1.6
+      "in": 1.66,
+      "len": 1.44
     },
     {
       "name": "D music",
       "clip": "music.mp4",
-      "in": 0.2,
-      "len": 3.6
+      "in": 0.28,
+      "len": 3.82
     },
     {
       "name": "S lock",
@@ -70,8 +70,8 @@
     {
       "name": "S sign-in",
       "clip": "lock-screen.mp4",
-      "in": 6.6,
-      "len": 3.3,
+      "in": 7.75,
+      "len": 1.8,
       "zoom": 1.0,
       "cursor": [
         1280,
@@ -81,8 +81,8 @@
     {
       "name": "home-end",
       "clip": "home-end.mp4",
-      "in": 0.2,
-      "len": 1.0,
+      "in": 1.3,
+      "len": 0.7,
       "zoom": 1.0,
       "cursor": [
         1280,
