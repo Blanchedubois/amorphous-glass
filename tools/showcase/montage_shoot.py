@@ -24,7 +24,8 @@ is recorded in a throwaway shell by tools/showcase/lock-video.sh.
   TAHOE_SHOWCASE_PLAYER=spotify   no fake player: the user's own Spotify plays on, so the widgets show
               the real song, cover and synced lyrics (the Lyrics widget fetches them from lrclib.net
               itself, user's choice 2026-10-21); it is moved to TAHOE_SHOWCASE_SEEK seconds (default
-              60) so the track does not end mid-shoot
+              60) so the track does not end mid-shoot; TAHOE_SHOWCASE_TRACK=spotify:track:... opens
+              that song first (the player may have moved on to another)
 """
 import json, os, shutil, signal, subprocess, sys, time
 
@@ -183,9 +184,14 @@ def status(name):
 
 def seek_real(name, seconds):
     """the user's player playing its current track, at `seconds` in (so it does not end mid-shoot)"""
+    uri = os.environ.get('TAHOE_SHOWCASE_TRACK')   # e.g. spotify:track:...: the song the user chose
+    if uri:
+        BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'OpenUri',
+                      GLib.Variant('(s)', (uri,)), None, Gio.DBusCallFlags.NONE, 5000, None)
+        settle(2500)
     if status(name) != 'Playing':
-        player(name, 'Play')                  # its current track: the one the user chose
-        pause(800)
+        player(name, 'Play')
+        settle(800)
     meta = BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'Get',
                          GLib.Variant('(ss)', ('org.mpris.MediaPlayer2.Player', 'Metadata')), None,
                          Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
@@ -395,23 +401,29 @@ def s_window_menu():
 
 
 def s_menu_slide():
-    """the top bar's menus: the calendar opens, then a glide right hands it over to quick settings (one
-    glass surface morphing), and back to the calendar"""
-    with Clip('menu-slide'):
-        dx, dy = center('date')
-        qx, qy = center('quick-settings')
-        move(dx, dy + 300, 600)
-        move(dx, dy, 600)
-        click()
-        pause(1000)
-        move(qx - 300, qy, 900)
-        pause(400)
-        move(qx, qy, 700)
-        pause(1100)
-        move(dx, dy, 1000)
-        pause(900)
-        close_all()
-        move(*HOME_XY, 700)
+    """the top bar's menus: the calendar opens, then a slow glide right hands it over to quick settings
+    (one glass surface morphing), and back. Slower than the rest of the shoot (user, 2026-10-21: "too
+    fast where you cant see the animations"): the tempo does not apply here"""
+    global TEMPO
+    tempo, TEMPO = TEMPO, 1.0
+    try:
+        with Clip('menu-slide'):
+            dx, dy = center('date')
+            qx, qy = center('quick-settings')
+            move(dx, dy + 300, 500)
+            move(dx, dy, 500)
+            click()
+            pause(1300)                        # the calendar grows out of the clock
+            move(qx - 300, qy, 1600)           # across the status icons: each hand-over shows
+            pause(700)
+            move(qx, qy, 900)
+            pause(1500)                        # quick settings, settled
+            move(dx, dy, 1800)                 # back: quick settings morphs into the calendar
+            pause(1300)
+            close_all()
+            move(*HOME_XY, 600)
+    finally:
+        TEMPO = tempo
 
 
 def s_overview_search():
