@@ -1,0 +1,1 @@
+{ "uuid": "showcase@local", "name": "Tahoe showcase driver", "description": "Dev only: scripted input and screenshots for the README shoot (docs/SHOWCASE_PLAN.md)", "shell-version": ["51"], "version": 1 }
