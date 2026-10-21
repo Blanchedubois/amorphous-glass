@@ -25,7 +25,7 @@ seed() {
   [[ -d "$REAL/.config/autostart" ]] && cp -a "$REAL/.config/autostart" "$H/.config/"
   cp -a "$REAL/.local/share/gnome-shell/extensions" "$H/.local/share/gnome-shell/"
   mkdir -p "$H/.local/share/gnome-shell/extension-updates"
-  [[ -d "$REAL/.local/src/blur-my-shell" ]] && cp -a "$REAL/.local/src/blur-my-shell" "$H/.local/src/"
+  for s in blur-my-shell MacTahoe-gtk-theme; do [[ -d "$REAL/.local/src/$s" ]] && cp -a "$REAL/.local/src/$s" "$H/.local/src/"; done
   ln -s "$REAL/.local/share/fonts" "$H/.local/share/fonts"
   [[ -d "$REAL/.local/share/applications" ]] && cp -a "$REAL/.local/share/applications" "$H/.local/share/"
   mkdir -p "$H/Projects"; [[ -d "$REAL/Projects/cachyos-tahoe-theme" ]] && ln -s "$REAL/Projects/cachyos-tahoe-theme" "$H/Projects/"
@@ -40,7 +40,7 @@ run_in() {
     HOME="$H" XDG_CONFIG_HOME="$H/.config" XDG_DATA_HOME="$H/.local/share" XDG_CACHE_HOME="$H/.cache" \
     XDG_STATE_HOME="$H/.local/state" XDG_RUNTIME_DIR="$dir/run" XDG_CURRENT_DESKTOP=GNOME \
     GIO_USE_VFS=local GVFS_DISABLE_FUSE=1 TAHOE_REPAIR_NO_SHELL=1 TAHOE_REPAIR_NOTIFY=print TAHOE_REPAIR_PKG_STAMP="$dir/packages-changed" \
-    TAHOE_REPAIR_ALLOW_WORKTREE=1 ${TAHOE_REPAIR_FAKE_SHELL:+TAHOE_REPAIR_FAKE_SHELL=$TAHOE_REPAIR_FAKE_SHELL} \
+    TAHOE_REPAIR_ALLOW_WORKTREE=1 $(env | grep -E '^TAHOE_REPAIR_[A-Z_]+=' | tr '\n' ' ') \
     REAL_BUS="${DBUS_SESSION_BUS_ADDRESS:-none}" \
     dbus-run-session -- bash -c '
       [[ "$DBUS_SESSION_BUS_ADDRESS" != "$REAL_BUS" && "$HOME" != '"'$REAL'"' ]] || { echo "sandbox not isolated" >&2; exit 99; }

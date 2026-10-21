@@ -57,6 +57,22 @@
    }
   },
   {
+   "id": "A1-content",
+   "feature": "MacTahoe Dark shell theme is whole (not emptied by a failed install)",
+   "check": {
+    "type": "contains",
+    "path": "~/.themes/MacTahoe-Dark/gnome-shell/gnome-shell.css",
+    "text": [
+     "#panel",
+     ".popup-menu-content"
+    ]
+   },
+   "fix": {
+    "type": "mactahoe-install",
+    "logout": true
+   }
+  },
+  {
    "id": "A1-light",
    "feature": "MacTahoe Light shell theme present (light mode)",
    "check": {
@@ -464,6 +480,22 @@
     "glass": true,
     "apps": "on",
     "mode": "milky"
+   }
+  },
+  {
+   "id": "B6-content",
+   "feature": "libadwaita stylesheets are whole (MacTahoe gtk-4.0 files)",
+   "check": {
+    "type": "contains",
+    "path": "~/.config/gtk-4.0/gtk-Dark.css",
+    "text": [
+     "headerbar",
+     "popover"
+    ]
+   },
+   "fix": {
+    "type": "mactahoe-install",
+    "logout": true
    }
   },
   {
