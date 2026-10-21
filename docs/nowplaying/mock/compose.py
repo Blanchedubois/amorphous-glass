@@ -21,7 +21,7 @@ for name in ('lyrics', 'lyrics-notes', 'nolyrics', 'nolyrics-notes'):
 a = Image.open(frames / 'tilt-a.png')
 b = Image.open(frames / 'tilt-b.png')
 sheet = Image.new('RGB', (1920, 1080), (18, 18, 22))
-crop = (230, 80, 230 + 900, 80 + 1000)
+crop = (165, 60, 165 + 900, 60 + 1000)
 for i, im in enumerate((a, b)):
     c = im.crop(crop).resize((855, 950))
     sheet.paste(c, (70 + i * 925, 90))

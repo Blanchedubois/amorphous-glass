@@ -6,11 +6,20 @@ all over the cover's colour swirl, with the time in Liquid Glass at the top. It 
 Wide Music widget made into a full screen, and it borrows the lock screen's music mode (swirl
 background, glass clock).
 
-Status: **plan only, nothing built.** The questions at the end need answers before Phase 1.
+Status: **plan only, nothing built.** Round 2 of the mockups (user, 2026-10-21):
+- the clock is the lock screen's glass clock;
+- the cover stands alone (glass only while it pours in);
+- the controls are floating SF Symbols;
+- the only other glass is the widgets' dark glass, matched exactly;
+- everything is centred.
+
+The questions at the end need answers before Phase 1.
 
 Mockups (made with HTML/CSS in `docs/nowplaying/mock/`, rendered by `render.sh`; the cover is
-original CSS art and the lyrics are made up). They show layout and timing. The real glass is the
-repo's shader, which bends the swirl; CSS can only blur it.
+original CSS art and the lyrics are made up). They show layout and timing. The glass in them is a
+CSS stand-in. The build uses the real code: the lock screen's clock shader and the widgets' glass,
+compared against them pixel by pixel (Phase 5). The dashed line in the annotated stills is the
+screen's centre.
 
 | | |
 |---|---|
@@ -32,8 +41,10 @@ modules in `widgets/`. They are listed in `tools/nowplaying/shared.list`, and
 `tools/nowplaying/sync-shared.sh` copies them over. `check-shared.sh` fails on any drift, and the
 install script refuses to install a stale copy. It copies these files:
 `mpris.js`, `palette.js`, `music.js` (the lyrics view and the transport), `glass.js` (mode only),
-`stylesheet.css`, `icons/`, and from tahoe-lockscreen `bgswirl.js` and `glassclock.js`, plus
-tahoe-gdm's `glass.js`, the SDF Liquid Glass pane, as `paneglass.js`.
+`stylesheet.css`, `icons/` (the fallback icons), and from tahoe-lockscreen `bgswirl.js` and
+`glassclock.js`. `glass.js` is the widgets' own Liquid Glass card (Blur My Shell's
+`pipeline_glassbar_dock`). Nothing from tahoe-gdm is copied: its SDF pane is a different glass from
+the widgets'.
 
 Why not inside tahoe-widgets:
 - **Its own on/off switch.** A crash or a GNOME update disables only this extension, never the desktop widgets.
@@ -103,46 +114,99 @@ After each such change, both copies (lock screen and Now Playing) are re-synced 
   - When the view is closed, there is no actor, no effect and no timer.
 - **Nothing playing.** The neutral grey palette (`swirlPalette(null)`).
 
-### Liquid Glass on every control (docs/STANDARD.md)
+### Layout: everything centred
 
-- **The material.** Controls are `GlassPane`s (tahoe-gdm `glass.js`, shared as `paneglass.js`): exact
-  SDF capsules and circles, the backdrop bending toward the edge, a crisp 2 px rim lit from the top
-  left with a 5 px glow, and an edge shadow.
-- **What the glass bends.** Each pane's backdrop is a `Clutter.Clone` of the swirl layer, so the
-  glass bends the swirl, as the lock screen's glass bends its swirl.
-- **No Blur My Shell.** The swirl is our own actor, and the panes need no BMS pipeline.
-- **Shapes** (logical px at 2560x1440; they scale with monitor height):
+All sizes are logical px at 2560x1440. They scale with the monitor's height.
 
-| Piece | Shape | Size |
-|---|---|---|
-| Cover card | rounded rect, radius **36** = cover 24 + gap 12 (concentric) | 640 (cover 612) |
-| Play / pause | circle | 112 |
-| Previous, next | circle | 80 |
-| Shuffle, repeat (when the player supports them) | circle | 56 |
-| ⋯ (open the player app, then exit) | circle | 56 |
-| Progress track | capsule, white fill, scrubbable | 640 × 14 |
-| Volume track | capsule | 520 × 12 |
-| Chevron | capsule | 104 × 48 |
+- **Group.** With lyrics, the player column (560), a 200 px gap and the lyrics column (1000) form one
+  1760 px group centred on the screen: the column at x 400, the lyrics at x 1160. Without lyrics,
+  the column alone is centred (x 1000). The swap animates between these two positions.
+- **Column.** Everything is centred on the cover's vertical axis: the cover, the title, the artist,
+  the progress bar, the transport row and the volume row.
+- **Vertical.** The column is centred between the clock and the chevron. The sung lyric line sits a
+  little under the cover's middle.
+- **Clock and chevron.** Both sit on the screen's centre line, at the top and the bottom.
 
-- **Hover and press.** These follow tahoe-motion's liquid buttons: on hover the pane lifts and its rim brightens; on press it squishes on `EXPRESSIVE.spatial.fast`.
+### The cover: by itself
+
+- **The cover.** 560 px, corners 24, a soft two-layer drop shadow, no glass and no frame.
+- **The glass card.** It exists only during the enter and exit animations: a drop of the widgets'
+  glass pours into a card 12 px larger than the cover (radius 36 = 24 + 12, concentric). The cover
+  fades in inside it, then the glass dissolves away and the cover is left on its own. The exit runs
+  this backwards.
+
+### The controls: floating SF Symbols
+
+- **No plates.** The symbols float on the swirl, as in the reference. On hover a control gets the
+  Music widget's own soft circle (`.tahoe-music-button:hover`, white 0.14, 0.20 pressed). Presses
+  get tahoe-motion's squish.
+- **The symbols.** They are SF Symbols from the user's installed SF Pro, drawn as text (an
+  `St.Label` in SF Pro Text Semibold with the symbol's code point), so they render as crisply as
+  type at any size and take the cover's ink colour. The code points were found in this font by shape
+  and checked by eye:
+
+| Control | SF Symbol | Code point | Size (glyph / hit area) |
+|---|---|---|---|
+| Play / pause | `play.fill` / `pause.fill` | U+100284 / U+100286 | 72 / 112 |
+| Previous / next | `backward.fill` / `forward.fill` | U+10028A / U+10028C | 52 / 96 |
+| Shuffle / repeat | `shuffle` / `repeat` | U+10029D / U+10029E | 32 / 64, at 72 % white (100 % when on) |
+| Volume ends | `speaker.fill` / `speaker.wave.3.fill` | U+1002A1 / U+1002A9 | 28 |
+| Chevron | `chevron.down` | U+100188 | 26 |
+
+- **Fallback.** If SF Pro is missing or lacks the code point (checked once with Pango at enable),
+  the view uses the repo's own SF-like SVGs (`icons/`, as the Music widget does). The symbols are
+  not copied into the repo: they are drawn from the font the user installed (`scripts/sf-fonts.sh`).
+- **Progress and volume.** These are the Music widget's thin track, not glass: a track at the cover
+  ink's 0.22 and a fill at 0.88 (`.tahoe-music-ink-white`, or the dark ink on pale covers), 8 px
+  tall, radius 4, with the widget's times under the progress bar. The progress bar scrubs; the
+  volume track is the system output.
+
+### Liquid Glass: the widgets' glass in dark mode, exactly
+
+The user's rule: any Liquid Glass here is the existing widgets' glass, in **dark mode**, and must
+match it exactly. The clock is the only exception (next section). Two things use it: the chevron
+capsule (112 × 52), and the drop and card of the enter and exit animations.
+
+- **Same code.** These pieces are built from the widgets' own `glass.js`: the same Blur My Shell
+  pipeline (`pipeline_glassbar_dock`), with the dark mode forced whatever the desktop's mode.
+  The backdrop is a static copy of what is under the piece (the swirl over the blurred snapshot),
+  where the widgets copy the wallpaper. Nothing is re-implemented.
+- **The dark recipe** (docs/STANDARD.md, `tokens/glass.json` "dark"), the reference for the comparison:
+
+| | Dark mode |
+|---|---|
+| Tint | rgb(34, 34, 38) at 0.42 |
+| Edge line | 1 px white at 0.16 |
+| Rim light | 0.55 over 0.45 of the edge band |
+| Edge shadow | 0.30 over 0.20 of the band |
+| Drop shadow | 0.20 |
+| Blur | 18 |
+| Shape | capsule (chevron); radius 36 (the pouring card) |
+
+- **The comparison** (Phase 5 gate). A headless shell shows a real dark Music widget and the
+  screensaver's chevron and card over the same backdrop. A script crops matching regions (the
+  tint's middle, the edge line, the rim band top left, the shadow band bottom right, the drop
+  shadow) and compares them. Every region must be within 2/255 per channel. A side-by-side sheet
+  zoomed to 400 % is committed with the numbers.
+- **Swirl motion.** The swirl behind moves slowly, so the chevron's backdrop copy is refreshed at
+  the swirl's 25 fps only while the chevron is on screen. The card's glass exists only for the ~0.6 s
+  of an animation.
 
 ### The 3D tilt on the cover
 
 - **Geometry.**
-  - The card (glass and cover together) gets `rotation_angle_x/y` about its centre, at most **8°**
+  - The cover gets `rotation_angle_x/y` about its centre, at most **8°**
     per axis toward the pointer.
   - It also gets `translation_z` +20 px and a drop shadow that moves away from the pointer.
   - The stage's own perspective gives the depth.
 - **Motion.** Two `Spring`s (`EXPRESSIVE.spatial.default`) drive the angles on the frame clock,
-  only while the pointer is over the card or the springs have not settled. On leave they retarget
-  to 0 and the card springs back flat with a small overshoot.
+  only while the pointer is over the cover or the springs have not settled. On leave they retarget
+  to 0 and the cover springs back flat with a small overshoot.
 - **The sheen.** A small shader over the cover:
   - a soft radial highlight at the pointer, mirrored across the centre so it reads as a reflection;
   - a diagonal band that slides with the tilt;
   - a rim that brightens on the side tilted toward the light.
   It is drawn additively, so dark covers stay dark.
-- **Known compromise.** The glass rim samples the swirl at the untilted position. At 8° on a smooth
-  field the mismatch cannot be seen.
 
 ### Lyrics
 
@@ -164,13 +228,17 @@ After each such change, both copies (lock screen and Now Playing) are re-synced 
 - **Copyright.** Committed screenshots, fixtures and docs use only original placeholder lines
   (`docs/nowplaying/mock`, `tools/nowplaying/fixtures/*.lrc`). Live lrclib lyrics appear only on the user's screen.
 
-### The clock
+### The clock: the lock screen's glass clock
 
-- **Code.** The lock screen's Glass Text clock (`glassclock.js`): Space Grotesk SemiBold, the
-  subtler material A. Its backdrop is a clone of the swirl layer instead of the lock background.
-- **Size and place.** Smaller than the lock screen's: the time at about 9 % of the height (132 px
-  at 1440p), with the date under it in SF Pro Text Semibold 30 px at 62 % white, centred at the top.
+- **Code.** The lock screen's clock (`glassclock.js`), unchanged: Space Grotesk SemiBold, the
+  subtler material A, **its own light glass** (not the widgets' dark glass), the date above the time,
+  as on the lock screen. Only its backdrop changes: a clone of the swirl layer instead of the lock
+  background.
+- **Size and place.** The time at about 10 % of the height (150 px at 1440p; the lock screen uses
+  12 %) with the date (40 px) above it, centred at the top.
 - **Updates.** The glyph mask is redrawn once a minute, as on the lock screen.
+- **Check.** Phase 2 renders it next to the lock screen's clock over the same picture; the two must
+  match apart from size.
 
 ### Nothing playing (proposal, see question 3)
 
@@ -213,7 +281,7 @@ The view is modal, so **every key is swallowed** and nothing reaches the app und
 | `Print` | GNOME's screenshot UI over the view (it stacks its own modal) | yes |
 | `Super+L` | GNOME locks; the view closes underneath | no |
 | **Any other key** (letters, Enter, Tab, F-keys…) | close, the key swallowed | no |
-| **Click** on a control (buttons, progress, volume, ⋯) | that control | yes (⋯ raises the player and closes) |
+| **Click** on a control (transport, shuffle, repeat, progress, volume, chevron) | that control (the chevron closes) | yes |
 | **Click** anywhere else, the cover included, any button | close | no |
 | **Scroll** over the volume slider | volume | yes |
 | **Scroll** elsewhere | nothing | yes |
@@ -235,9 +303,10 @@ moves with translation, scale, opacity and shader uniforms.
 |---|---|
 | 0 | Snapshot taken, overlay up, modal pushed. The frame is identical to the desktop. |
 | 0–350 ms | Blur radius 0 → 48, brightness 1 → 0.88 (`effects.slow`, critically damped) |
-| 100 ms | A Liquid Glass drop (64 px circle) appears at the card's centre: tahoe-motion's `Drop` geometry (fall, stretch, spread), drawn as a `GlassPane` whose rect and radius follow the drop each frame |
-| 150–550 ms | The drop pours into the 640 px card; its corners relax to radius 36 (`spatial.slow`, the popup's elastic grow from 0.92) |
+| 100 ms | A drop of the widgets' dark glass (64 px circle) appears at the cover's centre: tahoe-motion's `Drop` geometry (fall, stretch, spread) drives the glass card's rect and radius each frame |
+| 150–550 ms | The drop pours into a card 12 px larger than the cover; its corners relax to radius 36 (`spatial.slow`, the popup's elastic grow from 0.92) |
 | 350–700 ms | The cover fades in inside the glass, scale 0.94 → 1 |
+| 600–900 ms | The glass dissolves (opacity to 0): the cover stands alone |
 | 200–1400 ms | Swirl `lm_amount` 0 → 1 (slow ease, so the gradient creeps over the blurred desktop) |
 | 500–900 ms | Title, progress, controls and volume rise 40 px into place, an eased stagger (`stagger()`, inQuad, 24 ms); the clock and chevron fade in; the lyrics glide in line by line |
 
@@ -246,7 +315,7 @@ moves with translation, scale, opacity and shader uniforms.
 | t | What |
 |---|---|
 | 0 | Modal popped, overlay non-reactive: the desktop already takes input. The live backdrop clones are built. |
-| 0–180 ms | Lyrics, controls, clock and chevron fade out; the card gathers back into the drop, which shrinks away (the popup's close) |
+| 0–180 ms | Lyrics, controls, clock and chevron fade out; the glass card forms around the cover, the cover fades, and the card gathers back into the drop, which shrinks away (the popup's close) |
 | 80–450 ms | Swirl `lm_amount` 1 → 0: the swirl fades into the blurred live desktop |
 | 350–700 ms | Blur 48 → 0, brightness back to 1 |
 | ~700 ms | Overlay destroyed; every effect, clone, timer and MPRIS listener released |
@@ -316,19 +385,21 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   JS errors in the test shell's log.
 
 ### Phase 2: layout and the glass clock
-- **`layout.js`.** It places the clock, the left column, the lyrics column and the chevron from the
-  monitor's size (the §1 sizes at 1440p, scaled by height, clamped for 1080p and 4K). It has two
+- **`layout.js`.** It places the clock, the column, the lyrics and the chevron from the monitor's
+  size (the §1 sizes at 1440p, scaled by height, clamped for 1080p and 4K), centred as in §1. It has two
   states (two columns and centred) and one blend value between them, so Phase 4 only animates that value.
 - **Placeholders.** Static stand-ins for the cover, the lyrics and the controls.
 - **The clock.** `glassclock.js` (shared) over a temporary flat swirl.
-- **Gate:** headless screenshots at 2560x1440, 1920x1080 and 3840x2160, in both layouts, compared
-  side by side with the mockups. No overlap and no clipping (an automated box check, as the lock
-  screen's `addCheck`).
+- **Gate:**
+  - Headless screenshots at 2560x1440, 1920x1080 and 3840x2160, in both layouts, compared side by side with the mockups.
+  - No overlap and no clipping, by an automated box check (as the lock screen's `addCheck`).
+  - The group's centre within 1 px of the screen's centre.
+  - The clock beside the lock screen's clock over the same picture.
 
 ### Phase 3: player and lyrics wired to MPRIS
 - **`mpris.js`.** Volume, Shuffle, LoopStatus, `SetPosition` / `Seek`, CanSeek. Shared, so re-synced.
 - **The player.** Cover, title, artist, scrubbable progress, transport, shuffle and repeat (hidden
-  when unsupported). The volume slider is the system output (`Volume.getMixerControl()` default sink).
+  when unsupported; the row stays centred). The volume slider is the system output (`Volume.getMixerControl()` default sink).
 - **Lyrics.** `LyricsView` with the full-screen options; the looking / found / none states.
 - **Nothing playing.** The placeholder.
 - **Fixtures.** `tools/nowplaying/fixtures/` holds original placeholder `.lrc` files: one long song,
@@ -347,15 +418,19 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   - a change mid-swap, where the spring must retarget smoothly.
   Frame timing is within budget.
 
-### Phase 5: glass buttons and the 3D tilt
-- **Glass.** Every control is a `GlassPane` over a clone of the swirl, with hover lift and press squish.
+### Phase 5: controls, the widgets' glass, and the 3D tilt
+- **Controls.** SF Symbols as labels (the fallback SVGs when SF Pro is missing), the widget's hover
+  circle and press squish, the cover's ink.
+- **Glass.** The chevron, and the card used by the enter and exit, on the widgets' `glass.js` in dark mode.
 - **The tilt.** Rotation springs, the sheen shader, the moving shadow, and spring-back on leave.
 - **Gate:**
-  - Close-ups checked against STANDARD.md: the rim, the edge shadow, concentric radii.
-  - A scripted tilt sweep: pointer motion across the card, then leave, recorded. It must stay in the tilt budget.
+  - The pixel comparison with a real dark Music widget (§1): every region within 2/255, with the
+    sheet and the numbers committed.
+  - A test with SF Pro hidden from fontconfig: the SVG fallback appears.
+  - A scripted tilt sweep: pointer motion across the cover, then leave, recorded. It must stay in the tilt budget.
 
 ### Phase 6: enter and exit animations
-- **Enter.** The snapshot, the blur spring, tahoe-motion's `Drop` geometry drawn with a `GlassPane`,
+- **Enter.** The snapshot, the blur spring, tahoe-motion's `Drop` geometry driving the widgets' dark glass card,
   the cover fading in, the swirl taking over, the staggered content.
 - **Exit.** The modal released at once, the live backdrop clones, the swirl fading out, the blur
   sharpening, then teardown.
@@ -397,15 +472,15 @@ Also: the live exit clone measured against the snapshot fallback (§1), and the 
 ## 6. Questions for the user
 
 1. **Idle start.** Should the view also open by itself after idle, like a real screensaver?
-   *Proposal:* yes, opt-in. `idle-start` defaults to 0 (off); when set (e.g. 120 s), the view opens only while music
-   plays, never over a fullscreen app or an idle-inhibited session, and well before GNOME's 300 s
-   blank. Or: on by default at 120 s, or no idle start at all.
+   *Proposal:* yes, opt-in. `idle-start` defaults to 0 (off); when set (e.g. 120 s), the view opens
+   only while music plays, never over a fullscreen app or an idle-inhibited session, and well before
+   GNOME's 300 s blank. Or: on by default at 120 s, or no idle start at all.
 2. **Hotkey.** `Super+Shift+M` (free on this desktop; GNOME uses `Super+M` / `Super+V` for the
    calendar). Is that OK, or would you rather use another key?
 3. **Nothing playing, from the hotkey.** Show the placeholder ("Not Playing", neutral swirl, clock),
    or not open at all (the hotkey does nothing)?
-4. **The clock.** The time with the date under it (as mocked), or the time alone?
-5. **Clicking the cover.** You said everything except the controls closes the view, so a click on the cover closes it too.
-   Should it instead do nothing, so the tilt can be played with without accidentally leaving?
-6. **Extra buttons.** Shuffle, repeat and the ⋯ (open the player app) are in the mock. Do you want
-   a lyrics on/off glass button (bottom right, as in the reference) to force the centred layout?
+4. **Clicking the cover.** You said everything except the controls closes the view, so a click on
+   the cover closes it too. Should it instead do nothing, so the tilt can be played with without
+   accidentally leaving?
+5. **Lyric lines.** Left-aligned within their centred column, as in the reference (mocked), or
+   centred too?
