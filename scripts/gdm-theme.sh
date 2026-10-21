@@ -187,7 +187,10 @@ EOF
 run_part() {
   # the user's choices: the clock as the user's own (12 h shows without AM/PM, as the lock screen),
   # Space Grotesk, the extension, the weather, the song for Switch User
-  export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}
+  # only a format the user set: with none, GNOME Shell shows its locale's default (12 h for en_US), which
+  # 'gsettings get' does not report (it prints the schema's 24h), and copying that made the login screen
+  # 24 h under a 12 h lock screen (seen in the test VM, 2026-10-21); unset, both use the same default
+  export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(dconf read /org/gnome/desktop/interface/clock-format | tr -d "'")}
   # Space Grotesk for the greeter only when the user has it (the clock falls back to a sans face)
   local sg=0; [ -f "$HOME/.local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf" ] && sg=1
   export GDM_FONTS=${GDM_FONTS:-$sg} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1} GDM_SONG=${GDM_SONG:-1}
