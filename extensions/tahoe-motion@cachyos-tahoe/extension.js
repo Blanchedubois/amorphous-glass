@@ -16,8 +16,10 @@
 // A menu opened in the call that made it (the window menu, a new menu each time; a dock icon's
 // first menu) has no glass yet: Blur My Shell makes it a frame later, so it joins in the first
 // frames. GNOME's destroy of a closing window menu waits for the close to play out.
+import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import St from 'gi://St';
 import * as BoxPointer from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { State as TrayState } from 'resource:///org/gnome/shell/ui/messageTray.js';
@@ -168,6 +170,13 @@ export default class TahoeMotion extends Extension {
         container.height = -1;
         const [, fullHeight] = container.get_preferred_height(-1);
         container.height = startHeight;
+        // The glass sizes itself from the box's allocation of the frame before (laid out after it
+        // is placed): grown with the container, its bottom edge trailed the card by up to 20 px a
+        // frame, then caught up when the motion ended (user: "the bottom of the card is clipped and
+        // then it glitches to the right size"). So the box keeps its full height, the container
+        // clips it, and the glass's reveal, set in the same frame as the container's height, is
+        // its edge.
+        this.holdBox(target, container, fullHeight);
         const piece = previous.get(target) ?? new CardPiece(surface, {
             fall: false,
             geometry: () => {
@@ -197,6 +206,7 @@ export default class TahoeMotion extends Extension {
             },
             onDone: () => {
                 this._morphs.delete(target);
+                this.releaseBox(target);
                 if (opening) {
                     container.height = -1;
                 } else {
@@ -206,6 +216,41 @@ export default class TahoeMotion extends Extension {
             },
         });
         this._morphs.set(target, morph);
+    }
+
+    /// a submenu's box held at its full height, clipped by its container, for the motion: the
+    /// container's bin layout would cap the box at its own height, so a fixed layout stands in
+    /// (the first hold keeps what to put back)
+    holdBox(box, container, fullHeight) {
+        this._heldBoxes ??= new Map();
+        if (!this._heldBoxes.has(box)) {
+            this._heldBoxes.set(box, { layout: container.layout_manager, clip: container.clip_to_allocation, container });
+            container.layout_manager = new Clutter.FixedLayout();
+        }
+        // where the bin layout puts it once open: inside the container's padding, less its own
+        // margins (Clutter adds those to a fixed position as well)
+        const node = container.get_theme_node();
+        const left = node.get_padding(St.Side.LEFT);
+        const top = node.get_padding(St.Side.TOP);
+        box.set_position(left, top);
+        // the container spans quick settings' overlay; its own width is stale before it opens
+        const width = Math.max(container.width, container.get_parent()?.width ?? 0);
+        box.set_size(
+            Math.max(0, width - left - node.get_padding(St.Side.RIGHT) - box.margin_left - box.margin_right),
+            Math.max(0, fullHeight - top - node.get_padding(St.Side.BOTTOM) - box.margin_top - box.margin_bottom));
+        container.clip_to_allocation = true;
+    }
+
+    releaseBox(box) {
+        const saved = this._heldBoxes?.get(box);
+        if (!saved)
+            return;
+        this._heldBoxes.delete(box);
+        saved.container.layout_manager = saved.layout;
+        box.set_size(-1, -1);
+        box.set_position(-1, -1);
+        box.fixed_position_set = false;
+        saved.container.clip_to_allocation = saved.clip;
     }
 
     /// Notification banners: a glass circle at the top of the banner grows into it; on hide it
@@ -424,6 +469,8 @@ export default class TahoeMotion extends Extension {
         }
         this._morphs.forEach(morph => morph.destroy());
         this._morphs.clear();
+        [...(this._heldBoxes?.keys() ?? [])].forEach(box => this.releaseBox(box));
+        this._heldBoxes = null;
         this.unpatchWindowMenu();
         for (const boxPointer of [...this._windowMenusClosing]) {
             boxPointer.hide();
