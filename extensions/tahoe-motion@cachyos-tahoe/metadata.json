@@ -3,6 +3,6 @@
   "name": "Tahoe Motion",
   "description": "Liquid Glass open and close animations: a glass circle under the clicked icon grows into the menu. Needs the patched Blur My Shell (liquid-glass).",
   "shell-version": ["51"],
-  "url": "https://github.com/Blanchedubois/liquid-glass",
+  "url": "https://github.com/Blanchedubois/amorphous-glass",
   "version": 1
 }

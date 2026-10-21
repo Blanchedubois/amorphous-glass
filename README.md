@@ -7,7 +7,7 @@
   </picture>
 </p>
 
-<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/liquid-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a></sub></p>
+<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a></sub></p>
 
 **Amorphous Glass: macOS Tahoe's Liquid Glass look, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
 dock, every menu, quick settings, the calendar, GTK apps, desktop widgets and the lock screen, with
@@ -253,11 +253,11 @@ The login screen gets the same glass from `scripts/gdm-theme.sh` (optional, need
 Everything goes into your home folder, and an uninstall puts back what was there.
 
 ```bash
-git clone https://github.com/Blanchedubois/liquid-glass ~/Projects/liquid-glass
+git clone https://github.com/Blanchedubois/amorphous-glass ~/Projects/amorphous-glass
 ```
 
 ```bash
-cd ~/Projects/liquid-glass && ./install.sh --check
+cd ~/Projects/amorphous-glass && ./install.sh --check
 ```
 
 `--check` changes nothing. It lists what is missing and the exact `pacman` line to fix it. Then:
