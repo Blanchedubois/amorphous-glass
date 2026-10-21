@@ -49,6 +49,17 @@ export function relative(seconds) {
     return min < 6 * 60 ? `in ${Math.round(min / 60)} h` : '';
 }
 
+// the events that touch the local day of nowDate (any time of it): schedule() of these is the
+// same as of all of them, so the widgets keep this per day and the minute tick stays small
+export function dayEvents(events, nowDate) {
+    const day0 = midnight(nowDate);
+    const dayStart = day0.to_unix();
+    const dayEnd = day0.add_days(1).to_unix();
+    const today = nowDate.format('%Y-%m-%d');
+    return events.filter(e => e.allDay ? e.startDate <= today && e.endDate > today
+        : (e.end > dayStart || e.start >= dayStart) && e.start < dayEnd);
+}
+
 // the rows for the local day of `nowDate`, in order: one row for the all-day events (and timed
 // ones covering the whole day), then what has not ended yet. The first one not yet started gets
 // the relative time; the ones going on are "now".

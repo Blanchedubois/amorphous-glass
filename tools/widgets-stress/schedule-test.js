@@ -86,6 +86,10 @@ for (const [name, when, sec, h24, want] of C) {
     check(name, rows.map(r => [r.title, fmt(M.timeLine(r, now, {h24, large: false})), fmt(M.timeLine(r, now, {h24, large: true}))].join('|')), want);
 }
 
+check('the day\'s events alone give the same rows, every case', C.every(([, when, sec]) =>
+    JSON.stringify(M.schedule(M.dayEvents(EVENTS, at(when, sec)), at(when, sec))) === JSON.stringify(M.schedule(EVENTS, at(when, sec)))), true);
+check('the day\'s events', M.dayEvents(EVENTS, at('2026-10-20 12:00')).map(e => e.uid),
+    ['trip', 'overnight', 'holiday', 'standup', 'gym', 'lunch', 'conf', 'reminder', 'late']);
 const day = M.schedule(EVENTS, at('2026-10-20 09:00'));
 check('colours: the event\'s own, else a fixed one per UID', [day.find(r => r.uid === 'gym').color, day.find(r => r.uid === 'lunch').color === M.paletteColor('lunch'),
     M.paletteColor('lunch') === M.paletteColor('lunch')], ['#0a84ff', true, true]);

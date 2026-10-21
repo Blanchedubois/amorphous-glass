@@ -96,16 +96,19 @@ async function readText(path, cancellable) {
     }
 }
 
-// a file only the user can read, replaced in one step
-async function writePrivate(path, bytes, cancellable) {
+// a file only the user can read, replaced in one step; data: a Uint8Array or GLib.Bytes chunks
+async function writePrivate(path, data, cancellable) {
     GLib.mkdir_with_parents(GLib.path_get_dirname(path), 0o700);
     const stream = await Gio.File.new_for_path(path).replace_async(null, false,
         Gio.FileCreateFlags.PRIVATE | Gio.FileCreateFlags.REPLACE_DESTINATION, GLib.PRIORITY_DEFAULT, cancellable);
     try {
         // GLib.Bytes: the stream keeps its own reference while it writes (a JS array may move)
-        for (let at = 0; at < bytes.length;) {
-            // eslint-disable-next-line no-await-in-loop
-            at += await stream.write_bytes_async(new GLib.Bytes(bytes.subarray(at)), GLib.PRIORITY_DEFAULT, cancellable);
+        for (const chunk of Array.isArray(data) ? data : [new GLib.Bytes(data)]) {
+            for (let rest = chunk; rest.get_size() > 0;) {
+                // eslint-disable-next-line no-await-in-loop
+                const n = await stream.write_bytes_async(rest, GLib.PRIORITY_DEFAULT, cancellable);
+                rest = n < rest.get_size() ? new GLib.Bytes(rest.toArray().subarray(n)) : new GLib.Bytes(new Uint8Array());
+            }
         }
     } finally {
         await stream.close_async(GLib.PRIORITY_DEFAULT, null);
@@ -157,6 +160,8 @@ class IcsFeed extends EventEmitter {
         this._window = null;         // {from, to, tz, changed} the events cover
         this._helper = null;
         this._expandAgain = false;
+        this._memo = new Map();
+        this.connect('events-changed', () => this._memo.clear());
     }
 
     // what the widgets read
@@ -182,6 +187,17 @@ class IcsFeed extends EventEmitter {
     // endDate?, color?}, unix seconds; empty until the first copy is read
     get events() {
         return this._events;
+    }
+
+    // a value worked out once for every widget (today's events, this week's dots), until the
+    // events change
+    memo(key, compute) {
+        if (!this._memo.has(key)) {
+            if (this._memo.size > 16)
+                this._memo.clear();
+            this._memo.set(key, compute(this._events));
+        }
+        return this._memo.get(key);
     }
 
     // called on the widgets' minute tick (cheap): the events follow the day and the time zone
@@ -546,8 +562,9 @@ class IcsFeed extends EventEmitter {
     }
 }
 
+// the body as the chunks it came in (GLib.Bytes): a 5 MB feed is never copied in JS
 async function readAll(stream, cancellable) {
-    const parts = [];
+    const chunks = [];
     let size = 0;
     for (;;) {
         // eslint-disable-next-line no-await-in-loop
@@ -558,20 +575,15 @@ async function readAll(stream, cancellable) {
         size += n;
         if (size > MAX_BYTES)
             throw new Error(`over ${MAX_BYTES >> 20} MB`);
-        parts.push(bytes.toArray());
+        chunks.push(bytes);
     }
-    const all = new Uint8Array(size);
-    let at = 0;
-    for (const p of parts) {
-        all.set(p, at);
-        at += p.length;
-    }
-    return all;
+    return chunks;
 }
 
 // a calendar, not a sign-in page sent with 200
-function looksLikeCalendar(body) {
-    const head = new TextDecoder().decode(body.subarray(0, 64)).replace(/^﻿/, '').trimStart();
+function looksLikeCalendar(chunks) {
+    const first = chunks[0]?.toArray().subarray(0, 64) ?? new Uint8Array();
+    const head = new TextDecoder().decode(first).replace(/^\ufeff/, '').trimStart();
     return head.toUpperCase().startsWith('BEGIN:VCALENDAR');
 }
 

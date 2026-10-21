@@ -1,6 +1,6 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phases 1 to 4 done (link, fetch, parsing, the widgets, live behaviour); Phase 5 (stress) next.** Your picks: small layout A,
+**Status: Phases 1 to 5 done (link, fetch, parsing, the widgets, live behaviour, stress); Phase 6 (docs) next.** Your picks: small layout A,
 Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
 week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
@@ -279,6 +279,34 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
   47 µs a tick; 12:00 to 12:01 rebuilds nothing, 12:50 to 12:51 once, for "in N min").
 - Sheet: `docs/shots/schedule-states.png` (next event, going on, offline, nothing left, no link;
   dark and light; Calendar: Today beside them for comparison).
+
+## Phase 5: stress and performance (2026-10-20)
+
+`STRESS_ONLY=schedule DRIVER=widget-stress@local bash tools/widgets-stress/run.sh OUT
+tools/widgets-stress/layout-schedule-stress.json`: six Schedule widgets (3 small, 3 Large), a
+digital clock and Calendar: Today, one 5 MB made-up feed (`ics-bigfeed.py`, 5 046 occurrences in
+the 16-day window: far busier than a real calendar) from 127.0.0.1, the main loop watched by a
+1 ms timeout (the longest gap between its runs is the longest stall).
+
+| Check | Found first | Now |
+|---|---|---|
+| One feed for six widgets | 1 request, 1 reader run | same |
+| Longest main-loop gap, at rest (the headless shell's own) | 21 to 30 ms | same |
+| Longest gap while the 5 MB feed is fetched, saved and read | 24.5 ms: the six widgets rebuilt in one main-loop pass when the events came (GLib runs every ready idle source of one priority in the same pass) | **12.6 ms**: one shared idle source, one widget per pass; the 5 MB body kept as the `GLib.Bytes` chunks it came in, never copied in JS |
+| Idle minute tick, per widget | 285 µs: every event filtered and every row of the day formatted | **65 µs**: the day's events and the week's dots worked out once for all widgets (`feed.memo`), only the rows that can show formatted |
+| The shell's own work on the reader's answer | | `JSON.parse` of 547 KB: 0.8 ms |
+| Idle 65 s | | 1 tick (the minute) |
+| Under a fullscreen window | | 0 ticks |
+| 6 lock cycles, each while a new copy is being read, then 6 disable/enable cycles | | timers 2 and 2 (the clock tick, the feed's refresh), D-Bus subscriptions 0 and 0, match rules 86 and 86, actors 3 234 and 3 230, no reader process left running, events kept |
+
+The reader (`ics-expand.js`) parses outside the shell, so the shell never does: 0.6 s for this
+feed in its own process. What is left in the gaps above is building the rows' actors (about
+3.5 ms per widget, only when the words change) and painting them.
+
+Rerun after the changes, all passing: `ics-test.js` (24), `schedule-test.js` (19), `ics-feed-test.sh`
+(32), `widget-sched@local` (14), and the full widget stress (`layout-all.json`) with the same
+counts as before this work (timers 3, 2, 2, 2, 2; D-Bus subscriptions 1; match rules 89 to 87;
+the logged errors are the date menu's DBusProxy ones listed below, none from the Schedule files).
 
 ## Phases (one commit each, on this branch)
 
