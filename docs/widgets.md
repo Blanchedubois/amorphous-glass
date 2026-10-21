@@ -1,6 +1,18 @@
-# Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
+# Calendar: Schedule, today's events from a Google Calendar ICS link (2026-10-20)
 
-**Status: Phases 1 to 5 done (link, fetch, parsing, the widgets, live behaviour, stress); Phase 6 (docs) next.** Your picks: small layout A,
+**Status: done on the branch (phases 0 to 6), not yet merged or installed.** How to set your link:
+README, "Calendar: Schedule: setting your calendar link". Sheets: `docs/shots/schedule-{light,dark,milky}.png`
+and `schedule-states.png` (made-up events only). Tests, all passing:
+
+```bash
+gjs -m tools/widgets-stress/ics-test.js                    # ICS parsing, 24 hand-checked cases
+gjs -m tools/widgets-stress/schedule-test.js               # what the rows say, 19 checks
+bash tools/widgets-stress/ics-feed-test.sh /tmp/ics-feed   # link, fetch, cache, keyring, 32 checks
+DRIVER=widget-sched@local bash tools/widgets-stress/run.sh /tmp/sched tools/widgets-stress/layout-schedule.json
+STRESS_ONLY=schedule DRIVER=widget-stress@local bash tools/widgets-stress/run.sh /tmp/stress tools/widgets-stress/layout-schedule-stress.json
+```
+
+Your picks at Phase 0: small layout A,
 Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
 week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
@@ -334,7 +346,7 @@ the logged errors are the date menu's DBusProxy ones listed below, none from the
    README widget table, ical.js credit, and how to set your link. Then I ask you before merging into
    main, installing (`tahoe-widgets.sh on`) or logging out.
 
-## Questions for you (Phase 0)
+## Questions at Phase 0 (answered: see the picks at the top)
 
 1. Small layout A, B or C? And the Large one as mocked up, or changes?
 2. Bar colours: one colour per event by its UID (as in the mockup), or one colour for the whole
