@@ -1,4 +1,4 @@
-# Liquid Glass
+# Amorphous Glass
 
 <p align="center">
   <picture>
@@ -7,13 +7,13 @@
   </picture>
 </p>
 
-<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/liquid-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a> · <a href="docs/showcase/title/">how the title is made</a></sub></p>
+<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/liquid-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a></sub></p>
 
-**macOS Tahoe's Liquid Glass, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
+**Amorphous Glass: macOS Tahoe's Liquid Glass look, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
 dock, every menu, quick settings, the calendar, GTK apps, desktop widgets and the lock screen, with
 macOS-style motion: popups grow out of the icon you clicked as a circle of glass.
 
-![The Liquid Glass desktop: a floating glass top bar, Music and Lyrics widgets playing Nude by Radiohead, weather, schedule and clock widgets, and the glass dock](docs/showcase/media/desktop.webp)
+![The Amorphous Glass desktop: a floating glass top bar, Music and Lyrics widgets playing Nude by Radiohead, weather, schedule and clock widgets, and the glass dock](docs/showcase/media/desktop.webp)
 
 <p align="center">
   <img src="docs/showcase/media/quick-settings-motion.webp" width="49%" alt="Quick settings opening as a circle of glass from its icon, then the Wi-Fi submenu">
@@ -37,8 +37,7 @@ are of the real desktop, recorded with GNOME's own screencast. Other apps' notif
 Every glass surface is the same material, drawn by one shader with one set of values
 (`glass_params()` in `scripts/glass-bar.sh`): blur, a refraction band at the edge, a rim light lit
 from the top left, an edge shadow just inside the rim and a soft drop shadow. Only the blur
-strength and the tint change, per surface and per mode (light, dark, milky). The title above is that
-same shader, ported to WebGL, with the tint taken out.
+strength and the tint change, per surface and per mode (light, dark, milky).
 
 | | Value |
 |---|---|
@@ -337,7 +336,7 @@ Details, the switches and the drift test results: `docs/REPAIR.md`.
 
 ## Credits and inspirations
 
-Liquid Glass stands on other people's work. Thank you.
+Amorphous Glass stands on other people's work. Thank you.
 
 **Extensions it uses**
 
@@ -386,7 +385,7 @@ Liquid Glass stands on other people's work. Thank you.
 | `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
 | `tokens/`, `docs/STANDARD.md` | The glass standard: radius, gap, tint and edge per surface |
 | `docs/` | Plans, measurements and workshop notes for every part |
-| `docs/showcase/title/`, `docs/showcase/montage/`, `docs/showcase/design/` | The video at the top: the title (a WebGL page with the desktop's glass shader and springs), the montage's cursor camera and cut list, the annotated design images |
+| `docs/showcase/title/`, `docs/showcase/montage/`, `docs/showcase/design/` | The video at the top and the design images |
 | `tools/` | Headless test shells, stress tests, the repair's drift tests, the showcase shoot |
 
 ## Licence
