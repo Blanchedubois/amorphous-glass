@@ -1,0 +1,77 @@
+{
+ "about": "tools/showcase/redact.py: OCR terms blurred everywhere, plus fixed boxes [x, y, w, h, from_s, to_s] per still or clip (2560x1440). The personal terms (names, places, networks) are kept outside the repo, in ~/.config/tahoe-glass/showcase-redact-terms.json, and added at run time.",
+ "terms": [
+  "/home/",
+  "greeter"
+ ],
+ "boxes": {
+  "calendar": [
+   [
+    950,
+    160,
+    380,
+    215
+   ]
+  ],
+  "calendar-open": [
+   [
+    950,
+    160,
+    380,
+    215
+   ]
+  ],
+  "menu-slide": [
+   [
+    950,
+    160,
+    380,
+    215
+   ]
+  ],
+  "quick-settings-submenu": [
+   [
+    2180,
+    340,
+    360,
+    70
+   ],
+   [
+    2222,
+    230,
+    120,
+    30
+   ]
+  ],
+  "quick-settings-open": [
+   [
+    2180,
+    340,
+    360,
+    70
+   ],
+   [
+    2222,
+    230,
+    120,
+    30
+   ]
+  ],
+  "search": [
+   [
+    800,
+    280,
+    980,
+    75
+   ]
+  ],
+  "quick-settings": [
+   [
+    2222,
+    230,
+    120,
+    30
+   ]
+  ]
+ }
+}
