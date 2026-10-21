@@ -200,3 +200,15 @@ GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
   anti-aliased pixel). A plain toggle that is on (Dark Style): no glass under it any more (its edge
   showed as a dark ring a hair outside the white pill); now background to white at the button's
   exact edge on every side (`system-menu-on-pill.png`).
+
+## Phase F results (2026-10-20)
+
+Lock screen gates, all pass: G1 (music playing), music-idle (frames stop after 35 s idle, restart
+on input), ours-throw and ours-cover (GNOME's lock screen back, still locked, the field takes
+keys), verifying, qs and qs-sub (glass on every piece and the submenu, none under the white on
+toggle, no card), lockvideo, churn 25 (nothing of ours left; GNOME's Wi-Fi list grows), monitors
+1280x720, 1920x1080, 3440x1440, 3840x2160. Login screen: the song (live and dead session), the
+menus and hover, the glass fault (GNOME's login screen back), the same four sizes. No real PAM
+conversation since the start (journal), faillock empty. Two shutdown-only warnings fixed on the
+way (a queued menu update, and disconnects from menus GNOME had already disposed).
+`phaseF-final.png`: Super+L, the login screen and the desktop widgets.

@@ -112,12 +112,16 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
                 glass.connect('destroy', () => (glassGone = true));
                 const ids = ['allocation', 'visible', 'checked'].map(prop =>
                     piece.connect(`notify::${prop}`, () => schedule(pointer, pane)));
+                let pieceGone = false;
+                piece.connect('destroy', () => (pieceGone = true));
                 const forget = () => {
-                    ids.forEach(id => {
-                        try {
-                            piece.disconnect(id);
-                        } catch {}
-                    });
+                    if (!pieceGone) {
+                        ids.forEach(id => {
+                            try {
+                                piece.disconnect(id);
+                            } catch {}
+                        });
+                    }
                     pane._pieces?.delete(piece);
                     if (!glassGone)
                         glass.destroy();
@@ -197,18 +201,22 @@ export function buildMenus(ext, backdrop, {GlassPane, MENU_GLASS}) {
                 glass._forget?.();
             pane._pieces?.clear();
         };
+        let pointerGone = false;   // its signals go with it: nothing to disconnect then
         ids.push([pointer, pointer.connect('destroy', () => {
+            pointerGone = true;
             followed.delete(pointer);
             dropPieces();
             if (!paneGone)
                 pane.destroy();
         })]);
         ext._undo.push(() => {
-            ids.forEach(([obj, id]) => {
-                try {
-                    obj.disconnect(id);
-                } catch {}
-            });
+            if (!pointerGone) {
+                ids.forEach(([obj, id]) => {
+                    try {
+                        obj.disconnect(id);
+                    } catch {}
+                });
+            }
             if (followed.get(pointer) === pane) {
                 followed.delete(pointer);
                 dropPieces();
