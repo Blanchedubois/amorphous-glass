@@ -18,3 +18,9 @@ clocks.js clocks.js
 ../tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
 # the widget column's layout (rows of small and wide widgets), shared with the login screen
 ../tahoe-gdm@cachyos-tahoe/widgetlayout.js widgetlayout.js
+# the Schedule widget (the calendar's private link, in the user's session only)
+schedule.js schedule.js
+schedule-model.js schedule-model.js
+icsfeed.js icsfeed.js
+ics-expand.js ics-expand.js
+vendor vendor

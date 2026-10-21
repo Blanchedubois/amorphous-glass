@@ -14,11 +14,13 @@ export const LAYOUTS = {
     E1: [['weather-medium'], ['calendar-month']],             // the forecast wide, the month
     E2: [['weather-medium'], ['calendar-medium']],            // both wide: the forecast, day + month
     E3: [['weather-small', 'calendar-month'], ['clock-analog', 'clock-quarters']],   // 2 x 2
+    // the user's pick (2026-10-20): E2 with the Schedule widget (2 x 2) for the calendar
+    E2S: [['weather-medium'], ['schedule-large']],
 };
 
 // the test shells try one (TAHOE_WIDGET_LAYOUT=E1|E2|E3)
-// the user's pick (2026-10-20): E2
-const LAYOUT = GLib.getenv('TAHOE_WIDGET_LAYOUT') || 'E2';
+// the user's pick (2026-10-20): E2, its calendar the Schedule widget
+const LAYOUT = GLib.getenv('TAHOE_WIDGET_LAYOUT') || 'E2S';
 
 // the rows to show: [[kind, ...], ...]
 export function layoutRows() {
@@ -26,7 +28,12 @@ export function layoutRows() {
 }
 
 export function widthOf(kind) {
-    return kind.endsWith('-medium') ? 2 * SIZE + GAP : SIZE;
+    return kind.endsWith('-medium') || kind.endsWith('-large') ? 2 * SIZE + GAP : SIZE;
+}
+
+// a large widget is two rows tall (the desktop's large: 356 x 356)
+export function heightOf(kind) {
+    return kind.endsWith('-large') ? 2 * SIZE + GAP : SIZE;
 }
 
 // the column keeps clear of the centre (the music card, the prompt, the rows: at most 42 % of the
@@ -40,11 +47,13 @@ export function arrange(rows, monitor, left, margin) {
     const widest = Math.max(...rows.map(row => row.reduce((w, kind) => w + widthOf(kind), 0) + (row.length - 1) * GAP));
     const room = monitor.x + RIGHT_LIMIT * monitor.width - GAP - left;
     const k = Math.min(1, room / widest);
-    const size = SIZE * k, gap = GAP * k;
+    const gap = GAP * k;
+    const heights = rows.map(row => Math.max(...row.map(heightOf)) * k);
+    const total = n => heights.slice(0, n).reduce((a, b) => a + b, 0) + (n - 1) * gap;
     let n = rows.length;
-    while (n > 1 && n * size + (n - 1) * gap > monitor.height * (1 - 2 * margin))
+    while (n > 1 && total(n) > monitor.height * (1 - 2 * margin))
         n--;
-    let y = monitor.y + (monitor.height - (n * size + (n - 1) * gap)) / 2;
+    let y = monitor.y + (monitor.height - total(n)) / 2;
     const spots = [];
     rows.forEach((row, r) => {
         let x = left;
@@ -53,7 +62,7 @@ export function arrange(rows, monitor, left, margin) {
             x += (widthOf(kind) + GAP) * k;
         }
         if (r < n)
-            y += size + gap;
+            y += heights[r] + gap;
     });
     return {spots, scale: k};
 }

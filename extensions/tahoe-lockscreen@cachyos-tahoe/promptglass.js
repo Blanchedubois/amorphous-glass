@@ -43,6 +43,7 @@ export function buildPromptGlass(frame, dialog, backdrop) {
         () => dialog._authPrompt?.cancelButton,
         () => dialog._otherUserButton,
         () => Main.panel?.statusArea?.quickSettings,   // the top-right status pill
+        () => dialog._authMenuButton,                   // Login Options (the gear), when shown
     ];
     const pill = Main.panel?.statusArea?.quickSettings;
     if (pill)
