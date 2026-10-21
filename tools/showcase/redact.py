@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """redact.py RULES IN OUT: blur the sensitive parts of the shoot (docs/SHOWCASE_PLAN.md, Phase 4).
 
-RULES (JSON):
+RULES (JSON):                                (plus the personal terms in ~/.config/tahoe-glass/
+                                              showcase-redact-terms.json, never committed)
   {"terms": ["regex", ...],                 words found by OCR (tesseract) on every still and on clip
                                             frames sampled every 0.2 s; each match is blurred, padded
    "boxes": {"name": [[x, y, w, h, from_s, to_s], ...]}}  fixed boxes per still/clip (no times = all)
@@ -15,7 +16,13 @@ from PIL import Image, ImageFilter
 
 RULES, IN, OUT = sys.argv[1:4]
 rules = json.load(open(RULES))
-TERMS = [re.compile(t, re.I) for t in rules.get('terms', [])]
+# the personal terms (names, places, networks) live outside the repo, so publishing the rules does
+# not publish what they hide: TAHOE_REDACT_TERMS, else ~/.config/tahoe-glass/showcase-redact-terms.json
+private = os.environ.get('TAHOE_REDACT_TERMS', os.path.expanduser('~/.config/tahoe-glass/showcase-redact-terms.json'))
+extra = json.load(open(private)).get('terms', []) if os.path.exists(private) else []
+if not extra:
+    print(f'warning: no personal terms in {private}: only the generic ones are blurred', file=sys.stderr)
+TERMS = [re.compile(t, re.I) for t in rules.get('terms', []) + extra]
 BOXES = rules.get('boxes', {})
 PAD = 10
 os.makedirs(OUT, exist_ok=True)
