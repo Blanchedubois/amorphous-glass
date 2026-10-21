@@ -188,7 +188,9 @@ run_part() {
   # the user's choices: the clock as the user's own (12 h shows without AM/PM, as the lock screen),
   # Space Grotesk, the extension, the weather, the song for Switch User
   export GDM_CLOCK_FORMAT=${GDM_CLOCK_FORMAT:-$(gsettings get org.gnome.desktop.interface clock-format | tr -d "'")}
-  export GDM_FONTS=${GDM_FONTS:-1} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1} GDM_SONG=${GDM_SONG:-1}
+  # Space Grotesk for the greeter only when the user has it (the clock falls back to a sans face)
+  local sg=0; [ -f "$HOME/.local/share/fonts/SpaceGrotesk/SpaceGrotesk-Variable.ttf" ] && sg=1
+  export GDM_FONTS=${GDM_FONTS:-$sg} GDM_EXTENSION=${GDM_EXTENSION:-1} GDM_WEATHER=${GDM_WEATHER:-1} GDM_SONG=${GDM_SONG:-1}
   local text part
   text=$(commands)
   case $1 in
