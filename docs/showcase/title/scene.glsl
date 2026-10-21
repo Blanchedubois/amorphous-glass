@@ -39,9 +39,12 @@ void main() {
 
     // the melt field: under the lens (softly: the refraction does the rest) and in its wake
     float d = (front - p.x) * dir;   // > 0: the glass has passed
+    // every term is continuous across the glass: a step here shows as a vertical seam in the
+    // letters under it (the wake used to start at full melt right at the glass's centre)
     float lens = 0.55 * (1.0 - smoothstep(halfW * 0.5, halfW + 60.0, abs(d)));
-    float wake = d > 0.0 ? exp(-d / max(wakeLen, 1.0)) : 0.0;
-    float m = melt * max(lens, mix(wake, step(0.0, d), gone));
+    float behind = smoothstep(-halfW * 0.5, halfW * 0.5, d);
+    float wake = behind * exp(-max(d, 0.0) / max(wakeLen, 1.0));
+    float m = melt * max(lens, mix(wake, behind, gone));
     float fade = 1.0 - gone * smoothstep(halfW * 0.2, halfW + 380.0, d);
 
     // melted letters: drift along a slow noise field and run together (blur, then a threshold)
