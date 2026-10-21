@@ -70,13 +70,23 @@ def log(**kv):
     LOG.flush()
 
 
+# the shoot's tempo (user, 2026-10-21: "sharper cuts and motion"): glides, drags and ordinary pauses
+# at this fraction of their written length; waits for an app to open (settle) are not scaled
+TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.7'))
+
+
 def pause(ms):
+    time.sleep(max(120, ms * TEMPO) / 1000)
+
+
+def settle(ms):
+    """wait for something to open or close: not scaled by the tempo"""
     time.sleep(ms / 1000)
 
 
 def move(x, y, ms=700):
     """an eased glide (the driver's ease in-out), at least 0.6 s for a long way: the camera follows"""
-    x, y = int(x), int(y)
+    x, y, ms = int(x), int(y), max(300, int(ms * TEMPO))
     log(move=[POS[0], POS[1], x, y, ms])
     call('Move', (x, y, ms), '(iiu)')
     POS[:] = [x, y]
@@ -91,7 +101,7 @@ def click(x=None, y=None, button=1):
 
 def drag(x2, y2, ms=1300):
     """press where the cursor is, glide (eased) to x2, y2, release (the driver waits 150 ms before)"""
-    x2, y2 = int(x2), int(y2)
+    x2, y2, ms = int(x2), int(y2), max(300, int(ms * TEMPO))
     log(drag=[POS[0], POS[1], x2, y2, ms])
     call('Drag', (POS[0], POS[1], x2, y2, ms), '(iiiiu)')
     POS[:] = [x2, y2]
@@ -356,7 +366,7 @@ def s_files_window():
         move(*center('dock:org.gnome.Nautilus'), 900)
         pause(250)
         subprocess.Popen(['nautilus', '--new-window', folder], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        pause(1800)
+        settle(1700)
         move(*window_header('org.gnome.Nautilus'), 900)
         pause(200)
         drag(POS[0] + 440, POS[1] - 160, 1400)
@@ -384,7 +394,7 @@ def s_window_menu():
 def s_overview_search():
     with Clip('overview-search'):
         press('Super_L')
-        pause(900)
+        settle(700)
         type_('calc')
         pause(1400)
         move(POS[0], POS[1] - 240, 900)        # up over the result panels
@@ -459,7 +469,7 @@ def s_desktop_menu():
 def s_app_grid():
     with Clip('app-grid'):
         press('Super_L', 'a')                   # the app grid (a second Super can land on the windows)
-        pause(1600)
+        settle(1200)
         move(*center('folder:0'), 1000)
         click()
         pause(1800)
@@ -476,7 +486,7 @@ def s_settings_window():
     with Clip('settings-window'):
         move(1280, 600, 600)
         subprocess.Popen(['gnome-control-center', 'background'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        pause(2200)
+        settle(2000)
         move(*window_header('org.gnome.Settings'), 900)
         pause(200)
         drag(POS[0] - 380, POS[1] + 140, 1400)
@@ -492,8 +502,9 @@ def s_settings_window():
         move(*HOME_XY, 900)
 
 
-SHOTS = [s_home, s_widget_drag, s_quick_settings, s_files_window, s_window_menu, s_overview_search, s_music,
-         s_calendar, s_volume, s_desktop_menu, s_app_grid, s_settings_window, s_home_end]
+# in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left
+SHOTS = [s_home, s_widget_drag, s_desktop_menu, s_quick_settings, s_files_window, s_window_menu, s_settings_window,
+         s_overview_search, s_app_grid, s_calendar, s_volume, s_music, s_home_end]
 
 
 def main():
