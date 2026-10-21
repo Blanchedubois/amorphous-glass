@@ -17,7 +17,8 @@ import {GlassPane} from './glass.js';
 import {CalendarMedium, CalendarMonth} from './widgets/calendar.js';
 import {AnalogClock, AnalogQuartersClock} from './widgets/clocks.js';
 import {WeatherMedium, WeatherSmall} from './widgets/weather.js';
-import {SIZE, arrange, layoutRows, widthOf} from './widgetlayout.js';
+import {ScheduleLarge} from './widgets/schedule.js';
+import {arrange, heightOf, layoutRows, widthOf} from './widgetlayout.js';
 
 // the widgets the column may hold (widgetlayout.js LAYOUTS); calendars without events (the
 // user's rule: no event titles on the lock and login screens)
@@ -28,6 +29,8 @@ const KINDS = {
     'calendar-medium': () => new CalendarMedium({events: false}),
     'clock-analog': () => new AnalogClock(),
     'clock-quarters': () => new AnalogQuartersClock(),
+    // today's events as the locked session shares them (widgets/icsfeed.js, the login screen's own)
+    'schedule-large': () => new ScheduleLarge(),
 };
 const RADIUS = 24;         // tokens/radius.json widget
 const LEFT = 0.045;        // the column's left edge, share of the monitor's width
@@ -56,7 +59,7 @@ export function buildWidgets(ext, dir) {
         const actor = new St.Widget({
             style_class: `tahoe-widget tahoe-widget-${kind} tahoe-gdm-pane`,
             layout_manager: new Clutter.BinLayout(),
-            width: widthOf(kind), height: SIZE,
+            width: widthOf(kind), height: heightOf(kind),
         });
         const pane = new GlassPane(backdrop, RADIUS);
         pane.connect('mask-failed', () => ext._fail(`widget glass: ${pane.failed}`));
