@@ -24,8 +24,8 @@ UPDATES_DIR = os.path.join(HOME, '.local/share/gnome-shell/extension-updates')
 STATE_FILE = os.path.join(os.environ.get('XDG_CONFIG_HOME', os.path.join(HOME, '.config')), 'tahoe-glass', 'state')
 OWN = os.path.join(os.environ.get('XDG_STATE_HOME', os.path.join(HOME, '.local/state')), 'tahoe-repair')
 PKG_STAMP = os.environ.get('TAHOE_REPAIR_PKG_STAMP', '/var/lib/tahoe-repair/packages-changed')
-SYS_GRESOURCE = '/usr/share/gnome-shell/gnome-shell-theme.gresource'
-GDM_KEYS = '/etc/dconf/db/gdm.d/90-tahoe-gdm'
+SYS_GRESOURCE = os.environ.get('TAHOE_REPAIR_SYS_GRESOURCE', '/usr/share/gnome-shell/gnome-shell-theme.gresource')
+GDM_KEYS = os.environ.get('TAHOE_REPAIR_GDM_KEYS', '/etc/dconf/db/gdm.d/90-tahoe-gdm')
 GDM_EXT = '/usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe'
 BMS = 'blur-my-shell@aunetx'
 PACKAGES = ['gnome-shell', 'mutter', 'gtk3', 'gtk4', 'libadwaita', 'gdm', 'gnome-shell-extensions', 'glib2', 'gjs']
@@ -696,7 +696,8 @@ class Repair:
         src = os.path.join(HOME, '.local/src/MacTahoe-gtk-theme')
         if not os.path.isdir(src):
             sh('git', 'clone', '-q', '--depth', '1', 'https://github.com/vinceliuice/MacTahoe-gtk-theme', src, check=True)
-        for d in glob.glob(os.path.join(HOME, '.config/gtk-4.0/gtk*.css')) + [os.path.join(HOME, '.config/gtk-3.0/gtk.css')]:
+        for d in (glob.glob(os.path.join(HOME, '.config/gtk-4.0/gtk*.css')) + [os.path.join(HOME, '.config/gtk-3.0/gtk.css')]
+                  + glob.glob(os.path.join(HOME, '.themes/MacTahoe-*/gnome-shell/gnome-shell.css'))):
             self.log.backup(d)
         shutil.rmtree('/tmp/MacTahoe.lock', ignore_errors=True)
         sh('sh', '-c', 'cd "$1" && TERM=xterm-256color script -qfec "./install.sh -b -l" /dev/null', 'x', src)
@@ -763,9 +764,9 @@ class Repair:
                 todo.append((order, it, fix))
         done_runs = set()
         for _, it, fix in sorted(todo, key=lambda t: t[0]):
-            key = tuple(fix.get('cmd', [])) if fix['type'] in ('run', 'bms-rebuild', 'mactahoe-install') else None
-            if fix['type'] == 'bms-rebuild':
-                key = ('bms-rebuild',)
+            # one run per command: several items share glass-bar.sh menus on, the rebuild, the reinstall
+            key = (('run',) + tuple(fix['cmd'])) if fix['type'] == 'run' else \
+                (fix['type'],) if fix['type'] in ('bms-rebuild', 'mactahoe-install', 'quarantine-updates') else None
             if key and key in done_runs:
                 continue
             try:

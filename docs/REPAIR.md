@@ -329,3 +329,71 @@ gsettings for keys), except: step 5c (v75 modal dialogs) and 5b2 (pre-v76 patch 
 checks with no automatic fix; step 8's `rm -rf` and refetch becomes "fetch only when the folder is
 missing, and never for the patched extensions"; MacTahoe is rebuilt only when its theme folder is
 missing, not when `gtk.css` is merely not a link.
+
+## Phase 4: proof
+
+Run 2026-10-20 in a throwaway home (`tools/repair-test/sandbox.sh`). It holds copies of the themes,
+GTK CSS, state file, extensions, Blur My Shell source and the dconf settings, on a private D-Bus
+session with its own dconf database, so no command reached the live desktop. The live settings and
+files were checked unchanged afterwards, and a read-only `check` of the live desktop gives exit 0.
+
+Each row: break one thing; `check` must report the listed items; run `repair`; a second `check` must
+be clean (or, for user and root steps, report the same action); then the result is checked directly.
+The GNOME bumps are faked with `TAHOE_REPAIR_FAKE_SHELL`. The login-screen row points the check at
+the stock gresource backup (`.bak`) instead of the installed one. Reproduce with
+`python3 tools/repair-test/drift_test.py <new folder>`.
+
+| Feature | How it breaks | Check reports | Detected | Repaired (clean check after) | Verified | Time |
+|---|---|---|---|---|---|---|
+| Interface settings | gsettings reset of button layout, cursor, font, resize border | C3 drift, C2 drift, C5-ui drift, C4 drift | yes | yes | yes: button-layout back | 3s |
+| Dark Style switched off | quick settings Dark Style: color-scheme default in dark mode | B1-scheme-dark drift | yes | yes | yes: prefer-dark | 3s |
+| Theme changed | shell theme, GTK3 theme and icon theme set to Adwaita | A2-dark drift, B1-gtk-dark drift, C1 drift | yes | yes | yes: MacTahoe-Dark, Tahoe-Material | 4s |
+| GTK4 glass block deleted | the tahoe-glass-gtk4 block cut out of gtk-Dark.css | B3-dark drift | yes | yes | yes: block back | 3s |
+| GTK3 glass block deleted | the tahoe-glass-gtk3 block cut out of ~/.config/gtk-3.0/gtk.css | B4-dark drift | yes | yes | yes: block back | 3s |
+| Shell CSS overrides deleted | the tahoe-overrides block cut out of MacTahoe-Dark gnome-shell.css | A3 drift | yes | yes | yes: block back | 4s |
+| Shell CSS overrides stale | one radius in the rendered block changed by hand | A3 drift | yes | yes | yes: re-rendered | 4s |
+| GTK3 corners | MacTahoe-Dark gtk-3.0 back to 24px 24px 0 0 | A5 drift | yes | yes | yes: all four rounded | 3s |
+| Theme file emptied | MacTahoe-Dark gnome-shell.css and gtk-4.0/gtk-Dark.css truncated (a failed theme install) | A1-content drift, B6-content drift | yes | yes | yes: MacTahoe reinstalled, glass re-applied (notified) | 8s |
+| libadwaita link | gtk-4.0/gtk.css pointed at gtk-Light.css in dark mode | B2-dark drift | yes | yes | yes: gtk-Dark.css | 3s |
+| Blur My Shell settings | menus pipeline default, pipelines reset, a radius key changed, motion-freeze off | D2-menu-pipe drift, D2-menu-pipes drift, D2-bar-pipes-glass drift, D3-popup-menu-corner-radius drift, D2-menu-freeze drift | yes | yes | yes: pipelines and freeze back | 4s |
+| Blur My Shell replaced with stock | unpatched v76 from the pinned commit installed (as GNOME's updater would) | D1 drift | yes | yes | yes: patched, stamped (notified) | 3s |
+| Blur My Shell from an old patch | the build's patch stamp differs from the repo's patch | D1-stamp drift | yes | yes | yes: rebuilt, stamp current | 3s |
+| Pending upstream update | GNOME's updater left a Blur My Shell update in extension-updates | D1-pending drift | yes | yes | yes: held back (notified) | 3s |
+| Extensions disabled | dock, Blur My Shell and the widgets taken out of enabled-extensions; user extensions off | C9 drift, C8 drift | yes | yes | yes: back on | 3s |
+| A user's own extension | an extension the user enabled that the design does not know, the list reordered | nothing flagged | yes | yes | yes: kept, order kept | 2s |
+| Switched off stays off | state widgets=off, but the widgets were enabled again by hand | C9 drift | yes | yes | yes: removed, not re-added | 3s |
+| Absent switch is left alone | no controlcenter key; the Control Center enabled by hand | nothing flagged | yes | yes | yes: left as the user set it | 2s |
+| Tahoe extension deleted | the motion extension folder removed while motion=on | F-motion drift | yes | yes | yes: reinstalled from the repo (notified) | 3s |
+| Open Bar styling | Open Bar told to style GTK and menus, its font changed | D7-apply-gtk drift, D7-menustyle drift, D7-font drift | yes | yes | yes: bar only | 3s |
+| Dock settings and stylesheet | Dash to Dock on its own theme and moved left; stylesheet renamed (tweaks -d) | D6-apply-custom-theme drift, D6-dock-position drift, D6-css drift | yes | yes | yes: stylesheet back (notified) | 3s |
+| Rounded Window Corners refetched | the 51 port gone (GLSLEffect import back), metadata at 50 | D9-port drift, D9-meta drift | yes | yes | yes: ported (notified) | 3s |
+| Now Playing and Vitals | Now Playing back to its own text, Vitals asks for the public IP | D10-panel-text drift, D11-ip drift | yes | yes | yes: no IP lookup | 3s |
+| Entry points | autostart deleted, tahoe-repair linked to the old repo | H1 drift, H2 drift | yes | yes | yes: both restored | 3s |
+| Light mode | the user picks light (state mode=light) and a repair runs before glass-bar.sh mode | A2-light drift, B1-gtk-light drift, B2-light drift, B3-light drift | yes | yes | yes: light everywhere | 4s |
+| Back to dark | state mode=dark again | A2-dark drift, B1-gtk-dark drift, B2-dark drift | yes | yes | yes: dark theme and stylesheet | 4s |
+| repair-skip | repair-skip=C3 in the state file, then the button layout changed | nothing flagged | yes | yes | yes: left as the user set it | 2s |
+| Login screen replaced by a gnome-shell update | system gresource is the stock one (test copy), Tahoe GDM keys present | A6 action | yes | yes | yes: reported with the sudo command; nothing root touched (notified) | 2s |
+| SF Pro missing | the fonts folder gone | E4 action | yes | yes | yes: reported; the font settings are left until it is back (notified) | 3s |
+| Packages changed | the pacman hook stamp is newer than the last run | H6 info | yes | yes | yes: reported once | 2s |
+| GNOME minor bump (51.2) | the installed shell says 51.2 | nothing flagged | yes | yes | yes: no hold; validation stays off | 2s |
+| GNOME major bump (52) | the installed shell says 52.0 and a refetch put RWC's unported code back | C7 drift, D9-port held, D9-meta held | yes | yes | yes: validation on, 51 port not forced, user notified (notified) | 2s |
+| Back on GNOME 51 | the shell says 51.1 again | C7 drift, D9-port drift | yes | yes | yes: validation off, port back (notified) | 3s |
+| repair=off | repair=off in the state file and a setting changed | nothing flagged | yes | yes | yes: nothing changed | 1s |
+
+Found and fixed while testing:
+
+- An emptied theme file (a failed or interrupted MacTahoe install) went unnoticed, because only the
+  folders' existence was checked. A1-content and B6-content now check the files are whole.
+- The MacTahoe reinstall ran once per item that asked for it; fixes now run once per command.
+- `glass-bar.sh menus on` stopped when the pre-glass backup folder was missing (only `off` needs it).
+
+Not covered here:
+
+- Checks that need a running shell: extensions in ERROR (C9-state), the Adwaita fallback
+  (A2-loaded) and running-vs-installed shell (H7). The sandbox has no shell, so they report skip.
+  On the live desktop they read the shell over D-Bus, and the read-only live check exercised them.
+- Real desktop notifications (the sandbox prints them), the systemd units and the pacman hook
+  (not installed), and two runs at once (the lock is a plain `flock`).
+- Fetching a missing extension from extensions.gnome.org. The Blur My Shell rebuild fetches from
+  GitHub and asks extensions.gnome.org for the version label, as `glass-bar.sh rebuild` always has.
+- The lock screen and GDM harnesses were not run (they once locked the account through PAM faillock).

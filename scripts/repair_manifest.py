@@ -80,6 +80,9 @@ def mode_name(m):
 # ---- A. shell theme and CSS -------------------------------------------------------------------
 item('A1', 'MacTahoe Dark shell theme present', {'type': 'exists', 'path': SHELL_CSS[0]},
      {'type': 'mactahoe-install', 'logout': True})
+item('A1-content', 'MacTahoe Dark shell theme is whole (not emptied by a failed install)',
+     {'type': 'contains', 'path': SHELL_CSS[0], 'text': ['#panel', '.popup-menu-content']},
+     {'type': 'mactahoe-install', 'logout': True})
 item('A1-light', 'MacTahoe Light shell theme present (light mode)', {'type': 'exists', 'path': SHELL_CSS[1]},
      {'type': 'mactahoe-install', 'logout': True}, {'mode': 'light'})
 for m in MODES:
@@ -120,6 +123,9 @@ for m in ['light', 'dark']:
 item('B3-milky', 'No GTK4 glass block in milky mode',
      {'type': 'absent-text', 'glob': f'{GTK4}/gtk-[DL]*.css', 'text': 'tahoe-glass-gtk4'},
      run('glass-bar.sh', 'apps', 'on', backup=GTK4_CSS + [GTK3_CSS]), {'glass': True, 'apps': 'on', 'mode': 'milky'})
+item('B6-content', 'libadwaita stylesheets are whole (MacTahoe gtk-4.0 files)',
+     {'type': 'contains', 'path': f'{GTK4}/gtk-Dark.css', 'text': ['headerbar', 'popover']},
+     {'type': 'mactahoe-install', 'logout': True})
 item('B5', 'No old GTK4 popover translucency block',
      {'type': 'absent-text', 'glob': f'{GTK4}/gtk-Dark.css', 'text': 'tahoe-gtk4-overrides:'},
      {'type': 'strip-block', 'begin': '/* tahoe-gtk4-overrides:', 'end': '/* end tahoe-gtk4-overrides */'})
