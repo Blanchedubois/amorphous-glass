@@ -531,7 +531,7 @@ apps() { # on | off : live Liquid Glass behind the whitelisted app windows (File
 
 menus() { # on | off : Blur My Shell's popup module
   local mode=$1 b cur
-  b=$(readlink -f "$BACKUP")
+  b=$(readlink -f "$BACKUP" || true)   # only 'off' needs the backup
   cur=$(mktemp)
   dconf dump "${EXT_PATH}blur-my-shell/" > "$cur"
   if [ "$mode" = on ]; then
@@ -613,15 +613,19 @@ build_bms() {
   shell_major=$(gnome-shell --version | grep -oE '[0-9]+' | head -1)
   ego_ver=$(curl -sf "https://extensions.gnome.org/extension-info/?uuid=$BMS_UUID&shell_version=$shell_major" |
             python3 -c 'import json,sys;print(json.load(sys.stdin).get("version",""))' || true)
-  if [ -n "$ego_ver" ]; then
-    python3 - "$EXT/$BMS_UUID/metadata.json" "$ego_ver" <<'PY'
+  # stamped with the commit and the patch it was built from, so tahoe-repair can tell a stale build
+  python3 - "$EXT/$BMS_UUID/metadata.json" "$ego_ver" "$BMS_COMMIT" "$(sha256sum "$BMS_PATCH" | cut -d' ' -f1)" <<'PY'
 import json, sys
-p, v = sys.argv[1], int(sys.argv[2])
+p, v, commit, sha = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 m = json.load(open(p))
 m['tahoe-glass-built-from'] = m.get('version')
-m['version'] = v
+if v:
+    m['version'] = int(v)
+m['tahoe-glass-commit'] = commit
+m['tahoe-glass-patch-sha256'] = sha
 json.dump(m, open(p, 'w'), indent=2)
 PY
+  if [ -n "$ego_ver" ]; then
     shell_edges
     echo "  built from v76 + $(basename "$BMS_PATCH"), labelled v$ego_ver (extensions.gnome.org's current) so GNOME does not swap it"
     if [ "$ego_ver" -ge 76 ]; then
