@@ -36,6 +36,9 @@ from gi.repository import Gio, GLib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARGS = [a for a in sys.argv[1:] if not a.startswith('-')]
 DRY = '--dry-run' in sys.argv
+# user, 2026-10-21: "take the entire clip of moving around the OS ... all in one take", the camera
+# zooming in and following the mouse where needed (docs/showcase/montage/tour.py)
+ONE_TAKE = '--one-take' in sys.argv
 OUT = os.path.abspath(ARGS[0]) if ARGS else sys.exit(__doc__)
 LAYOUT = os.path.expanduser('~/.config/tahoe-glass/widgets.json')
 WIDGETS_UUID = 'tahoe-widgets@cachyos-tahoe'
@@ -73,7 +76,7 @@ def log(**kv):
 
 # the shoot's tempo (user, 2026-10-21: "sharper cuts and motion", then "faster ... choppier and faster"): glides, drags and ordinary pauses
 # at this fraction of their written length; waits for an app to open (settle) are not scaled
-TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.5'))
+TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.75'))
 
 
 def pause(ms):
@@ -152,8 +155,13 @@ class Clip:
 
     def __init__(self, name):
         self.name = name
+        # one take (--one-take): only the 'tour' clip records; each shot inside it is a marked segment
+        self.segment = ONE_TAKE and name != 'tour'
 
     def __enter__(self):
+        if self.segment:
+            log(segment=self.name, cursor=list(POS))
+            return self
         opts = {'framerate': GLib.Variant('i', 60), 'draw-cursor': GLib.Variant('b', True)}
         t0 = time.time()
         ok, self.file = call('Screencast', (os.path.join(OUT, self.name), opts), '(sa{sv})', '(bs)',
@@ -164,6 +172,9 @@ class Clip:
         return self
 
     def __exit__(self, *exc):
+        if self.segment:
+            log(segment_end=self.name)
+            return False
         pause(400)
         call('StopScreencast', dest='org.gnome.Shell.Screencast', path='/org/gnome/Shell/Screencast',
              iface='org.gnome.Shell.Screencast', out='(b)')
@@ -570,19 +581,32 @@ def main():
     try:
         driver_on()
         setup()
-        for shot in shots:
-            try:
-                shot()
-                log(done=shot.__name__[2:])
-            except Exception as e:  # noqa: BLE001  one failed shot never stops the rest
-                log(failed=shot.__name__[2:], error=f'{type(e).__name__}: {e}')
-                try:
-                    close_all()
-                except GLib.Error:
-                    pass
+        if ONE_TAKE:
+            shots = [s for s in shots if s not in (s_home, s_home_end)]
+            with Clip('tour'):
+                move(*HOME_XY, 300)
+                pause(1600)                   # the home screen, still: where the title hands over
+                run_shots(shots)
+                move(*HOME_XY, 600)
+                settle(1800)                  # and where the lock screen takes over
+            return
+        run_shots(shots)
     finally:
         restore()
         log(restored=True)
+
+
+def run_shots(shots):
+    for shot in shots:
+        try:
+            shot()
+            log(done=shot.__name__[2:])
+        except Exception as e:  # noqa: BLE001  one failed shot never stops the rest
+            log(failed=shot.__name__[2:], error=f'{type(e).__name__}: {e}')
+            try:
+                close_all()
+            except GLib.Error:
+                pass
 
 
 DRIVER = 'showcase@local'
