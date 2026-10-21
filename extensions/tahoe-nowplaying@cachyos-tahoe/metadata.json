@@ -1,0 +1,9 @@
+{
+  "uuid": "tahoe-nowplaying@cachyos-tahoe",
+  "name": "Tahoe Now Playing",
+  "description": "A full-screen Now Playing view (cover, player and live lyrics over the album-colour swirl), opened with a hotkey. Escape, a click outside the controls or almost any key returns to the desktop.",
+  "shell-version": ["51"],
+  "settings-schema": "org.gnome.shell.extensions.tahoe-nowplaying",
+  "url": "https://github.com/Blanchedubois/amorphous-glass",
+  "version": 1
+}

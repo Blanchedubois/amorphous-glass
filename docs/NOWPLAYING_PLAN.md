@@ -81,7 +81,7 @@ After each such change, both copies (lock screen and Now Playing) are re-synced 
      `teardown()`, which pops the modal and destroys the overlay with no animation.
   3. A watchdog: if the enter or exit animation has not finished 3 s after it started, it jumps to the end state.
   4. `disable()`, the screen locking (`Main.screenShield` `locked-changed`) and a session-mode change all close the view instantly.
-  5. If `pushModal` fails (another grab holds input), the view does not open at all.
+  5. If the grab is not really ours (Mutter 51: `grab.is_revoked()`, or `global.stage.get_grab_actor()` is another actor), the view does not open at all; if the grab is revoked later (`notify::revoked`), the view goes at once.
   6. During the exit, the modal is released **at the first frame**, and the overlay goes
      non-reactive. Clicks and keys reach the desktop while the blur is still sharpening.
   7. The hotkey pressed again while the view is open closes it.
@@ -378,7 +378,7 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
 - Mockups of both layouts, the enter and exit storyboards, the swap, the tilt, and the key map.
 - **Gate:** the user's answers to §6.
 
-### Phase 1: the overlay skeleton
+### Phase 1: the overlay skeleton (done: 39/39 headless tests, `tools/nowplaying/run.sh`)
 - **The extension.** New `extensions/tahoe-nowplaying@cachyos-tahoe/`: `metadata.json`,
   `extension.js`, `overlay.js` (open, close, guard, teardown, watchdog), `keys.js` (the §2 map) and
   `schemas/org.gnome.shell.extensions.tahoe-nowplaying.gschema.xml`. These settings keys:
