@@ -22,6 +22,20 @@ ffmpeg -loglevel error -y -i "$title" -i "$montage" -i "$title" -filter_complex 
   [a][b]xfade=transition=fade:duration=$D:offset=$o1[ab];
   [ab][c]xfade=transition=fade:duration=$D:offset=$o2[v]" \
   -map '[v]' -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart "$out"
+# user, 2026-10-21: "the starting clip should be the title card": the loop is seamless, so the file is
+# rotated to begin on the word, already on screen (ROTATE s into the title), and the home screen
+# it opened on plays at the end instead
+ROTATE=${ROTATE:-1.25}
+if [ "$ROTATE" != 0 ]; then
+  tmp="${out%.mp4}.unrotated.mp4"
+  mv "$out" "$tmp"
+  ffmpeg -loglevel error -y -i "$tmp" -filter_complex "
+    [0:v]split[x][y];
+    [x]trim=start=$ROTATE,setpts=PTS-STARTPTS[a];
+    [y]trim=end=$ROTATE,setpts=PTS-STARTPTS[b];
+    [a][b]concat=n=2:v=1[v]" -map '[v]' -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -movflags +faststart "$out"
+  rm -f "$tmp"
+fi
 ls -l "$out"
 if [ -n "$webp" ]; then
   python3 "$here/../title/render.py" webp "$out" -o "$webp" --webp-width 1280 --webp-fps 24 --webp-quality 78 --webp-kmax 12

@@ -121,11 +121,13 @@ def main():
     ap.add_argument('--lock-in', type=float, default=1.0)
     ap.add_argument('--lock-out', type=float, default=9.6)
     ap.add_argument('--start', type=float, default=0.0, help='where in the tour to begin (s)')
+    ap.add_argument('--cuts', type=Path, help='a cut list (tour-cuts.json): clips of the take, each at one zoom')
     ap.add_argument('--draft', action='store_true')
     args = ap.parse_args()
     out_size = (OUT_W // 2, OUT_H // 2) if args.draft else (OUT_W, OUT_H)
     track = json.loads(Path(args.track).read_text())
     pts = np.array([[p[0], p[1]] for p in track['points']], dtype=float)
+    track_fps = track.get('fps', FPS)
     segs = segments(args.log, track.get('offset', 0.0))
     for a, b, n in segs:
         print(f'  {a:6.2f} - {b:6.2f}  {n}  zoom {ZOOM.get(n, 1.3)}', file=sys.stderr)
@@ -133,6 +135,10 @@ def main():
                             '-s', f'{out_size[0]}x{out_size[1]}', '-r', str(FPS), '-i', '-', '-c:v', 'libx264',
                             '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', args.output], stdin=subprocess.PIPE)
     dt = 1 / FPS
+    if args.cuts:
+        last, tour_frames = render_cuts(args, pts, enc, out_size)
+        finish(args, enc, last, out_size, tour_frames)
+        return
     first = pts[min(len(pts) - 1, int(args.start * FPS))]
     cx, cy, z = Spring(first[0], CENTRE), Spring(first[1], CENTRE), Spring(zoom_at(args.start, segs), ZOOMING)
     last = None
@@ -145,19 +151,61 @@ def main():
         last = np.asarray(view(im, cx.value, cy.value, max(1.0, z.value), out_size))
         enc.stdin.write(last.tobytes())
     tour_frames = n + 1
+    finish(args, enc, last, out_size, tour_frames)
+
+
+def render_cuts(args, pts, enc, out_size):
+    """each clip of the cut list at its own fixed zoom. Above 1 the cursor is locked to the exact centre
+    of the frame (user, 2026-10-21: "I also like the mouse being centered"), the wallpaper continuing
+    past the screen's edge (edit.py's Stage), with motion blur along the camera's path; at 1 the clip
+    is the whole screen"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import edit
+    clips = json.loads(args.cuts.read_text())['clips']
+    dt, total, last = 1 / FPS, 0, None
+    size = probe(args.tour)
+    for c in clips:
+        z = c['zoom']
+        stage = edit.Stage(size, z) if z > 1 else None
+        count = round((c['out'] - c['in']) * FPS)
+        n = 0
+        for n, im in enumerate(frames(args.tour, c['in'], c['out'] - c['in'] + 0.1)):
+            if n >= count:
+                break
+            t = c['in'] + n * dt
+            if stage is None:
+                last = np.asarray(im.resize(out_size, Image.LANCZOS))
+            else:
+                here = edit.position(pts, t)
+                before = edit.position(pts, t - edit.SHUTTER * dt)
+                moved = float(np.hypot(*(here - before)))
+                samples = 1 if args.draft or moved < 0.75 or moved > edit.JUMP else int(min(edit.MAX_SAMPLES, max(3, moved / 4)))
+                centres = [tuple(before + (here - before) * k / max(1, samples - 1)) for k in range(samples)]
+                last = stage.shoot(stage.compose(im), centres, out_size)
+            enc.stdin.write(last.tobytes())
+        total += count
+        print(f'  {c["name"]}: {c["in"]:.2f}-{c["out"]:.2f} at {z}', file=sys.stderr)
+    return last, total
+
+
+def finish(args, enc, last, out_size, tour_frames):
     if args.lock:
         # the lock screen, full screen, a dissolve in and out (it ends where it began: the home screen)
         lock = [np.asarray(im.resize(out_size, Image.LANCZOS))
                 for im in frames(args.lock, args.lock_in, args.lock_out - args.lock_in)]
-        D = 12
+        # smoother (user): the crossfades overlap GNOME's own lock and unlock animations, eased, so the
+        # widgets fade out while the lock comes down and back in while it lifts (the lock recording's
+        # own desktop is the same wallpaper without them)
+        D = 30
+        ease = lambda x: x * x * (3 - 2 * x)
         for i in range(D):
-            a = (i + 1) / (D + 1)
-            enc.stdin.write((last * (1 - a) + lock[0] * a).astype(np.uint8).tobytes())
-        for f in lock:
+            a = ease((i + 1) / (D + 1))
+            enc.stdin.write((last * (1 - a) + lock[i] * a).astype(np.uint8).tobytes())
+        for f in lock[D:len(lock) - D]:
             enc.stdin.write(f.tobytes())
         for i in range(D):
-            a = (i + 1) / (D + 1)
-            enc.stdin.write((lock[-1] * (1 - a) + last * a).astype(np.uint8).tobytes())
+            a = ease((i + 1) / (D + 1))
+            enc.stdin.write((lock[len(lock) - D + i] * (1 - a) + last * a).astype(np.uint8).tobytes())
         for _ in range(30):
             enc.stdin.write(last.tobytes())
     enc.stdin.close()
