@@ -159,6 +159,21 @@ export default class {
             hoverAll(false);
         }
 
+        // GDM_SHOT_AUTHMENU=1: Login Options (the gear) with two sessions, shown and opened
+        if (GLib.getenv('GDM_SHOT_AUTHMENU') && d._authMenuButton) {
+            const b = d._authMenuButton;
+            for (const [id, name] of [['gnome', 'GNOME'], ['gnome-xorg', 'GNOME on Xorg']])
+                b.addItem({sectionName: 'Session Type', name, id});
+            b.show();
+            await wait(1);
+            record('authmenu', d);
+            await shot('authmenu');
+            b._menu.open(true);
+            await wait(1.2);
+            await shot('authmenu-open');
+            b._menu.close(false);
+            await wait(0.4);
+        }
         // GDM_SHOT_MENUS=1: the calendar, the system menu and the accessibility menu, open
         if (GLib.getenv('GDM_SHOT_MENUS')) {
             const menus = [['calendar', Main.panel.statusArea.dateMenu?.menu],
