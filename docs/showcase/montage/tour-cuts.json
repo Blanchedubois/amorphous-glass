@@ -3,7 +3,7 @@
   "clips": [
     {
       "name": "home",
-      "in": 0.5,
+      "in": 0.9,
       "out": 1.9,
       "zoom": 1.0,
       "where": "whole screen"
@@ -18,7 +18,7 @@
     {
       "name": "quick-settings",
       "in": 8.3,
-      "out": 11.72,
+      "out": 11.05,
       "zoom": 1.6,
       "where": "top right: the panel grows from its icon, Wi-Fi submenu"
     },
@@ -46,7 +46,7 @@
     {
       "name": "menu-slide",
       "in": 14.64,
-      "out": 21.3,
+      "out": 20.3,
       "zoom": 1.35,
       "where": "top: the calendar slides into quick settings"
     },
@@ -60,16 +60,9 @@
     {
       "name": "app-grid",
       "in": 50.35,
-      "out": 52.4,
+      "out": 54.15,
       "zoom": 1.0,
-      "where": "whole screen: a folder opens"
-    },
-    {
-      "name": "home-end",
-      "in": 62.2,
-      "out": 63.4,
-      "zoom": 1.0,
-      "where": "whole screen: to the lock screen"
+      "where": "whole screen: a folder opens, then it all collapses back to the home screen, into the lock"
     }
   ]
 }
