@@ -212,3 +212,14 @@ menus and hover, the glass fault (GNOME's login screen back), the same four size
 conversation since the start (journal), faillock empty. Two shutdown-only warnings fixed on the
 way (a queued menu update, and disconnects from menus GNOME had already disposed).
 `phaseF-final.png`: Super+L, the login screen and the desktop widgets.
+
+## After Phase F (2026-10-20, the user)
+
+- Notifications on Super+L: each row its own glass capsule (promptglass.js), its app icon in a
+  32 px circle 12 px from the capsule's left, top and bottom (measured from the pixels).
+  `notification-glass.png`. The login screen has no notifications.
+- The system menu aligned on both screens: every piece 44 px tall (sliders were 27, the round
+  button 37), 12 px between rows and columns, slider icons in the toggles' 32 px circle 6 px
+  from the end, round buttons 44 px circles, submenus the menu's full 420 px width. Measured with
+  the sliders shown in the test shells (TAHOE_QS_SLIDERS: no audio device there).
+  `system-menu-aligned.png` (Super+L, login).

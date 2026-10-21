@@ -206,6 +206,14 @@
 #uiGroup.tahoe-gdm-glass-menus .quick-toggle-menu .header { padding: 6px 8px !important; }
 /* a little wider than GNOME's, as the desktop's: the titles beside the round icons fit */
 #uiGroup.tahoe-gdm-glass-menus .popup-menu-content.quick-settings { min-width: 420px !important; }
+/* the round buttons (screenshot, settings, lock, power): 44 px circles, as tall as the toggles */
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .icon-button {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-settings .icon-button StIcon { icon-size: 20px !important; }
 /* no divider between a split toggle and its arrow (the desktop has none) */
 #uiGroup.tahoe-gdm-glass-menus .quick-toggle-separator {
   background-color: transparent !important;
@@ -234,4 +242,27 @@
   min-width: 0 !important;
   padding: 0 !important;
   margin: 6px 6px 6px 0 !important;
+}
+
+/* a slider (volume, microphone, brightness): a capsule as tall as the toggles, its icon in the same
+   32 px circle 6 px from its end, the track filling the rest */
+#uiGroup.tahoe-gdm-glass-menus .quick-slider {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 14px 0 6px !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-slider > StBoxLayout { spacing: 10px !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-slider .icon-button {
+  width: 32px !important;
+  height: 32px !important;
+  margin: 6px 0 !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  background-color: rgba(255, 255, 255, 0.10) !important;
+}
+#uiGroup.tahoe-gdm-glass-menus .quick-slider .icon-button StIcon { icon-size: 18px !important; }
+#uiGroup.tahoe-gdm-glass-menus .quick-slider .slider-bin {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }

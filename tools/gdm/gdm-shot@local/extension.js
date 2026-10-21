@@ -167,9 +167,17 @@ export default class {
             for (const [name, menu] of menus) {
                 if (!menu)
                     continue;
+                if (name === 'system' && GLib.getenv('TAHOE_QS_SLIDERS')) {
+                    const w = a => { if (a.has_style_class_name?.('quick-slider')) { a.show(); a.get_parent()?.show(); } a.get_children().forEach(w); }; w(menu.box);
+                }
                 menu.open(true);
                 await wait(1.2);
                 record(name, d);
+                if (name === 'system') {
+                    const out = []; const w = a => { const c = ['quick-toggle-has-menu', 'quick-slider', 'icon-button'].find(k => a.has_style_class_name?.(k)) ?? (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu') ? 'quick-toggle' : null);
+                        if (c && a.mapped) { out.push({kind: c, box: box(a)}); return; } a.get_children().forEach(w); }; w(menu.box);
+                    Gio.File.new_for_path(`${OUT}/${TAG}-pieces.json`).replace_contents(new TextEncoder().encode(JSON.stringify(out)), null, false, 0, null);
+                }
                 if (name === 'system') {
                     const out = []; const w = a => { if (a.mapped && (a.has_style_class_name?.('quick-toggle-has-menu') || (a.has_style_class_name?.('quick-toggle') && !a.get_parent()?.get_parent()?.has_style_class_name?.('quick-toggle-has-menu')))) {
                         const b = box(a); let icon = null, arrow = null; const f = x => { if (!icon && x.has_style_class_name?.('quick-toggle-icon') && x.mapped) icon = box(x); if (!arrow && x.has_style_class_name?.('quick-toggle-menu-button') && x.mapped) arrow = box(x); x.get_children().forEach(f); }; f(a);

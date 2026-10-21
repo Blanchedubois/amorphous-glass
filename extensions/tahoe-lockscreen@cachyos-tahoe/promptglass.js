@@ -19,6 +19,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {GlassPane, THIN_EDGE} from './widgets/paneglass.js';
 
 const STYLE_CLASS = 'tahoe-lock-glass-prompt';
+const NOTE_RADIUS = 'capsule';   // a notification row: a capsule, its icon circle in its end
 
 // backdrop: () => the primary monitor's lock background actor
 export function buildPromptGlass(frame, dialog, backdrop) {
@@ -80,7 +81,39 @@ export function buildPromptGlass(frame, dialog, backdrop) {
         pane.opacity = actor.get_paint_opacity();
         pane.show();
     };
-    const sync = () => TARGETS.forEach((target, i) => follow(target(), panes[i]));
+    // the notifications on the lock screen: each row its own glass capsule (the user, 2026-10-20);
+    // rows come and go with the notifications
+    const notifications = dialog._notificationsBox?._notificationBox ?? null;
+    const notes = new Map();   // row -> its pane
+    const syncNotes = () => {
+        if (!notifications)
+            return;
+        const rows = notifications.get_children().filter(r => r.has_style_class_name?.('unlock-dialog-notification-source'));
+        for (const row of rows) {
+            if (!notes.has(row)) {
+                const pane = new GlassPane(backdrop, NOTE_RADIUS, THIN_EDGE);
+                pane.set_pivot_point(0, 0);
+                pane.connect('mask-failed', () => frame.fail(`notification glass: ${pane.failed}`));
+                layer.add_child(pane);
+                notes.set(row, pane);
+                frame.connect(row, 'notify::allocation', schedule);
+                frame.connect(row, 'notify::visible', schedule);
+                frame.connect(row, 'destroy', () => {
+                    notes.get(row)?.destroy();
+                    notes.delete(row);
+                });
+            }
+            follow(row, notes.get(row));
+        }
+        for (const [row, pane] of notes) {
+            if (!rows.includes(row))
+                pane.hide();
+        }
+    };
+    const sync = () => {
+        TARGETS.forEach((target, i) => follow(target(), panes[i]));
+        syncNotes();
+    };
 
     // not from inside a layout pass (moving the pane then makes Clutter warn): once, just before
     // the next frame
@@ -152,5 +185,12 @@ export function buildPromptGlass(frame, dialog, backdrop) {
         watchPrompt(dialog._authPrompt);
         schedule();
     });
+    if (notifications) {
+        frame.connect(notifications, 'child-added', schedule);
+        frame.connect(notifications, 'child-removed', schedule);
+        watchFades(notifications);
+        for (let a = notifications; a && a !== dialog; a = a.get_parent())
+            frame.connect(a, 'notify::allocation', schedule);
+    }
     schedule();
 }
