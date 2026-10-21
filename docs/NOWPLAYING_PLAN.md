@@ -13,6 +13,12 @@ Status: **plan only, nothing built.** Round 2 of the mockups (user, 2026-10-21):
 - the only other glass is the widgets' dark glass, matched exactly;
 - everything is centred.
 
+Round 3 (user, 2026-10-21):
+- the cover is less rounded (12);
+- hovering it shows the widgets' glass outline;
+- the lyrics take the cover's ink with the widget's own font styling;
+- the clock is more translucent, as on the lock screen.
+
 The questions at the end need answers before Phase 1.
 
 Mockups (made with HTML/CSS in `docs/nowplaying/mock/`, rendered by `render.sh`; the cover is
@@ -129,11 +135,15 @@ All sizes are logical px at 2560x1440. They scale with the monitor's height.
 
 ### The cover: by itself
 
-- **The cover.** 560 px, corners 24, a soft two-layer drop shadow, no glass and no frame.
-- **The glass card.** It exists only during the enter and exit animations: a drop of the widgets'
-  glass pours into a card 12 px larger than the cover (radius 36 = 24 + 12, concentric). The cover
-  fades in inside it, then the glass dissolves away and the cover is left on its own. The exit runs
-  this backwards.
+- **The cover.** 560 px, corners **12**, a soft two-layer drop shadow, no glass and no frame at rest.
+- **The glass card.** One card of the widgets' dark glass, 12 px larger than the cover all round,
+  radius **24** (12 + 12, concentric, and the widgets' own `RADIUS`). It shows in three places:
+  - **Enter:** a drop of it pours into the card; the cover fades in inside it, then the glass
+    dissolves and the cover is left on its own.
+  - **Exit:** the same backwards.
+  - **Hover:** the card fades in behind the cover as a Liquid Glass **outline** (150 ms,
+    `effects.fast`) and tilts with it (next section). It fades out when the pointer leaves, while
+    the cover springs back flat.
 
 ### The controls: floating SF Symbols
 
@@ -165,7 +175,7 @@ All sizes are logical px at 2560x1440. They scale with the monitor's height.
 
 The user's rule: any Liquid Glass here is the existing widgets' glass, in **dark mode**, and must
 match it exactly. The clock is the only exception (next section). Two things use it: the chevron
-capsule (112 × 52), and the drop and card of the enter and exit animations.
+capsule (112 × 52), and the cover's card (the enter and exit pour, and the hover outline).
 
 - **Same code.** These pieces are built from the widgets' own `glass.js`: the same Blur My Shell
   pipeline (`pipeline_glassbar_dock`), with the dark mode forced whatever the desktop's mode.
@@ -181,7 +191,7 @@ capsule (112 × 52), and the drop and card of the enter and exit animations.
 | Edge shadow | 0.30 over 0.20 of the band |
 | Drop shadow | 0.20 |
 | Blur | 18 |
-| Shape | capsule (chevron); radius 36 (the pouring card) |
+| Shape | capsule (chevron); radius 24 (the card: pour and hover outline) |
 
 - **The comparison** (Phase 5 gate). A headless shell shows a real dark Music widget and the
   screensaver's chevron and card over the same backdrop. A script crops matching regions (the
@@ -195,7 +205,7 @@ capsule (112 × 52), and the drop and card of the enter and exit animations.
 ### The 3D tilt on the cover
 
 - **Geometry.**
-  - The cover gets `rotation_angle_x/y` about its centre, at most **8°**
+  - The cover, with its glass outline behind it, gets `rotation_angle_x/y` about its centre, at most **8°**
     per axis toward the pointer.
   - It also gets `translation_z` +20 px and a drop shadow that moves away from the pointer.
   - The stage's own perspective gives the depth.
@@ -212,12 +222,17 @@ capsule (112 × 52), and the drop and card of the enter and exit animations.
 
 - **Source.** The same as the widget: a `.lrc` next to a local file, else lrclib.net (`mpris.js`
   `lyrics()`), looked up once per track after `LOOKUP_DELAY`. The lookup runs only while the view is open.
-- **Style** (the reference):
-  - Every line is the **same size**: SF Pro Display Heavy, 74 px at 1440p, left-aligned, wrapping.
-  - The sung line is white. Lines next to it are 34 % white, those further off 26 %.
-  - Lines away from the sung one are blurred by distance: 3 px, then 4.4 px, then 6 px. This is a
-    `Shell.BlurEffect` per visible line, about 7 lines, re-blurred only when the line changes.
-  - The sung line sits at about 42 % of the height.
+- **Style: the widget's own** (`.tahoe-music-lyric`, `LyricsView`), only larger:
+  - **Font.** SF Pro Display Bold (700), as in the widget, at 72 px for 1440p (the widget's 26 px scaled), left-aligned, wrapping.
+  - **Colour.** The cover's ink, exactly as the widget sets it (`MusicWidget._setInk` with
+    palette.js `inkColour`). On most covers that is a very light white tinted toward the cover's most
+    colourful colour; on pale covers it is the deep dark ink. The title, artist, times, tracks and
+    symbols take the same ink.
+  - **Unsung lines.** The widget's `LINE_SCALE` 0.84 and `DIM` 125/255, so the column never reflows.
+  - **Blur.** On top of that, as in the reference, lines away from the sung one blur by distance
+    (2.2, 3.4, then up to 5 px). This is a `Shell.BlurEffect` per visible line, about 7, re-blurred
+    only when the line changes.
+  - **Position.** The sung line sits a little under the cover's middle.
 - **Motion.** The widget's wave glide (`DRIFT_MS`, `STAGGER_MS`): each line drifts up a little
   after the one above it. Long gaps show three breathing dots (♪ in the widget).
 - **States.**
@@ -232,7 +247,8 @@ capsule (112 × 52), and the drop and card of the enter and exit animations.
 
 - **Code.** The lock screen's clock (`glassclock.js`), unchanged: Space Grotesk SemiBold, the
   subtler material A, **its own light glass** (not the widgets' dark glass), the date above the time,
-  as on the lock screen. Only its backdrop changes: a clone of the swirl layer instead of the lock
+  as on the lock screen. It is as translucent as there: the strokes are mostly the swirl seen
+  through, with a thin lit rim and very little milk. No extra fill or outline is added. Only its backdrop changes: a clone of the swirl layer instead of the lock
   background.
 - **Size and place.** The time at about 10 % of the height (150 px at 1440p; the lock screen uses
   12 %) with the date (40 px) above it, centred at the top.
@@ -304,7 +320,7 @@ moves with translation, scale, opacity and shader uniforms.
 | 0 | Snapshot taken, overlay up, modal pushed. The frame is identical to the desktop. |
 | 0–350 ms | Blur radius 0 → 48, brightness 1 → 0.88 (`effects.slow`, critically damped) |
 | 100 ms | A drop of the widgets' dark glass (64 px circle) appears at the cover's centre: tahoe-motion's `Drop` geometry (fall, stretch, spread) drives the glass card's rect and radius each frame |
-| 150–550 ms | The drop pours into a card 12 px larger than the cover; its corners relax to radius 36 (`spatial.slow`, the popup's elastic grow from 0.92) |
+| 150–550 ms | The drop pours into a card 12 px larger than the cover; its corners relax to radius 24 (`spatial.slow`, the popup's elastic grow from 0.92) |
 | 350–700 ms | The cover fades in inside the glass, scale 0.94 → 1 |
 | 600–900 ms | The glass dissolves (opacity to 0): the cover stands alone |
 | 200–1400 ms | Swirl `lm_amount` 0 → 1 (slow ease, so the gradient creeps over the blurred desktop) |
@@ -427,7 +443,7 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   - The pixel comparison with a real dark Music widget (§1): every region within 2/255, with the
     sheet and the numbers committed.
   - A test with SF Pro hidden from fontconfig: the SVG fallback appears.
-  - A scripted tilt sweep: pointer motion across the cover, then leave, recorded. It must stay in the tilt budget.
+  - A scripted tilt sweep: pointer motion across the cover, then leave, recorded. The glass outline must fade in and out with it, and the sweep must stay in the tilt budget.
 
 ### Phase 6: enter and exit animations
 - **Enter.** The snapshot, the blur spring, tahoe-motion's `Drop` geometry driving the widgets' dark glass card,

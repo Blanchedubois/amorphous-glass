@@ -26,7 +26,7 @@ for i, im in enumerate((a, b)):
     c = im.crop(crop).resize((855, 950))
     sheet.paste(c, (70 + i * 925, 90))
 d = ImageDraw.Draw(sheet)
-d.text((70, 30), 'Cover tilt: the card leans toward the pointer (max 8° each axis), a sheen follows it', font=big, fill='white')
+d.text((70, 30), 'Hover: the widgets\' glass outline appears, the cover tilts toward the pointer (max 8°), a sheen follows', font=big, fill='white')
 d.text((70, 1048), 'pointer top left', font=small, fill=(200, 200, 205))
 d.text((995, 1048), 'pointer bottom right', font=small, fill=(200, 200, 205))
 sheet.save(out / 'tilt.png')
