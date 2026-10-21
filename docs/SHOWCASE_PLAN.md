@@ -73,6 +73,13 @@ anyone on a GNOME 51 machine can follow, and credits for every extension, theme 
    - it sets up the repair autostart;
    - SF Pro comes from your own Apple download, and the login screen is an optional sudo step.
 
+   The VM (QEMU, a fresh CachyOS GNOME install with a throwaway test account) is also where the
+   login screen and Switch User are filmed at full 2560x1440, from the host through QEMU's own
+   screen capture: the real login screen is another session (the gdm user) that nothing in the
+   user's own session can capture, and the VM keeps every password prompt away from the real
+   account (no PAM faillock risk). The ISO download (about 3 GB, cachyos.org) waits for the
+   user's go-ahead.
+
    `install.sh --uninstall` puts it all back (`glass-bar.sh undo`, the off switches). It is tested in
    a throwaway user or a VM, never on your account.
 6. **README.** Hero image and a 10 s animation montage at the top, then:
