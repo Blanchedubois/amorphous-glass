@@ -468,8 +468,16 @@ class Repair:
         if self.shell.exts is None:
             return SKIP, 'no shell on this session bus'
         s, _ = self.settings.get('org.gnome.shell')
-        bad = [(u, self.shell.state(u)) for u in s[0].get_strv('enabled-extensions')
-               if self.shell.state(u) in ('ERROR', 'OUT OF DATE')]
+        enabled = s[0].get_strv('enabled-extensions')
+        bad = []
+        # at login the shell is still starting extensions: a state seen once can be passing, so
+        # only one that is still there 15 s later is reported
+        for attempt in range(4):
+            bad = [(u, self.shell.state(u)) for u in enabled if self.shell.state(u) in ('ERROR', 'OUT OF DATE')]
+            if not bad or attempt == 3 or os.environ.get('TAHOE_REPAIR_NO_SHELL'):
+                break
+            time.sleep(5)
+            self.shell._connect()
         if not bad:
             return OK, ''
         text = ', '.join(f'{u} {st}' for u, st in bad)
