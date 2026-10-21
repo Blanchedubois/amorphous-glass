@@ -56,6 +56,42 @@
 .tahoe-cal-medium { spacing: 16px; }
 .tahoe-cal-medium .tahoe-cal-day { width: 130px; }
 
+/* schedule: today's events from a calendar's ICS link (schedule.js) */
+.tahoe-sched-header { spacing: 4px; }
+.tahoe-sched-header-day { font-size: 13px; font-weight: 700; }
+.tahoe-sched-rows { spacing: 8px; padding-top: 8px; }
+.tahoe-sched-row { spacing: 7px; }
+.tahoe-sched-bar { width: 3px; border-radius: 2px; }
+.tahoe-sched-time { font-size: 11px; font-weight: 500; }
+.tahoe-sched-time-now { font-weight: 600; }
+.tahoe-sched-title { font-size: 13px; font-weight: 600; }
+.tahoe-sched-footer { font-size: 11px; }
+.tahoe-sched-empty { spacing: 2px; }
+.tahoe-sched-empty-title { font-size: 13px; font-weight: 600; }
+.tahoe-sched-empty-detail { font-size: 11px; }
+.tahoe-sched-large .tahoe-sched-header { spacing: 12px; }
+.tahoe-sched-daynum { font-family: "SF Pro Display", sans-serif; font-size: 46px; font-weight: 600; }
+.tahoe-sched-month { font-size: 15px; font-weight: 600; }
+.tahoe-sched-today { font-size: 15px; font-weight: 500; }
+.tahoe-sched-week { padding-top: 12px; }
+.tahoe-sched-weekday { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.tahoe-widget-light .tahoe-sched-weekday { color: rgba(28, 28, 30, 0.55); }
+.tahoe-sched-date { font-size: 15px; font-weight: 500; width: 28px; height: 28px; border-radius: 14px; }
+.tahoe-sched-weekend { color: rgba(255, 255, 255, 0.55); }
+.tahoe-widget-light .tahoe-sched-weekend { color: rgba(28, 28, 30, 0.45); }
+.tahoe-sched-date-today, .tahoe-widget-light .tahoe-sched-date-today { background-color: #ff453a; color: #ffffff; font-weight: 700; }
+.tahoe-sched-dot { width: 4px; height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.5); }
+.tahoe-widget-light .tahoe-sched-dot { background-color: rgba(28, 28, 30, 0.4); }
+.tahoe-sched-separator { height: 1px; margin: 8px 0 2px 0; background-color: rgba(255, 255, 255, 0.10); }
+.tahoe-widget-light .tahoe-sched-separator { background-color: rgba(0, 0, 0, 0.10); }
+.tahoe-sched-large .tahoe-sched-row { spacing: 10px; }
+.tahoe-sched-large .tahoe-sched-bar { width: 4px; }
+.tahoe-sched-large .tahoe-sched-time { font-size: 12px; }
+.tahoe-sched-large .tahoe-sched-title { font-size: 15px; }
+.tahoe-sched-large .tahoe-sched-footer { font-size: 12px; }
+.tahoe-sched-large .tahoe-sched-empty-title { font-size: 15px; }
+.tahoe-sched-large .tahoe-sched-empty-detail { font-size: 12px; }
+
 /* weather */
 .tahoe-weather-place { font-size: 15px; font-weight: 700; }
 .tahoe-weather-temp { font-family: "SF Pro Display", sans-serif; font-size: 44px; font-weight: 300; }

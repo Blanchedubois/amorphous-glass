@@ -1,0 +1,7 @@
+{"widgets": [
+ {"type": "calendar-day", "monitor": 0, "x": 40, "y": 64},
+ {"type": "schedule-small", "monitor": 0, "x": 226, "y": 64},
+ {"type": "clock-digital", "monitor": 0, "x": 412, "y": 64},
+ {"type": "schedule-large", "monitor": 0, "x": 40, "y": 250},
+ {"type": "weather-large", "monitor": 0, "x": 412, "y": 250}
+]}

@@ -1,6 +1,6 @@
 # Calendar: Schedule, today's events from a Google Calendar ICS link (plan, 2026-10-20)
 
-**Status: Phases 1 and 2 done (link, fetch, parsing); Phase 3 (the widgets) next.** Your picks: small layout A,
+**Status: Phases 1 to 3 done (link, fetch, parsing, the two widgets); Phase 4 (live behaviour) next.** Your picks: small layout A,
 Large as mocked up, one colour per event by its UID, no "Tomorrow" line, one link, dots on the
 week strip. Two new widgets, "Calendar:
 Schedule" (small, 170 x 170) and "Calendar: Schedule Large" (356 x 356, two widget cells each
@@ -228,6 +228,25 @@ Midnight is a key change (new day), so the list rolls over on the first tick aft
   days since 2015 with old EXDATEs, every other week from a start day off its BYDAY days), colours,
   and two broken files. A deliberately wrong skip-ahead fails 3 cases. `ics-feed-test.sh` now has
   32 checks, the reader's among them (window, re-runs, private cache, a new shell, an unreadable feed).
+
+## Phase 3: what was built (2026-10-20)
+
+- `schedule.js`: `ScheduleSmall` (`schedule-small`, "Calendar: Schedule") and `ScheduleLarge`
+  (`schedule-large`, "Calendar: Schedule Large") in Add Widget. Both sit on the same `GlassCard` as
+  every other widget, so the glass is the same (Blur My Shell blur and tint, rim light, edge shadow,
+  drop shadow, the 1 px edge, radius 24); the mockups above were flat HTML and showed only the edge.
+  Checked: each corner at 4x beside Calendar: Today and Weather: Week, in light and dark.
+- All-day events are one row like the others ("All day" over the title, `+1` for more), not the
+  one-line form planned. The week strip starts on GNOME's first weekday; today is the red circle,
+  the other days with events get a dot.
+- The minute tick: `schedule(events, now)` (pure) picks the rows; the header is rebuilt once a day
+  or when the events change, the rows only when a row's text changes.
+- Screenshots (made-up calendar served from 127.0.0.1, placed around the current time):
+  `docs/shots/schedule-{light,dark,milky}.png`, beside Calendar: Today, the digital clock and
+  Weather: Week. `SHOT_ICS=1` in `widget-shot@local` (with `SHOT_ICS_EVENTS=now|none|nolink` for
+  other states) and `tools/widgets-stress/layout-schedule.json`.
+- `stylesheet.css` gained the `tahoe-sched-*` rules; `tools/lockscreen/sync-shared.sh` copied them
+  to the lock screen's `widgets.css` (they do nothing there; the lock screen has no Schedule widget).
 
 ## Phases (one commit each, on this branch)
 
