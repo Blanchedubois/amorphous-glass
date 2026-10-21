@@ -303,7 +303,14 @@ def s_app_grid():
 
 @shot_fn
 def s_widget_drag():
-    x, y, w, h = locate(f"widget:{os.environ.get('TAHOE_SHOWCASE_DRAG', '0')}")
+    want = int(os.environ.get('TAHOE_SHOWCASE_DRAG_X', '2000'))
+    boxes = []
+    for i in range(12):
+        try:
+            boxes.append(locate(f'widget:{i}'))
+        except LookupError:
+            break
+    x, y, w, h = min(boxes, key=lambda b: abs(b[0] - want))
     with Clip('widget-drag'):
         call('Drag', (x + w // 2, y + 30, x + w // 2 + 240, y + 150, 1200), '(iiiiu)')
         pause(900)
@@ -311,12 +318,125 @@ def s_widget_drag():
         pause(900)
 
 
+MAIN = os.environ.get('TAHOE_SHOWCASE_LIVE', os.path.expanduser('~/Projects/liquid-glass'))
+SPOTIFY = ('org.mpris.MediaPlayer2.spotify', '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player')
+
+
+@shot_fn
+def s_nude():
+    """Nude from about 50 s in, so the lyrics are mid-verse while the music shots run"""
+    dest, path, iface = SPOTIFY
+    meta = BUS.call_sync(dest, path, 'org.freedesktop.DBus.Properties', 'Get', GLib.Variant('(ss)', (iface, 'Metadata')),
+                         None, Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+    track = meta.get('mpris:trackid')
+    BUS.call_sync(dest, path, iface, 'SetPosition', GLib.Variant('(ox)', (track, 48_000_000)), None, Gio.DBusCallFlags.NONE, 5000, None)
+    BUS.call_sync(dest, path, iface, 'Play', None, None, Gio.DBusCallFlags.NONE, 5000, None)
+    pause(2500)
+
+
+@shot_fn
+def s_window_open():
+    """a window opening (tahoe-motion), then the window menu from its header bar"""
+    with Clip('window-open'):
+        launch('org.gnome.Calculator', 1800)
+        shot('calculator')
+        x, y, w, h = locate('window:org.gnome.Calculator')
+        move(x + w // 2, y + 22, 500)
+        click(x + w // 2, y + 22, 3)
+        pause(1100)
+        shot('window-menu')
+        press('Escape')
+        pause(500)
+        press('Control_L', 'q')
+        pause(1200)
+
+
+@shot_fn
+def s_osd():
+    with Clip('volume-osd'):
+        press('AudioRaiseVolume')
+        pause(400)
+        press('AudioLowerVolume')
+        pause(1200)
+        shot('volume-osd')
+        pause(1500)
+
+
+@shot_fn
+def s_light_mode():
+    """Tahoe light: the same glass with dark text; stills, then back to the mode it was in"""
+    mode = subprocess.run(['sed', '-n', 's/^mode=//p', os.path.expanduser('~/.config/tahoe-glass/state')],
+                          capture_output=True, text=True).stdout.split()[-1:] or ['dark']
+    subprocess.run(['bash', f'{MAIN}/scripts/glass-bar.sh', 'mode', 'light'], capture_output=True)
+    try:
+        pause(2500)
+        close_all()
+        shot('light-desktop')
+        x, y = center('quick-settings')
+        click(x, y)
+        pause(1300)
+        shot('light-quick-settings')
+        close_all()
+        x, y = center('date')
+        click(x, y)
+        pause(1300)
+        shot('light-calendar')
+        close_all()
+        folder = os.environ.get('TAHOE_SHOWCASE_FILES')
+        if folder:
+            subprocess.Popen(['nautilus', '--new-window', folder], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            pause(2500)
+            shot('light-files')
+            press('Control_L', 'w')
+            pause(800)
+    finally:
+        subprocess.run(['bash', f'{MAIN}/scripts/glass-bar.sh', 'mode', mode[0]], capture_output=True)
+        pause(2500)
+
+
+@shot_fn
+def s_claude_back():
+    """back to the first workspace, the Claude window restored from the dock"""
+    press('Super_L', 'Page_Up')
+    pause(1200)
+    x, y = center('dock:com.anthropic.Claude')
+    move(x, y, 400)
+    click(x, y)
+    pause(1200)
+
+
+@shot_fn
+def s_lock():
+    """the lock screen: the glass clock and the album-colour swirl. GNOME stops screencasts when the
+    screen locks, so the driver takes frames instead (it stays on the lock screen, screenshots only).
+    Locks through the screensaver interface (the driver never presses Super+L) and leaves the screen
+    locked: you unlock it with your password."""
+    import threading
+    frames = os.path.join(OUT, 'lock-frames')
+    os.makedirs(frames, exist_ok=True)
+    count, interval = int(os.environ.get('TAHOE_SHOWCASE_LOCK_FRAMES', '160')), 125
+    result = {}
+    t = threading.Thread(target=lambda: result.update(n=call('Frames', (frames, count, interval), '(suu)', '(u)',
+                                                             timeout=count * interval + 120000)))
+    t.start()
+    pause(1500)
+    subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.gnome.ScreenSaver', '--object-path', '/org/gnome/ScreenSaver',
+                    '--method', 'org.gnome.ScreenSaver.Lock'], capture_output=True)
+    t.join()
+    log(lock_frames=result.get('n'), dir=frames)
+
+
+SWEEP = ['nude', 'workspace', 'desktop', 'music', 'quick_settings', 'calendar', 'menu_slide', 'desktop_menu',
+         'dock_menu', 'window_open', 'files', 'overview', 'app_grid', 'osd', 'widget_drag', 'light_mode',
+         'claude_back', 'lock']
+
+
 def main():
     if '--list' in sys.argv:
         print('\n'.join(SHOTS))
         return
     log(driver=wait_driver())
-    names = [a for a in sys.argv[2:] if not a.startswith('-')] or list(SHOTS)
+    names = [a for a in sys.argv[2:] if not a.startswith('-')] or (SWEEP if '--sweep' in sys.argv else list(SHOTS))
     for name in names:
         try:
             SHOTS[name]()
