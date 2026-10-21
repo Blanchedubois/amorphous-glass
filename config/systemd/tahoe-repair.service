@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep the Liquid Glass desktop as designed (docs/REPAIR.md)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+# a short pause so a package transaction or GNOME's updater has finished writing
+ExecStartPre=/usr/bin/sleep 10
+ExecStart=@ROOT@/scripts/tahoe-repair.sh repair --wait 60
+Nice=10

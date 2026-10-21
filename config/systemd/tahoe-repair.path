@@ -1,0 +1,13 @@
+[Unit]
+Description=Run tahoe-repair when packages or pending extension updates change
+PartOf=graphical-session.target
+
+[Path]
+# written by the pacman hook (config/pacman/95-tahoe-repair.hook, installed by you with sudo)
+PathChanged=/var/lib/tahoe-repair/packages-changed
+# GNOME's own extension updater downloads here; a patched extension's update is held back
+PathChanged=%h/.local/share/gnome-shell/extension-updates
+Unit=tahoe-repair.service
+
+[Install]
+WantedBy=graphical-session.target

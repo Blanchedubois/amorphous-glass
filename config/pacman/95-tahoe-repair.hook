@@ -1,0 +1,23 @@
+# Records that a package the Liquid Glass desktop depends on changed. It only writes a stamp file;
+# the user's own tahoe-repair (tahoe-repair.path) does the checking inside the session.
+# Install (root): sudo install -m644 config/pacman/95-tahoe-repair.hook /etc/pacman.d/hooks/
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = gnome-shell
+Target = mutter
+Target = gtk3
+Target = gtk4
+Target = libadwaita
+Target = gdm
+Target = gnome-shell-extensions
+Target = glib2
+Target = gjs
+
+[Action]
+Description = Recording a package change for tahoe-repair
+When = PostTransaction
+NeedsTargets
+Exec = /usr/bin/sh -c 'mkdir -p /var/lib/tahoe-repair && { date -Is; cat; } > /var/lib/tahoe-repair/packages-changed.new && mv /var/lib/tahoe-repair/packages-changed.new /var/lib/tahoe-repair/packages-changed'
