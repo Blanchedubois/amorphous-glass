@@ -487,7 +487,15 @@ export default class Driver extends Extension {
             // a quick settings submenu opening, frame by frame: the container's height (what the
             // morph sets), its natural height now, and the box (the glass's target)
             const want = GLib.getenv('TAHOE_TEST_TOGGLE') ?? 'PowerProfilesToggle';
-            const toggle = qs._grid.get_children().find(c => c.menu && c.visible && c.constructor.name === want);
+            // the toggle, or any item with a menu (the power button's ShutdownItem sits deeper)
+            let toggle = qs._grid.get_children().find(c => c.menu && c.visible && c.constructor.name === want);
+            if (!toggle) {
+                const st = [qs._grid];
+                while (st.length && !toggle) { const a = st.pop(); if (a.constructor.name === want && a.menu) toggle = a; st.push(...a.get_children()); }
+            }
+            write('log.jsonl', { found: toggle?.constructor.name ?? null });
+            // tahoe-motion's submenu diagnostics on, in the test shell's own cache
+            GLib.file_set_contents(GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-motion-debug']), '');
             qs.open(false);
             await sleep(800);
             for (let run = 0; run < 2; run++) {
@@ -508,6 +516,54 @@ export default class Driver extends Extension {
                 write('log.jsonl', { run, toggle: want, frames: rows.join(' ') });
                 menu.close({ animate: false });
                 await sleep(600);
+            }
+            // interrupted: quick settings closed in the middle of the submenu's motion, then opened
+            const state = tag => {
+                const c = toggle.menu.actor;
+                const box = toggle.menu.box;
+                write('log.jsonl', { tag, open: toggle.menu.isOpen, container: [Math.round(c.height), c.visible, c.clip_to_allocation, c.layout_manager?.constructor.name], box: [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height), box.fixed_position_set] });
+            };
+            toggle.menu.open({ animate: true });
+            await sleep(60);
+            state('mid-open');
+            qs.close(true);
+            await sleep(900);
+            state('qs closed');
+            qs.open(true);
+            await sleep(900);
+            state('qs reopened');
+            await shotRect('subprobe-reopened', [1900, 0, 660, 900]);
+            toggle.menu.open({ animate: true });
+            await sleep(900);
+            state('submenu opened again');
+            await shotRect('subprobe-open-again', [1900, 0, 660, 900]);
+            toggle.menu.close({ animate: true });
+            await sleep(60);
+            toggle.menu.open({ animate: true });
+            await sleep(900);
+            state('close-open reversed');
+            await shotRect('subprobe-reversed', [1900, 0, 660, 900]);
+            try {
+                const [, dbg] = GLib.file_get_contents(GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-motion-debug.jsonl']));
+                GLib.file_set_contents(`${OUT}/tahoe-motion-debug.jsonl`, dbg);
+            } catch (e) { write('log.jsonl', { debug_copy: `${e}` }); }
+            // the submenu fully open, then quick settings closed with it (animated, then at once)
+            for (const animate of [true, false]) {
+                if (!toggle.menu.isOpen)
+                    toggle.menu.open({ animate: true });
+                await sleep(900);
+                state(`open before qs close (animate ${animate})`);
+                qs.close(animate ? true : { animate: false });
+                await sleep(900);
+                state(`after qs close (animate ${animate})`);
+                qs.open(true);
+                await sleep(1000);
+                state(`qs reopened (animate ${animate})`);
+                await shotRect(`subprobe-qs-reopened-${animate}`, [1900, 0, 660, 900]);
+                toggle.menu.open({ animate: true });
+                await sleep(1000);
+                state(`submenu opened (animate ${animate})`);
+                await shotRect(`subprobe-submenu-after-${animate}`, [1900, 0, 660, 900]);
             }
             write('log.jsonl', { done: true });
             return;
