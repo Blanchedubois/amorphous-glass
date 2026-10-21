@@ -75,7 +75,8 @@ dump('/org/gnome/desktop/background/')
 if os.environ.get('TAHOE_TEST_USERLOOK') == '1':
     dump('/org/gnome/desktop/interface/')
 out += ['[org/gnome/shell]',
-        "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tahoe-motion-test@local'" + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
+        "enabled-extensions=['blur-my-shell@aunetx', 'user-theme@gnome-shell-extensions.gcampax.github.com'"
+        + ("" if os.environ.get('TAHOE_TEST_NO_DRIVER') == '1' else ", 'tahoe-motion-test@local'") + os.environ.get('TAHOE_TEST_EXTRA', '') + "]",
         'disable-extension-version-validation=true',
         "favorite-apps=['org.gnome.Nautilus.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop']",
         'welcome-dialog-last-shown-version=\'999\'',
@@ -121,8 +122,22 @@ root.set_value('pipelines', GLib.Variant('a{sa{sv}}', out))
 Gio.Settings.sync()
 PYS
 fi
+# TAHOE_TEST_CLIENT="cmd args": instead of the driver ending the shell, run this command on the
+# test shell's own session bus while the shell runs, then end the shell (TAHOE_TEST_NO_DRIVER=1
+# leaves the motion test driver out). Used by tools/showcase (docs/SHOWCASE_PLAN.md).
+if [ -n "${TAHOE_TEST_CLIENT:-}" ]; then
+  export TAHOE_TEST_DISPLAY="tahoe-test-$$"
+  timeout ${TAHOE_TEST_TIMEOUT:-300} dbus-run-session -- bash -c '
+    gnome-shell --headless --wayland --no-x11 --wayland-display "$TAHOE_TEST_DISPLAY" \
+      --virtual-monitor 2560x1440@120 --force-animations > "$TAHOE_TEST_OUT/shell.log" 2>&1 &
+    shell=$!
+    $TAHOE_TEST_CLIENT > "$TAHOE_TEST_OUT/client.log" 2>&1
+    echo "client exit $?" >> "$TAHOE_TEST_OUT/client.log"
+    kill $shell; wait $shell' || true
+else
 timeout ${TAHOE_TEST_TIMEOUT:-90} dbus-run-session -- gnome-shell --headless --wayland --no-x11 --wayland-display "tahoe-test-$$" \
   --virtual-monitor 2560x1440@120 --force-animations > "$out/shell.log" 2>&1 || true
+fi
 cp "$kf" "$out/keyfile.after" 2>/dev/null
 # gvfs's metadata daemon can still be writing into the folder: a second try, never a failed run
 rm -rf "$root" 2>/dev/null || { sleep 1; rm -rf "$root" 2>/dev/null || true; }
