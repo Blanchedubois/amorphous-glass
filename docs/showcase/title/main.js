@@ -6,7 +6,9 @@
 //   plateIn=URL, plateOut=URL   the montage's last frame (the loop starts on it) and first frame
 //                           (it ends on it); default: the stand-in desktop screenshots
 //   t=SECONDS               draw one frame and stop
-//   render=1&fps=N          render.py: draw every frame and POST it to /frame/<n>, then /done
+//   render=1&fps=N&blur=M   render.py: draw every frame and POST it to /frame/<n>, then /done;
+//                           each frame adds up M moments across half the frame's time (a 180
+//                           degree shutter: motion blur, as a camera would see it)
 
 import { SEQ, timeline } from './timeline.js';
 
@@ -100,9 +102,33 @@ const tex = {
     textBlur: texture(await createImageBitmap(blurCanvas)),
     scene: texture(null),
 };
-const fbo = gl.createFramebuffer();
-gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex.scene, 0);
+function framebuffer(t) {
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    return f;
+}
+const fbo = framebuffer(tex.scene);
+
+// motion blur: the moments of a frame are added up in a float texture, then shown with a little
+// dither (the wallpaper's soft gradients band at 8 bits once encoded)
+const hasFloat = gl.getExtension('EXT_color_buffer_float');
+const accumTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, accumTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, hasFloat ? gl.RGBA16F : gl.RGBA8, W, H, 0, gl.RGBA,
+    hasFloat ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+const accumFbo = framebuffer(accumTex);
+const present = await program(`data:text/plain,${encodeURIComponent(`#version 300 es
+precision highp float;
+uniform sampler2D accum;
+out vec4 fragColor;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+void main() {
+    vec3 c = texelFetch(accum, ivec2(gl_FragCoord.xy), 0).rgb;
+    fragColor = vec4(c + (hash(gl_FragCoord.xy) - 0.5) / 255.0, 1.0);
+}`)}`);
 gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);
@@ -114,10 +140,12 @@ function bind(prog, name, unit, t) {
     gl.uniform1i(prog.u[name], unit);
 }
 
-export function draw(t) {
+/// draws the moment `t`, into the canvas or (`gain` < 1) added into the accumulation texture
+function drawMoment(t, gain) {
     const s = timeline(t, CAP);
     gl.viewport(0, 0, W, H);
 
+    gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.useProgram(scene.p);
     bind(scene, 'wall', 0, tex.wall);
@@ -140,8 +168,13 @@ export function draw(t) {
     gl.bindTexture(gl.TEXTURE_2D, tex.scene);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gain < 1 ? accumFbo : null);
+    if (gain < 1) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE);
+    }
     gl.useProgram(glass.p);
+    gl.uniform1f(glass.u.gain, gain);
     bind(glass, 'scene', 0, tex.scene);
     gl.uniform2f(glass.u.res, W, H);
     gl.uniform4f(glass.u.cap, s.cx, s.cy, s.w, s.h);
@@ -151,12 +184,34 @@ export function draw(t) {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
+/// draws frame `t`: `moments` instants spread over `shutter` seconds after it, added up
+export function draw(t, moments = 1, shutter = 0) {
+    if (moments <= 1) {
+        drawMoment(t, 1);
+        return;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, accumFbo);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    for (let i = 0; i < moments; i++)
+        drawMoment(t + (shutter * (i + 0.5)) / moments, 1 / moments);
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(present.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, accumTex);
+    gl.uniform1i(present.u.accum, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
 if (Q.has('render')) {
     // render.py: every frame, in order, POSTed as PNG
-    const fps = parseFloat(Q.get('fps') ?? '30');
+    const fps = parseFloat(Q.get('fps') ?? '60');
+    const moments = parseInt(Q.get('blur') ?? '6');
     const frames = Math.round(SEQ.end * fps);
     for (let n = 0; n < frames; n++) {
-        draw(n / fps);
+        draw(n / fps, moments, 0.5 / fps);
         const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         await fetch(`/frame/${n}`, { method: 'POST', body: png });
     }

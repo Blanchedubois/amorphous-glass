@@ -12,7 +12,10 @@
 // light and inner shadow follow liquid-glass by ryohsuke1231 (MIT).
 //
 // Changes for the title: clear glass (no tint), the edge band scaled to the hero capsule, a
-// little magnification (backdrop_zoom), and the analytic capsule drawn here, not by Clutter.
+// little magnification (backdrop_zoom), and the analytic capsule drawn here, not by Clutter. At
+// 8x the desktop's edge band, the quartz profile (steep at the rim) folds the image back on
+// itself and mirrors the letters; the title uses a profile that cannot fold instead (below).
+// Motion blur: render.py draws several moments per frame and adds them up (`gain`).
 precision highp float;
 
 uniform sampler2D scene;   // pass 1, mipmapped: the blur under the glass is a mip level
@@ -21,13 +24,13 @@ uniform vec4 cap;          // centre x, centre y, width, height (px, y down)
 uniform float blur;
 uniform float strength;    // x the recipe's 0.8, rises with speed
 uniform float show;
+uniform float gain;         // this moment's share of the frame (1 when drawn once)
 
 out vec4 fragColor;
 
 // glass_params()
 const float STRENGTH = 0.8;
 const float EDGE_SIZE = 12.0;
-const float FALLOFF = 2.4;
 const float RIM_WIDTH = 3.0;
 const float RGB_FRINGING = 0.06;
 const float GLOSS = 0.8;
@@ -49,9 +52,12 @@ vec3 sampleScene(vec2 px) {
     return textureLod(scene, vec2(px.x, res.y - px.y) / res, blur).rgb;
 }
 
-float quartzGlassEdgeProfile(float distanceFromEdge, float refractionHeight) {
-    float t = clamp(distanceFromEdge / max(refractionHeight, 0.001), 0.0, 1.0);
-    return 1.0 - sqrt(t * (2.0 - t));
+// the displacement across the edge band, in px: a quadratic that is largest at the rim and 0 where
+// the band ends. The sample point d + disp(d) has to keep moving inward as d does (no fold, so no
+// mirrored letters): its slope 1 - 2 * amount / band * (1 - t) stays above 0 for amount < band / 2
+float edgeDisplacement(float distanceFromEdge, float band, float amount) {
+    float u = 1.0 - clamp(distanceFromEdge / max(band, 0.001), 0.0, 1.0);
+    return min(amount, band * 0.48) * u * u;
 }
 
 float quartzGlassRing(float distanceFromEdge, float bezelWidth) {
@@ -109,7 +115,7 @@ void main() {
     if (sd > 0.0 || show < 0.5) {
         // the drop shadow under the glass (0.20)
         float drop = (1.0 - smoothstep(0.0, 60.0, sd - 10.0)) * SHADOW * show;
-        fragColor = vec4(base * (1.0 - drop * smoothstep(-30.0, 40.0, lp.y)), 1.0);
+        fragColor = vec4(base * (1.0 - drop * smoothstep(-30.0, 40.0, lp.y)) * gain, gain);
         return;
     }
 
@@ -120,12 +126,11 @@ void main() {
 
     float bezel = max(1.0, min(EDGE_SIZE * SCALE, min(cap.z, cap.w) * 0.5));
     float refractionBand = min(bezel * 0.35 * RIM_WIDTH, R);
-    float glassThickness = max(0.5, EDGE_SIZE * SCALE * 0.55 * FALLOFF);
     float edgeBand = clamp(1.0 - distFromSide / refractionBand, 0.0, 1.0);
 
-    float normDisp = distFromSide < refractionBand
-        ? quartzGlassEdgeProfile(distFromSide, glassThickness) : 0.0;
-    vec2 dispPx = -dir * normDisp * refractionBand * STRENGTH * strength * edgeBand;
+    float disp = edgeDisplacement(distFromSide, refractionBand, refractionBand * 0.45 * STRENGTH * strength);
+    float normDisp = disp / refractionBand;
+    vec2 dispPx = -dir * disp;
     dispPx += (cap.xy - p) * (1.0 - 1.0 / BACKDROP_ZOOM);
 
     float dispersion = clamp(RGB_FRINGING * DISPERSION_SCALE * strength, 0.0, 20.0);
@@ -152,5 +157,5 @@ void main() {
     col = tahoeRimLight(col, distFromSide, refractionBand, dir);
     col *= 1.0 - smoothstep(0.25, 1.0, (lp.y + halfSize.y) / cap.w) * SHADOW * 0.20;
 
-    fragColor = vec4(mix(base, col, clamp(distFromSide + 0.5, 0.0, 1.0)), 1.0);
+    fragColor = vec4(mix(base, col, clamp(distFromSide + 0.5, 0.0, 1.0)) * gain, gain);
 }
