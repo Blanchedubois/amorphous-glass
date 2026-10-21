@@ -381,7 +381,22 @@ async function runVideo() {
     await sleep(2500);
     mark('stop');
     const stopped = await call('StopScreencast', null, new GLib.VariantType('(b)'));
-    write({label: 'video', started, stopped, file: `${file}.mp4`, stillLocked: Main.sessionMode.isLocked});
+    await sleep(1500);                        // the file is finished
+    // keep a copy: once this shell is gone the screencast service errors and removes its file
+    const kept = `${file}-take.mp4`;
+    Gio.File.new_for_path(`${file}.mp4`).copy(Gio.File.new_for_path(kept), Gio.FileCopyFlags.OVERWRITE, null, null);
+    // and end that service (this throwaway session's own, by its pid on this bus), or it keeps the
+    // session alive and fills the log until the timeout
+    try {
+        const [pid] = (await new Promise((resolve, reject) => bus.call('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'GetConnectionUnixProcessID', new GLib.Variant('(s)', ['org.gnome.Shell.Screencast']),
+            new GLib.VariantType('(u)'), Gio.DBusCallFlags.NONE, -1, null,
+            (b, res) => { try { resolve(b.call_finish(res).deepUnpack()); } catch (e) { reject(e); } })));
+        GLib.spawn_command_line_async(`kill ${pid}`);
+    } catch (e) {
+        write({label: 'video-service', error: String(e)});
+    }
+    write({label: 'video', started, stopped, file: kept, stillLocked: Main.sessionMode.isLocked});
 }
 
 // TAHOE_LOCK_GATE=lockvideo: frames from the moment Super+L locks (lock(true), animated, as the

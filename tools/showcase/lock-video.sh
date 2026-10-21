@@ -10,7 +10,8 @@
 # The shell sees the system bus only through tools/gdm/sysbus.sh, so nothing it does reaches the
 # real GDM or PAM; run.sh also refuses to start after a recent PAM failure (faillock).
 #
-# Output: OUTDIR/lock-video.mp4 and the driver's log (marks: lock, wake, type, stop).
+# Output: OUTDIR/lock-video.mp4 and the driver's log (marks: lock, wake, type, stop; seconds from the
+# recording's start).
 set -eu
 out=$(realpath -m "$1"); mode=${2:-dark}
 H=$(cd "$(dirname "$0")" && pwd); R=$(cd "$H/../.." && pwd)
@@ -21,4 +22,6 @@ TAHOE_TEST_PIPEWIRE=1 TAHOE_TEST_TIMEOUT=${TAHOE_TEST_TIMEOUT:-90} TAHOE_LOCK_MO
   TAHOE_TEST_EXT_DIRS="${TAHOE_TEST_EXT_DIRS:-$R/extensions/tahoe-lockscreen@cachyos-tahoe}" \
   "$R/tools/lockscreen/run.sh" "$out" "$mode"
 grep '"video' "$out/log-video.jsonl" || { echo "lock-video: no recording (see $out/shell-video.log)" >&2; exit 1; }
+mv "$out/lock-video-take.mp4" "$out/lock-video.mp4"
 ls -l "$out/lock-video.mp4"
+du -h "$out/shell-video.log"
