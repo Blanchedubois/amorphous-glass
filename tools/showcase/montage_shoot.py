@@ -172,9 +172,10 @@ def status(name):
 
 
 def seek_real(name, seconds):
-    """the user's player, playing, at `seconds` into its track (so it does not end mid-shoot)"""
+    """the user's player playing its current track, at `seconds` in (so it does not end mid-shoot)"""
     if status(name) != 'Playing':
-        raise RuntimeError(f'{name} is not playing: start the song first')
+        player(name, 'Play')                  # its current track: the one the user chose
+        pause(800)
     meta = BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'Get',
                          GLib.Variant('(ss)', ('org.mpris.MediaPlayer2.Player', 'Metadata')), None,
                          Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
@@ -208,7 +209,20 @@ def demo_folder():
     return root
 
 
+def files_windows():
+    """how many Files windows are open (Nautilus exports one D-Bus object per window)"""
+    try:
+        xml = BUS.call_sync('org.gnome.Nautilus', '/org/gnome/Nautilus/window', 'org.freedesktop.DBus.Introspectable',
+                            'Introspect', None, GLib.VariantType('(s)'), Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()[0]
+    except GLib.Error:
+        return 0
+    return xml.count('<node name=')
+
+
 def setup():
+    # a Files window would be on camera in every clip (an interrupted run once left one behind)
+    if files_windows():
+        raise RuntimeError('a Files window is open: close it first (it would be in every clip)')
     shutil.copy2(LAYOUT, os.path.join(OUT, 'widgets.user.json'))
     shutil.copy2(LAYOUT, LAYOUT + '.before-showcase')
     STATE['layout'] = True
