@@ -47,6 +47,7 @@ Stress and idle-cost results (spam clicks, fast drags, lock cycles, leaks): `doc
 | Digital Clock, Date & Time | small, medium | `clocks.js` | local time |
 | Glass Text Clock (the digits are the glass) | medium | `glasstext.js` | local time; a shader cuts Blur My Shell's glass to the glyphs |
 | Calendar: Today, Month, Today and Month | small, small, medium | `calendar.js` | Evolution Data Server events |
+| Calendar: Schedule, Schedule Large | small, large | `schedule.js`, `schedule-model.js`, `icsfeed.js`, `ics-expand.js` | today's events from a calendar's private ICS link (Google Calendar's "Secret address in iCal format"), refreshed every 15 min, cached for offline; desktop only, not on the lock screen (sheets `docs/shots/schedule-{light,dark,milky}.png`, `schedule-states.png`) |
 | Weather, Next Hours, Week | small, medium, large | `weather.js` | the shell's WeatherClient (libgweather), location from GNOME Weather, refreshed every 30 min |
 | Music, Wide, Large (356 x 504), Lyrics, Extra Large Wide (728 x 504), Extra Large Tall (356 x 864) | small, medium, large, large, extra large | `music.js`, `mpris.js`, `swirl.js`, `palette.js` | MPRIS; synced lyrics from a `.lrc` next to a local file, else lrclib.net (Lyrics widget only, once per track); the glass is tinted by a slow swirl of the cover's colours; the app icon raises the player's window (sheets `docs/shots/music-all-{light,dark}.png`) |
 
@@ -61,6 +62,33 @@ The Music widgets' album-colour swirl follows the technique of the background re
 (AGPL-3.0) and of [Adaptive Palette](https://pub.dev/documentation/adaptive_palette/latest/) (MIT):
 dominant colours by k-means, a heavily blurred field turning slowly, a cross-fade per track. The
 shader and the colour code here are written for this repo (GPL-3.0); no code is taken from either.
+
+### Calendar: Schedule: setting your calendar link
+
+The Schedule widgets read one calendar through its private ICS address. In Google Calendar on the
+web: Settings, pick the calendar under "Settings for my calendars", Integrate calendar, copy
+**Secret address in iCal format**. Then, in a terminal:
+
+```bash
+bash scripts/tahoe-widgets.sh calendar-url
+```
+
+Paste the address at the hidden prompt and press Enter. The widgets load it within a second.
+
+- The address is a password: anyone with it can read the whole calendar. It is stored in the
+  GNOME keyring (or, without one, in `~/.config/tahoe-glass/calendar-url`, readable only by you),
+  never in this repo, and never logged. Don't paste it into chats, issues or screenshots. If it
+  leaks, use "Reset" next to it in Google Calendar and set the new one.
+- `bash scripts/tahoe-widgets.sh calendar-url --clear` forgets it and the cached events;
+  `bash scripts/tahoe-widgets.sh status` says where it is kept.
+- The last copy is cached privately in `~/.cache/tahoe-glass/calendar.*` (mode 0600) so the widgets
+  work offline. Google updates these feeds on its own schedule, sometimes hours after a change.
+- One calendar at a time. Colours: the feed's own if it has them (Google's has none), otherwise a
+  fixed colour per event, so a series keeps its colour.
+
+The ICS parsing uses [ical.js](https://github.com/kewisch/ical.js) 2.2.1 by Mozilla and Philipp
+Kewisch (MPL-2.0), vendored unmodified in `extensions/tahoe-widgets@cachyos-tahoe/vendor/` with its
+licence. It runs in its own process (`ics-expand.js`), never inside the shell.
 
 ## Keeping the design
 

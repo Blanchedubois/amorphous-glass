@@ -14,12 +14,21 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {GlassPane} from './glass.js';
-import {CalendarMonth} from './widgets/calendar.js';
-import {WeatherSmall} from './widgets/weather.js';
+import {CalendarMedium, CalendarMonth} from './widgets/calendar.js';
+import {AnalogClock, AnalogQuartersClock} from './widgets/clocks.js';
+import {WeatherMedium, WeatherSmall} from './widgets/weather.js';
+import {SIZE, arrange, layoutRows, widthOf} from './widgetlayout.js';
 
-const KINDS = [['weather-small', WeatherSmall], ['calendar-month', CalendarMonth]];
-const SIZE = 170;          // tahoe-widgets SIZES.small, logical px
-const GAP = 16;            // between widgets, as on the desktop grid
+// the widgets the column may hold (widgetlayout.js LAYOUTS); calendars without events (the
+// user's rule: no event titles on the lock and login screens)
+const KINDS = {
+    'weather-small': () => new WeatherSmall(),
+    'weather-medium': () => new WeatherMedium(),
+    'calendar-month': () => new CalendarMonth({events: false}),
+    'calendar-medium': () => new CalendarMedium({events: false}),
+    'clock-analog': () => new AnalogClock(),
+    'clock-quarters': () => new AnalogQuartersClock(),
+};
 const RADIUS = 24;         // tokens/radius.json widget
 const LEFT = 0.045;        // the column's left edge, share of the monitor's width
 const MARGIN = 0.04;       // clear of the monitor's top and bottom, share of its height
@@ -42,11 +51,12 @@ export function buildWidgets(ext, dir) {
     group.add_child(layer);
     ext._undo.push(() => layer.destroy());
 
-    const items = KINDS.map(([kind, cls]) => {
+    const rows = layoutRows().map(row => row.filter(kind => KINDS[kind])).filter(row => row.length);
+    const items = rows.flat().map(kind => {
         const actor = new St.Widget({
             style_class: `tahoe-widget tahoe-widget-${kind} tahoe-gdm-pane`,
             layout_manager: new Clutter.BinLayout(),
-            width: SIZE, height: SIZE,
+            width: widthOf(kind), height: SIZE,
         });
         const pane = new GlassPane(backdrop, RADIUS);
         pane.connect('mask-failed', () => ext._fail(`widget glass: ${pane.failed}`));
@@ -56,7 +66,7 @@ export function buildWidgets(ext, dir) {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true, y_expand: true,
         });
-        const widget = new cls();
+        const widget = KINDS[kind]();
         content.add_child(widget.actor);
         actor.add_child(content);
         layer.add_child(actor);
@@ -93,7 +103,9 @@ export function buildWidgets(ext, dir) {
         const now = GLib.DateTime.new_now_local();
         items.forEach(({widget}) => widget.tick(now));
     };
-    const tickId = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, TICK, () => {
+    // a clock's hands move each second; the others turn over at midnight or each hour
+    const every = rows.flat().some(kind => kind.startsWith('clock-')) ? 1 : TICK;
+    const tickId = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, every, () => {
         try {
             tick();
         } catch (e) {
@@ -109,17 +121,11 @@ export function buildWidgets(ext, dir) {
         const m = Main.layoutManager.primaryMonitor;
         if (!m)
             return;
-        let n = items.length;
-        while (n > 1 && n * SIZE + (n - 1) * GAP > m.height * (1 - 2 * MARGIN))
-            n--;
-        let y = Math.round(m.y + (m.height - (n * SIZE + (n - 1) * GAP)) / 2);
-        const x = Math.round(m.x + LEFT * m.width);
+        const {spots, scale} = arrange(rows, m, m.x + LEFT * m.width, MARGIN);
         items.forEach((item, i) => {
-            item.actor.visible = i < n;
-            if (i < n) {
-                item.actor.set_position(x, y);
-                y += SIZE + GAP;
-            }
+            item.actor.visible = spots[i].visible;
+            item.actor.set_position(spots[i].x, spots[i].y);
+            item.actor.set_scale(scale, scale);
         });
     };
     const id = Main.layoutManager.connect('monitors-changed', place);

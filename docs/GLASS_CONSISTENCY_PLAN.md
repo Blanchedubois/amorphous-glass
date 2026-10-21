@@ -1,0 +1,225 @@
+# Lock and login screens: one Liquid Glass with the desktop widgets (workshop, 2026-10-20)
+
+The user, after the first real look at both screens in dark mode: the outline is too thick on
+every card (widgets, account rows); the glass looks low resolution and pixelated; it should match
+the desktop widgets; "Not listed?" is not aligned or symmetrical; the top-right menu's buttons look
+off and are not Liquid Glass; the clock dark or plain clear blur; double-width widgets; every
+button tested and compared with the widgets. Work in phases, each workshopped with shots.
+
+## Findings (evidence in docs/unified/consistency/)
+
+### 1. Two different glass recipes
+
+| | Desktop widgets (docs/STANDARD.md, Blur My Shell) | Lock and login screens today (glass.js shader) |
+|---|---|---|
+| Backdrop | frosted: wallpaper blurred (menus 18, widgets similar) | clear: 0.5 px softening only |
+| Edge | 1 px white line, 16 % in dark | 2 px bright line + 5 px glow at 35 % |
+| Rim light | 0.55 over 0.45 of the edge band, soft | strong, top-left |
+| Bend (refraction) | small | 9 px at the edge, 10 px bevel |
+| Tint (dark) | rgb 34,34,38 at 0.42 | the same (dark look) |
+| Edge shadow | 0.30 over 0.20 of the band | 0.05 |
+
+`corners-desktop-lock-login-4x.png`: desktop weather card, lock weather card, login account row,
+same corner at 4x. The desktop edge is a hairline; ours is a thick lit band.
+
+### 2. "Low resolution and pixelated": the clear glass shows the wallpaper's grain
+
+- The wallpaper is fine: `fold-d.jxl` is 4096 px, 16 bit; display scale 1 (monitors.xml).
+- GNOME's fold wallpapers carry a deliberate film grain. Through clear glass (no blur), with the
+  9 px bend magnifying the edge band and the contrast/saturation of the glass, that grain reads as
+  pixels. The desktop widgets blur the wallpaper (frosted), which hides it.
+- Checked and ruled out: texture filtering of the glass's own copy (smooth vs default sampling
+  changes nothing visible in the bend band), the login picture's dither (no grid; the grain is the
+  wallpaper's own).
+- So the fix for "pixelated" and for "consistent with the widgets" is the same: frosted glass.
+
+### 3. "Not listed?"
+
+Measured (2560x1440): the rows span x 1116 to 1443 (centre 1280); "Not listed?" spans 1102 to 1218:
+left-aligned, and 14 px left of the rows' edge. `not-listed-now.png`.
+
+### 4. The top-right menu (system menu)
+
+On the login screen its toggles are flat translucent fills on one frosted pane; on the desktop each
+toggle is its own glass capsule with the 1 px edge (and on Super+L too, via Blur My Shell). So the
+login screen's menu looks unlike both. `menus-now.png`.
+
+### 5. Every button and menu, per screen
+
+| | Login screen | Super+L |
+|---|---|---|
+| Account rows | glass capsules (thick edge) | - |
+| Not listed? | glass capsule, misaligned | - |
+| Back arrow | glass circle | glass circle (shown when GNOME shows it) |
+| Next arrow (inside the field) | GNOME's own circle | GNOME's own circle |
+| Password field | glass capsule, thin edge | glass capsule, thin edge |
+| Session gear (after picking a user) | glass circle (not yet seen in a shot) | - |
+| Accessibility (bottom right) | glass circle | - |
+| Switch User | - | glass capsule |
+| Top-right status pill (panel) | GNOME's pill, not glass | GNOME's pill, not glass |
+| Calendar menu | frosted pane, light day buttons | - (GNOME has no clock menu while locked) |
+| System menu | frosted pane, flat toggles | frosted pane + per-toggle glass |
+| Accessibility menu | frosted pane, flat toggles | - |
+| Music card | glass (thick edge) | glass (thick edge) |
+| Widgets | glass (thick edge) | glass (thick edge) |
+| Clock | clear glass digits | clear glass digits |
+
+## Phases (each: build in the test shells, shots of both screens next to the desktop widgets at
+1x and 4x corners, the user picks, then the next phase)
+
+### Phase A: the desktop widgets' glass on both screens (the main fix)
+
+One material for every card, row, capsule and menu, from docs/STANDARD.md and tokens/glass.json:
+frosted backdrop (blur 18), dark tint 34,34,38 at 0.42, 1 px white edge at 16 %, the soft rim light
+and edge shadow, a small bend. Workshop: 3 variants on the same widget, row and capsule, each next to
+the desktop widget:
+- A1 frosted, no bend (closest to the desktop widgets);
+- A2 frosted with a 3 px bend (a touch of liquid at the edge);
+- A3 frosted with today's bend (9 px) but the hairline edge.
+Gate: 4x corners of every surface on both screens, no grain visible at 1x.
+
+### Phase B: the clock
+
+Two variants next to each other: dark glass digits (the Phase A material on the glyphs), or plain
+clear blur (frosted, no tint, no rim: the digits as a window onto the blurred picture).
+
+### Phase C: buttons and alignment
+
+- "Not listed?" centred under the rows, the same capsule height as the back button's circle row,
+  symmetric padding (measured: equal space left and right of its text).
+- Every button from the table above: same material and edge, concentric with what holds it;
+  the top-right status pill as a glass capsule; the next arrow as a glass circle inside the field
+  (concentric: field radius minus the gap).
+- Gate: a measured table (each button's box, its text box, left/right and top/bottom gaps) on
+  both screens; hover and pressed shots.
+
+### Phase D: the system menu and other menus
+
+- The login screen's system menu as the desktop's: each toggle, slider and round button its own
+  glass capsule (the same per-piece approach as Super+L's, with our shader instead of Blur My
+  Shell, which the login screen does not have), on the frosted menu pane; submenus (Wi-Fi, Power
+  Mode) at the standard's 32 radius, rows 16.
+- The accessibility and keyboard menus the same; the calendar's day buttons per the standard
+  (calendar 32, cards 20).
+- Gate: every toggle on and off, every submenu open, on both screens, next to the desktop's.
+
+### Phase E: double-width widgets
+
+The desktop has medium (2 x 1, 356 x 170) widgets: Weather with the hourly forecast, Calendar (day +
+month), Clock (digital + analogue), Music. Options for the column (left side, as iPad):
+- E1: Weather medium on top, the month small under it (stays one column wide at the top);
+- E2: Weather medium + Calendar medium (day and month), stacked, two rows of 356;
+- E3: a 2 x 2 grid of smalls (weather, month, clock, world time).
+Calendar events stay hidden (the user's rule); fit rules for small monitors (fall back to smalls).
+Gate: every monitor size from 1280x720 to 3840x2160, both screens.
+
+### Phase F: check everything together
+
+Both screens side by side with the desktop widgets; every surface at 4x; the fault, churn,
+music-idle and verifying gates; then install (lock screen: `scripts/tahoe-lockscreen.sh on`;
+login screen: `scripts/gdm-theme.sh install`, the user's sudo).
+
+## Phase A results (2026-10-20, test shells)
+
+Built: the desktop widgets' edge model in the glass shader (glass.js `desk`: inner edge shadow,
+rim light, 1 px hairline anti-aliased over a whole pixel, darker toward the bottom), the desktop's
+dark tint, and a frosted backdrop (GNOME Shell's blur, radius 18, one shared copy per backdrop,
+read by every pane). The old edge's line is now anti-aliased over a whole pixel too (it stepped
+on curves). Variants by `TAHOE_GLASS_VARIANT` in the test shells only (installed screens unchanged
+until the user picks): A1 no bend, A2 3 px, A3 9 px.
+Sheets: `phaseA-weather-1x.png`, `phaseA-corner-4x.png` (desktop widget, today, A1, A2, A3),
+`phaseA-row-3x.png`, `phaseA-screens.png`. No errors in any variant on either screen.
+- The user's pick (2026-10-20): A1 (frosted, no bend) on both screens; now the default in glass.js.
+
+## Phase B workshop (2026-10-20)
+
+Clock variants on the login screen (`TAHOE_CLOCK_VARIANT`, the same type, size and place as
+Super+L's clock): B1 dark glass (the cards' A1 glass on the glyphs: frosted, dark tint, hairline,
+rim light) and B2 clear blur (the picture blurred through the digits, a little lighter, no tint,
+only the hairline), next to today's clear glass. Sheets: `phaseB-clock.png`, `phaseB-clock-3x.png`.
+The pick then goes on Super+L too (its clock is drawn by glassclock.js today).
+- The user's pick (2026-10-20): B2 clear blur on both screens. The clock's panes are one module
+  now (tahoe-gdm clockpanes.js, an exact copy in the lock screen's widgets/): Super+L no longer uses
+  glassclock.js. `phaseB-both-clocks.png`: Super+L and the login screen, the same.
+
+## Phase C results (2026-10-20)
+
+Measured every button on both screens (test drivers record each button's box and its content's
+gaps; text centring measured from the pixels):
+- "Not listed?": centred under the rows (centre 1279, rows 1279.5; was 14 px left of them and
+  left-aligned), 34 px tall like the back circle, text 23 / 23 px from its ends (was 14 / 26).
+- "Switch User...": 34 px tall (the lock theme adds a 6 px border: min-height 22), text 17 / 18.
+- Circles (back 9/9, next 8/8, accessibility 16/16) were already symmetric.
+- The top-right status pill: a glass capsule on both screens, inside GNOME's transparent border.
+- The next arrow in the field: the glass hairline and a light fill (no glass in glass).
+- Hover and pressed: a light fill on every button, both screens (`phaseC-buttons-hover.png`).
+Gates: fault (both screens back to GNOME's), verifying, churn 25 cycles (the only growth is
+GNOME's own Wi-Fi list; the churn gate now records an actor census per cycle).
+
+## Phase D results (2026-10-20)
+
+- One menu module on both screens (tahoe-gdm menus.js, the lock screen's widgets/glassmenus.js):
+  a frosted pane under each menu, and in the system and accessibility menus every toggle, slider
+  and round button its own glass capsule, an open submenu its own glass at 32 (docs/STANDARD.md),
+  all in the cards' A1 glass. Super+L's Blur My Shell piece glass (menuglass.js) is retired, so
+  both screens draw the same thing; on toggles in the accent colour on both.
+- Submenus open in an overlay of the menu's own actor: the walk covers the whole menu.
+- `phaseD-menus.png`: the desktop's submenu and calendar next to Super+L's menu and submenu and the
+  login screen's menu, submenu, accessibility menu and calendar.
+- Gates: the lock screen's qs and qs-sub (glass on every piece, the submenu included), the fault
+  gates on both screens.
+
+## Phase E workshop (2026-10-20)
+
+- One layout module for the widget column on both screens (tahoe-gdm widgetlayout.js, shared):
+  rows of small (170) and wide (356 x 170) widgets; `TAHOE_WIDGET_LAYOUT` in the test shells.
+  E1: Weather Medium (the hourly forecast) + the month. E2: Weather Medium + Calendar Medium
+  (day and month). E3: 2 x 2: weather, month, two analogue clocks.
+- The calendars take `{events: false}` on both screens (tahoe-widgets calendar.js, opt-in; the
+  desktop is unchanged): no event list, and the calendar store is not opened at all.
+- The column keeps clear of the centre: its right edge at most 29 % of the width; a layout wider
+  than that is scaled down evenly (glass.js places the backdrop in the pane's own units, so a
+  scaled pane still lies exactly over the background). Rows drop from the bottom on short monitors.
+- The user (during Phase E): no card behind the system and accessibility menus, only their
+  pieces in glass (menus.js); the calendar keeps its card.
+- Sheets: `phaseE-columns.png`, `phaseE-screens.png`, `phaseE-E2-1280x720.png`,
+  `phaseE-menus-nocard.png`.
+- The user (2026-10-20): the system menu's buttons looked odd ("too much blue", a line before each
+  arrow): now drawn as the desktop's (config/gnome-shell-overrides.css, dark): clear glass
+  pieces, a split toggle's round icon white when on, a plain toggle white with accent text when
+  on, GNOME's divider (`quick-toggle-separator`) hidden, the menu 420 px wide so the titles fit.
+  `#uiGroup` in the selectors outranks the lock theme's !important rules.
+  `phaseD-system-menu-os.png`: the desktop's, Super+L's and the login screen's.
+- The user's pick (2026-10-20): E2 on both screens (widgetlayout.js default).
+- The system menu's insets (the user: the icons not evenly inset): toggles 44 px on both screens,
+  the round icon 32 px with 6 px above, below and to its left, the arrow a 32 px circle 6 px from
+  the right, top and bottom (measured on both screens: 6/6/6); the plain toggles' icons on the
+  same centre line. `system-menu-insets.png`.
+- Measured from the pixels (tools/glass/measure-toggle.py, both screens): the icon circle 32 x 32,
+  6 / 6 / 6 px from the button's left, top and bottom; the glass's edge on the button's box (one
+  anti-aliased pixel). A plain toggle that is on (Dark Style): no glass under it any more (its edge
+  showed as a dark ring a hair outside the white pill); now background to white at the button's
+  exact edge on every side (`system-menu-on-pill.png`).
+
+## Phase F results (2026-10-20)
+
+Lock screen gates, all pass: G1 (music playing), music-idle (frames stop after 35 s idle, restart
+on input), ours-throw and ours-cover (GNOME's lock screen back, still locked, the field takes
+keys), verifying, qs and qs-sub (glass on every piece and the submenu, none under the white on
+toggle, no card), lockvideo, churn 25 (nothing of ours left; GNOME's Wi-Fi list grows), monitors
+1280x720, 1920x1080, 3440x1440, 3840x2160. Login screen: the song (live and dead session), the
+menus and hover, the glass fault (GNOME's login screen back), the same four sizes. No real PAM
+conversation since the start (journal), faillock empty. Two shutdown-only warnings fixed on the
+way (a queued menu update, and disconnects from menus GNOME had already disposed).
+`phaseF-final.png`: Super+L, the login screen and the desktop widgets.
+
+## After Phase F (2026-10-20, the user)
+
+- Notifications on Super+L: each row its own glass capsule (promptglass.js), its app icon in a
+  32 px circle 12 px from the capsule's left, top and bottom (measured from the pixels).
+  `notification-glass.png`. The login screen has no notifications.
+- The system menu aligned on both screens: every piece 44 px tall (sliders were 27, the round
+  button 37), 12 px between rows and columns, slider icons in the toggles' 32 px circle 6 px
+  from the end, round buttons 44 px circles, submenus the menu's full 420 px width. Measured with
+  the sliders shown in the test shells (TAHOE_QS_SLIDERS: no audio device there).
+  `system-menu-aligned.png` (Super+L, login).
