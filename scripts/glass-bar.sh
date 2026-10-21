@@ -448,7 +448,8 @@ if marker in s:
     open(p, 'w').write(s[:i] + glass)
 PY
   local OBS="$EXT/openbar@neuromorph/schemas"
-  [ -d "$OBS" ] && gsettings --schemadir "$OBS" set org.gnome.shell.extensions.openbar balpha "$a"
+  # Open Bar comes after the first Blur My Shell build on a new install: no bar to edge yet
+  if [ -d "$OBS" ]; then gsettings --schemadir "$OBS" set org.gnome.shell.extensions.openbar balpha "$a"; fi
 }
 
 # gtk3_glass light | dark | off: GTK3 apps (Disks, pywebview apps such as vut-map, ...) keep the
