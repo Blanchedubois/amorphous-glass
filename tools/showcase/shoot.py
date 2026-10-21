@@ -303,6 +303,8 @@ def s_app_grid():
 
 @shot_fn
 def s_widget_drag():
+    """the analog clock dragged next to the Schedule widget, a gap from its edge, top edges lined up
+    (the widgets snap to an 8 px grid), held, then back where it was"""
     want = int(os.environ.get('TAHOE_SHOWCASE_DRAG_X', '2000'))
     boxes = []
     for i in range(12):
@@ -311,11 +313,16 @@ def s_widget_drag():
         except LookupError:
             break
     x, y, w, h = min(boxes, key=lambda b: abs(b[0] - want))
+    dx, dy = (int(v) for v in os.environ.get('TAHOE_SHOWCASE_DRAG_BY', '0,368').split(','))
+    gx, gy = x + w // 2, y + h // 2
     with Clip('widget-drag'):
-        call('Drag', (x + w // 2, y + 30, x + w // 2 + 240, y + 150, 1200), '(iiiiu)')
-        pause(900)
-        call('Drag', (x + w // 2 + 240, y + 150, x + w // 2, y + 30, 1200), '(iiiiu)')
-        pause(900)
+        move(gx, gy, 500)
+        pause(300)
+        call('Drag', (gx, gy, gx + dx, gy + dy, 1600), '(iiiiu)')
+        pause(1500)
+        shot('widget-snapped')
+        call('Drag', (gx + dx, gy + dy, gx, gy, 1400), '(iiiiu)')
+        pause(1000)
 
 
 MAIN = os.environ.get('TAHOE_SHOWCASE_LIVE', os.path.expanduser('~/Projects/liquid-glass'))
