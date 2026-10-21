@@ -56,7 +56,7 @@ def serve(frames_dir, done):
 
 
 def page_url(server, args, extra):
-    query = {'theme': args.theme, **extra}
+    query = {'theme': args.theme, **dict(p.split('=', 1) for p in args.param), **extra}
     for key, path in (('plateIn', args.plate_in), ('plateOut', args.plate_out)):
         if path:
             query[key] = '/' + Path(path).resolve().relative_to(ROOT).as_posix()
@@ -114,6 +114,8 @@ def main():
         p.add_argument('--theme', choices=('dark', 'light'), default='dark')
         p.add_argument('--plate-in', help="the montage's last frame (inside the repository)")
         p.add_argument('--plate-out', help="the montage's first frame (inside the repository)")
+        p.add_argument('--param', action='append', default=[], metavar='KEY=VALUE',
+                       help='a page parameter, e.g. follow=0.55,90 (see main.js)')
         if name == 'still':
             p.add_argument('time', type=float)
             p.add_argument('-o', '--output', required=True)
