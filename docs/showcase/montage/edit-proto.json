@@ -1,0 +1,18 @@
+{
+  "about": "Phase 2 prototype (REWRITE.md): the locked camera on two shots of the existing footage, a match cut on the cursor between them.",
+  "zoom": 1.6,
+  "shots": [
+    {
+      "name": "widget-drag",
+      "clip": "widget-drag.mp4",
+      "in": 0.6,
+      "len": 4.0
+    },
+    {
+      "name": "quick-settings",
+      "clip": "quick-settings-open.mp4",
+      "in": 1.25,
+      "len": 3.6
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# Montage rewrite: one zoom, the cursor locked in the middle (plan, waiting for approval)
+# Montage rewrite: one zoom, the cursor locked in the middle
 
 The user, 2026-10-21, on the montage now on main: "the constant zooming in and zooming out while
 following the mouse is disorienting. I would like you to always keep the cursor in the center of
@@ -21,6 +21,37 @@ exact centre, where the cursor always is):
   card on it with rounded corners, a shadow and a hairline).
 - `storyboard/locked-zoom.webp`: 2.0x (left) against 1.6x (right).
 
+## Decisions
+
+- 2026-10-21: **1.6x**, and **B, the wallpaper beyond the screen's edge** (user). Phase 2 done:
+  edit.py v2, prototype `edit-proto.json` (the widget drag, a match cut into quick settings).
+  Findings: the old shoot moves the cursor 1500 px in 0.45 s, which a locked camera turns into a whip
+  pan (the reshoot uses eased moves of at least 0.6 s); the motion blur takes one camera position per
+  4 px of travel so it streaks rather than steps; a tracker jump over 200 px in a frame is a cut.
+- 2026-10-21, user: "rerecord the animations again where you keep this in mind. Since the widgets
+  are behind the control center and its hard to see the animation. Maybe you rearrange the widgets
+  and try recording all the sequences again." → the reshoot moves the widgets off the path of the
+  popups (below), and every sequence is recorded again.
+- 2026-10-21, user: "show the finder/files window and settings window not as full screen but as a
+  window which you can drag around. This is another animation." → a new shot: Files and Settings
+  as normal windows, dragged across the desktop (window motion, the glass header bar).
+
+### Widget layout for the shoot
+
+Quick settings drops from the top right (x 2160 to 2540), the calendar from the top middle (x 950 to
+1610); today the clock, weather and calendar widgets sit right under them. For the shoot they move
+to the left column and the bottom left, so the popups open over the bare wallpaper and their glass
+shows its refraction:
+
+| Widget | Today | For the shoot |
+|---|---|---|
+| Music, Lyrics | top left | top left (unchanged), Lyrics with the placeholder .lrc |
+| Clock | top right, by quick settings | left, under Lyrics |
+| Weather | top right | bottom left, above the dock's left end |
+| Schedule / calendar | right | bottom left, beside Weather |
+
+The user's own layout is saved before the shoot and put back after it.
+
 ## Phase 1: screenplay and cut list
 
 **Rules.** No two neighbours of the same kind (P panel from the top bar, M menu, W window or app,
@@ -33,18 +64,19 @@ and the dock: it clicks and moves at once into what opened, so the content fills
 | 0 | | In from the title | the title's dissolve lands on the home screen with the cursor in the middle of the wallpaper (section "Joins") | |
 | 1 | D | Drag the clock widget | grab it, drag it across the desktop, it snaps into the grid | 3.0 |
 | 2 | P | Quick settings | up to the icon, click: the circle of glass grows; straight down onto Wi-Fi's arrow, the submenu opens | 3.5 |
-| 3 | W | A window opens | a dock click (cut in on the click), then up with the opening window to its header bar | 3.0 |
+| 3 | W | Files opens as a window and is dragged | a dock click: Files opens (not full screen); the cursor grabs its glass header bar and drags it across the wallpaper; it settles | 3.5 |
 | 4 | M | Its window menu | right-click on the header bar; glide down the glass menu | 2.5 |
 | 5 | O | Overview and search | Super, type "calc": results on raised glass panels; down over them | 3.0 |
 | 6 | D | Music widget | over Now Playing: the album-colour swirl, hover the controls (placeholder lyrics) | 3.0 |
 | 7 | P | Calendar | click the clock: the calendar; down over its concentric cards | 2.5 |
 | 8 | S | Volume | the cursor rests over the dock's middle; volume keys: the capsule OSD | 1.5 |
 | 9 | M | Desktop menu | right-click the wallpaper; down to Add Widget | 2.5 |
-| 10 | O | App grid and a folder | Super twice, click a folder: tiles and popup on one glass | 3.0 |
+| 10 | O | App grid and a folder | Super twice, click a folder: tiles and popup on one glass; open Settings from it | 3.0 |
+| 10b | W | Settings as a window, dragged | Settings opens as a window; drag it by its header bar, it settles | 3.0 |
 | 11 | S | Lock screen | Super+L: the glass clock, widgets, the Now Playing swirl; the cursor wakes the prompt; typing (field blurred) | 4.5 |
 | 12 | | Back home | unlock to the home screen; the cursor returns to where shot 1 began; dissolve to the title | 1.0 |
 
-About 33 s. Kinds in order: D P W M O D P S M O S; no neighbours repeat.
+About 36 s. Kinds in order: D P W M O D P S M O W S; no neighbours repeat.
 
 **Transitions.** The cursor is at the same place in every frame, so every cut is a match cut on
 it. Each cut lands where the cursor is still on both sides (the out-point after it stops, the
