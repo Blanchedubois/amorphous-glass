@@ -348,8 +348,17 @@ class Repair:
         miss = [expand(t) for t in c['text'] if expand(t) not in text]
         return (DRIFT, 'missing: ' + ' | '.join(m.replace('\n', ' ')[:70] for m in miss)) if miss else (OK, '')
 
+    def link_target(self, c):
+        """the target, or the first of a list that is there (with its 'need' file)"""
+        targets = c['target'] if isinstance(c['target'], list) else [c['target']]
+        for t in targets:
+            if os.path.exists(os.path.join(expand(t), c['need']) if c.get('need') else expand(t)):
+                return expand(t), t
+        return expand(targets[0]), targets[0]
+
     def c_symlink(self, c):
-        path, target = expand(c['path']), expand(c['target'])
+        path, (target, tname) = expand(c['path']), self.link_target(c)
+        c = dict(c, target=tname)
         if not os.path.exists(os.path.join(target, c['need']) if c.get('need') else target):
             if c.get('if_target'):
                 return SKIP, 'target not there'
@@ -521,7 +530,7 @@ class Repair:
         return (OK, '') if self.major in m.get('shell-version', []) else (DRIFT, f'shell-version {m.get("shell-version")}')
 
     def c_font(self, c):
-        return (OK, '') if self.font(c['family']) else (ACTION, f'{c["family"]} not installed')
+        return (OK, '') if self.font(c['family']) else (INFO, f'{c["family"]} not installed')
 
     def tree_hash(self, path):
         h = hashlib.sha256()
@@ -612,7 +621,7 @@ class Repair:
 
     def f_symlink(self, it):
         c = it['check']
-        path, target = expand(c['path']), expand(c['target'])
+        path, target = expand(c['path']), self.link_target(c)[0]
         self.log.backup(path)
         if os.path.lexists(path):
             os.remove(path)
