@@ -10,7 +10,7 @@
 // 6. on the way out the grab is released at the first frame and the overlay stops taking input,
 //    so the desktop has it while the exit still plays;
 // 7. the hotkey closes it again (keys.js).
-// Phase 1 draws a plain dark field and the chevron; later phases fill it in.
+// What it shows is view.js's.
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
@@ -20,12 +20,11 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {Action, decide, parseAccelerator} from './keys.js';
-import {symbolActor} from './symbols.js';
+import {NowPlayingView} from './view.js';
 
 const ENTER_MS = 250;
 const EXIT_MS = 200;
 const WATCHDOG_MS = 3000;
-const REF_HEIGHT = 1440;      // the sizes are given at 2560x1440 and scale with the monitor's height
 
 const State = Object.freeze({OPENING: 'opening', OPEN: 'open', CLOSING: 'closing', CLOSED: 'closed'});
 
@@ -103,7 +102,13 @@ export class Overlay {
         this._state = State.OPENING;
         actor.grab_key_focus();
 
-        this._buildChevron();
+        // the player goes on the monitor the pointer is on
+        const monitor = Main.layoutManager.monitors[global.display.get_current_monitor()] ?? Main.layoutManager.primaryMonitor;
+        this.view = new NowPlayingView(actor, monitor, {
+            guard: fn => this.guard(fn),
+            onControl: name => this._onAction?.(name),
+            onChevron: () => this.close(),
+        });
 
         this._accelerators = this._settings.get_strv('toggle').map(parseAccelerator).filter(Boolean);
         this._connect(actor, 'key-press-event', (_a, event) => this._onKey(event));
@@ -151,24 +156,8 @@ export class Overlay {
         return true;
     }
 
-    // the chevron: back to the desktop, bottom centre of the monitor the pointer is on
-    _buildChevron() {
-        const monitor = Main.layoutManager.monitors[global.display.get_current_monitor()] ?? Main.layoutManager.primaryMonitor;
-        const k = Math.min(1.5, Math.max(0.75, monitor.height / REF_HEIGHT));
-        const [w, h, bottom] = [112, 52, 34].map(v => Math.round(v * k));
-        const chevron = new St.Button({
-            style_class: 'tahoe-np-chevron',
-            accessible_name: 'Back to the desktop',
-            can_focus: false,
-            child: symbolActor('chevron.down', Math.round(26 * k), 'go-down-symbolic'),
-            width: w,
-            height: h,
-        });
-        chevron._tahoeNpControl = true;
-        chevron.set_position(monitor.x + Math.round((monitor.width - w) / 2), monitor.y + monitor.height - bottom - h);
-        chevron.connect('clicked', () => this.guard(() => this.close()));
-        this.actor.add_child(chevron);
-        this.chevron = chevron;
+    get chevron() {
+        return this.view?.chevron ?? null;
     }
 
     _onKey(event) {
@@ -292,7 +281,13 @@ export class Overlay {
         }
         const actor = this.actor;
         this.actor = null;
-        this.chevron = null;
+        const view = this.view;
+        this.view = null;
+        try {
+            view?.destroy();
+        } catch (e) {
+            console.error(`tahoe-nowplaying: view: ${e}`);
+        }
         if (actor) {
             actor.remove_all_transitions();
             actor.destroy();

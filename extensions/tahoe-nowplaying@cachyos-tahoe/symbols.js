@@ -45,11 +45,14 @@ export function symbolAvailable(name) {
 // the symbol as a label (size in px), else the fallback icon
 export function symbolActor(name, size, fallbackIcon) {
     if (symbolAvailable(name)) {
-        return new St.Label({
+        const label = new St.Label({
             style_class: 'tahoe-np-symbol',
             text: String.fromCodePoint(SYMBOLS[name]),
             style: `font-family: "${FAMILY}"; font-weight: 600; font-size: ${size}px;`,
         });
+        // a symbol is never shortened to "…" (a box a little narrower than the glyph)
+        label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        return label;
     }
     return new St.Icon({style_class: 'tahoe-np-symbol', icon_name: fallbackIcon, icon_size: Math.round(size * 1.1)});
 }

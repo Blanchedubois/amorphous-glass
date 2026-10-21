@@ -43,14 +43,15 @@ screen's centre.
 ### Where it lives: a new extension `tahoe-nowplaying@cachyos-tahoe`
 
 It follows the lock screen's approach: the extension carries **exact copies** of the shared
-modules in `widgets/`. They are listed in `tools/nowplaying/shared.list`, and
+modules in `shared/`. They are listed in `tools/nowplaying/shared.list`, and
 `tools/nowplaying/sync-shared.sh` copies them over. `check-shared.sh` fails on any drift, and the
 install script refuses to install a stale copy. It copies these files:
 `mpris.js`, `palette.js`, `music.js` (the lyrics view and the transport), `glass.js` (mode only),
-`stylesheet.css`, `icons/` (the fallback icons), and from tahoe-lockscreen `bgswirl.js` and
-`glassclock.js`. `glass.js` is the widgets' own Liquid Glass card (Blur My Shell's
-`pipeline_glassbar_dock`). Nothing from tahoe-gdm is copied: its SDF pane is a different glass from
-the widgets'.
+`stylesheet.css`, `icons/` (the fallback icons), and from tahoe-lockscreen `bgswirl.js`. `glass.js`
+is the widgets' own Liquid Glass card (Blur My Shell's `pipeline_glassbar_dock`). The clock comes
+from tahoe-gdm exactly as the lock screen carries it: `clockpanes.js` and its pane glass `glass.js`
+(as `shared/paneglass.js`). That glass is used for the clock only; every other glass is the
+widgets'.
 
 Why not inside tahoe-widgets:
 - **Its own on/off switch.** A crash or a GNOME update disables only this extension, never the desktop widgets.
@@ -245,13 +246,14 @@ capsule (112 × 52), and the cover's card (the enter and exit pour, and the hove
 
 ### The clock: the lock screen's glass clock
 
-- **Code.** The lock screen's clock (`glassclock.js`), unchanged: Space Grotesk SemiBold, the
-  subtler material A, **its own light glass** (not the widgets' dark glass), the date above the time,
-  as on the lock screen. It is as translucent as there: the strokes are mostly the swirl seen
+- **Code.** The lock screen's live clock, unchanged: `ClockPanes` (tahoe-gdm `clockpanes.js`) with
+  its glyph-shaped glass panes (tahoe-gdm `glass.js`), material **B2 "clear blur"**, Space Grotesk
+  SemiBold, **its own light glass** (not the widgets' dark glass), the date above the time, as on
+  the lock screen. (`glassclock.js` is the lock screen's older clock and is no longer used there.) It is as translucent as there: the strokes are mostly the swirl seen
   through, with a thin lit rim and very little milk. No extra fill or outline is added. Only its backdrop changes: a clone of the swirl layer instead of the lock
   background.
-- **Size and place.** The time at about 10 % of the height (150 px at 1440p; the lock screen uses
-  12 %) with the date (40 px) above it, centred at the top.
+- **Size and place.** The time at 150 px type at 1440p (digits 7.6 % of the height; the lock
+  screen's are 12 %), the date in the lock screen's proportion of it (27 px), centred at the top.
 - **Updates.** The glyph mask is redrawn once a minute, as on the lock screen.
 - **Check.** Phase 2 renders it next to the lock screen's clock over the same picture; the two must
   match apart from size.
@@ -400,12 +402,16 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
 - **Gate:** every test passes. After each one: `Main.modalCount === 0`, no overlay actor left, no
   JS errors in the test shell's log.
 
-### Phase 2: layout and the glass clock
+### Phase 2: layout and the glass clock (done: `docs/nowplaying/shots/phase2-*.png`)
 - **`layout.js`.** It places the clock, the column, the lyrics and the chevron from the monitor's
   size (the §1 sizes at 1440p, scaled by height, clamped for 1080p and 4K), centred as in §1. It has two
   states (two columns and centred) and one blend value between them, so Phase 4 only animates that value.
 - **Placeholders.** Static stand-ins for the cover, the lyrics and the controls.
-- **The clock.** `glassclock.js` (shared) over a temporary flat swirl.
+- **The clock.** `ClockPanes` (shared) over a temporary flat backdrop.
+- **Result.** Every check passes at 2560x1440, 1920x1080 and 3840x2160, in both layouts: the group's
+  middle on the screen's centre to the pixel, rows on the cover's axis, nothing overlapping or off
+  screen, the glass clock painted. Against the mockups the column sits about 22 px higher (centred
+  exactly between the clock and the chevron) and the date is smaller (the lock screen's proportion).
 - **Gate:**
   - Headless screenshots at 2560x1440, 1920x1080 and 3840x2160, in both layouts, compared side by side with the mockups.
   - No overlap and no clipping, by an automated box check (as the lock screen's `addCheck`).
