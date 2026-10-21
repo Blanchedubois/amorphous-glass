@@ -163,9 +163,16 @@ GNOME's own prompt and password check are unchanged. On any fault it falls back 
 The login screen gets the same glass from `scripts/gdm-theme.sh` (optional, needs `sudo`):
 
 - a theme for GDM;
-- a greeter extension with glass account rows and password field.
+- a greeter extension with the glass clock, the widgets, glass account rows and the password field.
 
-Shots of it from a VM are coming.
+**Switch User** on the lock screen leads straight to it. These shots come from a fresh test VM
+(`tools/vm`) installed with `./install.sh`, at 2560x1440.
+
+![The login screen: the glass clock, weather and calendar widgets, and a glass account row](docs/showcase/media/login-screen.webp)
+
+| Switch User on the lock screen | Two accounts | The password |
+|---|---|---|
+| ![The Switch User button beside the lock screen prompt](docs/showcase/media/lock-switch-button.webp) | ![The login screen listing two accounts on glass rows](docs/showcase/media/switch-user.webp) | ![The login screen's glass password field](docs/showcase/media/login-prompt.webp) |
 
 ## Requirements
 
@@ -207,6 +214,11 @@ The installer:
 6. sets up `tahoe-repair` to run at every login.
 
 **Log out and back in** when it finishes: GNOME on Wayland loads new extensions only at login.
+
+Tested from scratch on a fresh Arch Linux VM with GNOME 51.1 (`tools/vm/vm.sh`). The first login after
+the install looks like this, before you add widgets:
+
+![A fresh install after the first login: the glass bar, the glass dock and the Tahoe icons](docs/showcase/media/fresh-install.webp)
 
 Optional steps, after it:
 
