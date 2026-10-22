@@ -94,7 +94,7 @@ async function image(url) {
     // fetched, not Image.decode(): under headless Chromium's virtual time the decode never
     // resolved once the page had done the SDF's work first
     const blob = await (await fetch(url)).blob();
-    return createImageBitmap(blob);
+    return createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
 }
 
 // the loads start before the word's distance field is computed (under headless Chromium's
