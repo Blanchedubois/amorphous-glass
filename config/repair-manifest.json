@@ -188,6 +188,16 @@
    }
   },
   {
+   "id": "A7",
+   "feature": "Login screen extension (system copy) matches this checkout (when installed)",
+   "check": {
+    "type": "system-copy",
+    "path": "/usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe",
+    "repo": "extensions/tahoe-gdm@cachyos-tahoe",
+    "fix": "bash {ROOT}/scripts/gdm-theme.sh install"
+   }
+  },
+  {
    "id": "B1-gtk-light",
    "feature": "GTK3 theme for the mode",
    "check": {
