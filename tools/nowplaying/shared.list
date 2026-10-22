@@ -13,3 +13,7 @@ tahoe-widgets@cachyos-tahoe/music.js music.js
 tahoe-widgets@cachyos-tahoe/glass.js glass.js
 tahoe-widgets@cachyos-tahoe/swirl.js swirl.js
 tahoe-widgets@cachyos-tahoe/icons icons
+# the album-colour swirl as a whole background (the lock screen's music mode)
+tahoe-lockscreen@cachyos-tahoe/bgswirl.js bgswirl.js
+# tahoe-motion's springs (the layout swap, the tilt, the enter and exit)
+tahoe-motion@cachyos-tahoe/spring.js spring.js

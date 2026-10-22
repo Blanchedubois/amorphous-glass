@@ -2,15 +2,18 @@
 // the player column, the lyrics and the chevron, placed by layout.js. The view only draws: player.js
 // tells it what plays (set*), and it reports the controls (onControl).
 //
-// The backdrop has two layers: the wallpaper, blurred, and over it the cover's colours (Phase 4's
-// swirl; until then a still gradient of the same colours). With no cover the colours fade away and
-// the blurred wallpaper is the background (user, 2026-10-21), and the cover's place is a Liquid
-// Glass card with a note. Every glass pane clones the backdrop.
+// The backdrop is the wallpaper, blurred, with the cover's swirl over it (swirl.js). With no cover the
+// swirl fades away and the blurred wallpaper is the background (user, 2026-10-21), and the cover's
+// place is a Liquid Glass card with a note. Every glass pane clones the backdrop.
+//
+// Motion (motion.js, on the frame clock): the layout swap is one spring on the blend; a new cover
+// cross-fades over the old one, which grows from COVER_FROM; a new title slides up and fades in.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GnomeDesktop from 'gi://GnomeDesktop';
+import Graphene from 'gi://Graphene';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
@@ -20,12 +23,18 @@ import {ClockPanes, clockMaterial, FONT as CLOCK_FONT} from './shared/clockpanes
 import {GlassPane} from './shared/paneglass.js';
 import {LyricsView} from './shared/music.js';
 import {geometry} from './layout.js';
+import {EXPRESSIVE} from './shared/spring.js';
+import {Motion} from './motion.js';
+import {Swirl} from './swirl.js';
 import {setSymbol, symbolActor} from './symbols.js';
 
 const WALLPAPER_BLUR = 60;        // logical px at 1440p
 const WALLPAPER_BRIGHTNESS = 0.82;
 const LYRIC_BLUR = 4;             // px for a line one away from the sung one (more further off)
-const FADE_MS = 600;              // the cover's colours in or out over the wallpaper
+const COVER_FADE_MS = 300;        // the old cover fading out over the new one
+const COVER_FROM = 0.97;          // the new cover grows from this
+const TEXT_MS = 300;              // a new title sliding in
+const TEXT_RISE = 8;              // px at 1440p
 const DISABLED = 0.4;             // a control the player does not offer
 
 const interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
@@ -43,8 +52,6 @@ function clock(seconds) {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-const css = rgb => `rgb(${rgb.map(v => Math.round(v * 255)).join(', ')})`;
-
 export class NowPlayingView {
     // parent: the overlay actor (stage-sized); monitor: where the player goes; guard: the overlay's;
     // onControl: (name, value) => void for the controls; onChevron: () => void
@@ -59,6 +66,7 @@ export class NowPlayingView {
         this.parts = {};
         this.controls = {};
 
+        this.motion = new Motion(parent, guard);
         this._buildBackdrop();
         const g = geometry(monitor, 1);
         this._u = g.u;
@@ -96,21 +104,14 @@ export class NowPlayingView {
             brightness: WALLPAPER_BRIGHTNESS,
         }));
         backdrop.add_child(wallpaper);
-
-        // the cover's colours (a stand-in for Phase 4's swirl), faded in only with a cover
-        this._colours = new St.Widget({name: 'tahoe-np-colours', reactive: false, opacity: 0});
-        this._colours.set_size(global.stage.width, global.stage.height);
-        backdrop.add_child(this._colours);
+        // the cover's swirl, over the blur (an effect after it on the same layer)
+        this.swirl = new Swirl(wallpaper, this.motion);
     }
 
     // the cover's swirl palette (four sRGB colours 0..1), or null: the blurred wallpaper alone
     setColours(palette) {
         this.coloursOn = Boolean(palette);
-        if (palette) {
-            this._colours.set_style(`background-gradient-direction: vertical; background-gradient-start: ${css(palette[0])}; background-gradient-end: ${css(palette[2])};`);
-        }
-        this._colours.remove_all_transitions();
-        this._colours.ease({opacity: palette ? 255 : 0, duration: FADE_MS, mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD});
+        this.swirl.setPalette(palette);
     }
 
     // ---- the clock: the lock screen's (ClockPanes, B2 clear blur), the plain labels under it ----
@@ -217,13 +218,9 @@ export class NowPlayingView {
         this._inkedStyle(note, 0.7);
         this._coverGlass.add_child(note);
         cover.add_child(this._coverGlass);
-        this._coverArt = new St.Widget({
-            style_class: 'tahoe-np-cover-art',
-            x_expand: true, y_expand: true,
-            visible: false,
-        });
         this._coverRadius = radius;
-        cover.add_child(this._coverArt);
+        this._coverBox = cover;
+        this._coverArt = null;   // the art shown (an St.Widget), or null: the glass card
 
         const text = (string, extra, alpha) => {
             const l = new St.Label({text: string, style_class: 'tahoe-np-text'});
@@ -355,19 +352,52 @@ export class NowPlayingView {
 
     // ---- what plays ----
 
-    // uri: a file uri for the art, or null: the glass card
+    // uri: a file uri for the art, or null: the glass card. The new one comes in under the old,
+    // growing from COVER_FROM; the old fades out over it and goes.
     setCover(uri) {
-        if (uri === this._coverUri)
+        if (uri === (this._coverUri ?? null))
             return;
+        const first = this._coverUri === undefined;
         this._coverUri = uri;
+        const old = this._coverArt ?? (this._coverGlass.visible ? this._coverGlass : null);
+        let next;
         if (uri) {
-            this._coverArt.set_style(`background-image: url("${uri.replace(/"/g, '%22')}"); background-size: cover; border-radius: ${this._coverRadius}px;`);
-            this._coverArt.show();
-            this._coverGlass.hide();
+            next = new St.Widget({
+                style_class: 'tahoe-np-cover-art',
+                style: `background-image: url("${uri.replace(/"/g, '%22')}"); background-size: cover; border-radius: ${this._coverRadius}px;`,
+                x_expand: true, y_expand: true,
+                pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
+            });
+            this._coverBox.insert_child_below(next, old === this._coverGlass ? null : old);
         } else {
-            this._coverArt.hide();
-            this._coverArt.set_style(null);
-            this._coverGlass.show();
+            next = this._coverGlass;
+            this._coverBox.set_child_below_sibling(next, old && old !== next ? old : null);
+        }
+        this._coverArt = uri ? next : null;
+        next.show();
+        next.opacity = 255;
+        if (first || !Motion.animating || !old || old === next) {
+            if (old && old !== next)
+                this._dropCover(old);
+            return;
+        }
+        next.set_scale(COVER_FROM, COVER_FROM);
+        next.ease({scale_x: 1, scale_y: 1, duration: COVER_FADE_MS + 100, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        old.remove_all_transitions();
+        old.ease({
+            opacity: 0, duration: COVER_FADE_MS, mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+            onStopped: () => this._guard(() => this._dropCover(old)),
+        });
+    }
+
+    // an old cover gone: art is destroyed, the glass card only hidden (it is kept)
+    _dropCover(actor) {
+        if (actor === this._coverGlass) {
+            if (this._coverArt)
+                actor.hide();
+            actor.opacity = 255;
+        } else if (actor !== this._coverArt) {
+            actor.destroy();
         }
     }
 
@@ -375,9 +405,22 @@ export class NowPlayingView {
         return this._coverUri ?? null;
     }
 
+    // a new song's title and artist slide up a little and fade in
     setText(title, artist) {
+        if (title === this._title.text && artist === this._artist.text)
+            return;
+        const first = this._textSet === undefined;
+        this._textSet = true;
         this._title.text = title;
         this._artist.text = artist;
+        if (first || !Motion.animating)
+            return;
+        const rise = Math.round(TEXT_RISE * this._u);
+        for (const [l, delay] of [[this._title, 0], [this._artist, 40]]) {
+            l.remove_all_transitions();
+            l.set({translation_y: rise, opacity: 0});
+            l.ease({translation_y: 0, opacity: 255, duration: TEXT_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        }
     }
 
     setProgress(position, length) {
@@ -477,13 +520,21 @@ export class NowPlayingView {
         const g1 = geometry(this._monitor, 1);
         this._column.translation_x = g.boxes.cover.x - g1.boxes.cover.x;
         this.parts.lyrics.translation_x = g.boxes.lyrics.x - this._lyricsX;
+        // hidden by opacity only (an unallocated, invisible column warns while its lines ease)
         this.parts.lyrics.opacity = Math.round(255 * g.lyricsOpacity);
-        this.parts.lyrics.visible = g.lyricsOpacity > 0;
         this.geometry = g;
     }
 
     get blend() {
         return this._blend;
+    }
+
+    // the layout swap: one spring on the blend (a change mid-way keeps its velocity)
+    animateBlend(target) {
+        if (target === this._blendTarget && (this.motion.value('blend') !== undefined || this._blend === target))
+            return;
+        this._blendTarget = target;
+        this.motion.spring('blend', this._blend, target, EXPRESSIVE.spatial.slow, v => this.setBlend(v));
     }
 
     // every part's box on the stage, as drawn (for the tests' layout checks)
@@ -504,6 +555,7 @@ export class NowPlayingView {
     }
 
     destroy() {
+        this.motion.destroy();
         if (this._wallClock) {
             this._wallClock.disconnect(this._wallClockId);
             this._wallClock.run_dispose();
