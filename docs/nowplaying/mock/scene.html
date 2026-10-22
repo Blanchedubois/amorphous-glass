@@ -1,0 +1,270 @@
+<!doctype html>
+<!-- Now Playing screensaver mockup (docs/NOWPLAYING_PLAN.md, Phase 0), round 2. One parametric
+     scene, rendered by render.sh with headless Chromium at 2560x1440 logical. The cover is original
+     CSS art and the lyrics are made up. The controls are SF Symbols, drawn from the SF Pro font
+     the user has installed (Private Use Area code points, listed in SYMBOLS below).
+     Query: lyrics=0|1  layout=0..1 (0 centred, 1 two columns)  blur=px  swirl=0..1
+            card=none|drop|pour|glass|cover  content=0..1  ui=0..1  tilt=x,y  hover=1  notes=1 -->
+<html><head><meta charset="utf-8"><style>
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 2560px; height: 1440px; overflow: hidden; background: #111; font-family: 'SF Pro Display', sans-serif; color: #fff; }
+#ui { color: rgb(var(--ink)); }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+
+/* ---- the desktop (made up: wallpaper, two windows, the bar, the dock) ---- */
+#desk { position: absolute; inset: 0; }
+#desk .wall { position: absolute; inset: 0; background:
+  radial-gradient(1200px 900px at 20% 30%, #3d6fb0 0%, transparent 70%),
+  radial-gradient(1400px 1000px at 85% 80%, #a14f7c 0%, transparent 70%),
+  radial-gradient(900px 700px at 70% 15%, #e3a35a 0%, transparent 70%),
+  linear-gradient(160deg, #1d2b4a, #3a1f3d); }
+#desk .bar { position: absolute; left: 12px; right: 12px; top: 8px; height: 38px; border-radius: 19px; background: rgba(34,34,38,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); display: flex; align-items: center; padding: 0 22px; font: 600 17px 'SF Pro Text'; gap: 28px; }
+#desk .bar .r { margin-left: auto; }
+#desk .win { position: absolute; left: 380px; top: 170px; width: 1300px; height: 860px; border-radius: 24px; background: #f4f2f0; box-shadow: 0 30px 80px rgba(0,0,0,.45); overflow: hidden; }
+#desk .win .hb { height: 64px; background: #e8e6e3; display: flex; align-items: center; padding: 0 24px; gap: 10px; }
+#desk .win .hb i { width: 14px; height: 14px; border-radius: 50%; background: #ff5f57; display: block; }
+#desk .win .hb i:nth-child(2) { background: #febc2e; } #desk .win .hb i:nth-child(3) { background: #28c840; }
+#desk .win .ln { height: 18px; margin: 34px 60px 0; border-radius: 9px; background: #d9d6d2; }
+#desk .win .ln.s { width: 55%; } #desk .win .ln.m { width: 75%; }
+#desk .win2 { left: 1460px; top: 420px; width: 820px; height: 640px; background: #262629; }
+#desk .win2 .hb { background: #313135; } #desk .win2 .ln { background: #3a3a3f; }
+#desk .dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; height: 92px; width: 860px; border-radius: 28px; background: rgba(34,34,38,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); display: flex; align-items: center; justify-content: space-evenly; }
+#desk .dock b { width: 64px; height: 64px; border-radius: 16px; display: block; background: linear-gradient(135deg, #6aa8ff, #2c62d8); }
+#desk .dock b:nth-child(2n) { background: linear-gradient(135deg, #ffb36b, #f0603a); }
+#desk .dock b:nth-child(3n) { background: linear-gradient(135deg, #8de08a, #2f9b55); }
+
+/* ---- the album-colour swirl: the cover's four colours as soft waves (bgswirl.js) ---- */
+#sw { position: absolute; inset: 0; background: #6a3550; }
+#swirl { position: absolute; inset: -200px; filter: blur(90px) saturate(1.15); }
+#swirl div { position: absolute; border-radius: 50%; }
+#swirl .a { left: 0; top: 0; width: 1700px; height: 1300px; background: #e0743c; }
+#swirl .b { left: 1300px; top: -100px; width: 1800px; height: 1100px; background: #7b2f6e; }
+#swirl .c { left: 200px; top: 900px; width: 1900px; height: 900px; background: #1f6a78; }
+#swirl .d { left: 1700px; top: 800px; width: 1300px; height: 1000px; background: #d9b04a; }
+#swirl .e { left: 800px; top: 400px; width: 1200px; height: 700px; background: #b4475a; transform: rotate(-20deg); }
+#scrim { position: absolute; inset: 0; background: rgba(10, 6, 14, .28); }   /* bgswirl DIM */
+
+/* ---- the widgets' Liquid Glass in DARK mode (docs/STANDARD.md, tokens/glass.json "dark"):
+        tint rgb(34,34,38) at 0.42, 1 px white edge at 0.16, rim light from the top left, edge
+        shadow, drop shadow 0.20, blur 18. A CSS stand-in for the shader. ---- */
+.glass { position: absolute; background: rgba(34,34,38,.42);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), inset 2px 2px 2px -1px rgba(255,255,255,.42),
+    inset -3px -4px 10px rgba(0,0,0,.30), 0 10px 30px rgba(0,0,0,.20); }
+
+/* ---- the clock: the lock screen's glass clock (glassclock.js: Space Grotesk SemiBold, light
+        milky glass, a crisp rim lit from the top left, the date above the time). Stand-in. ---- */
+#date, #clock { position: absolute; left: 0; right: 0; text-align: center; font-family: 'Space Grotesk'; font-weight: 600; }
+#date { top: 64px; font-size: 40px; color: rgba(255,255,255,.55); text-shadow: -1px -1px 0 rgba(255,255,255,.22); }
+#clock { top: 104px; font-size: 150px; line-height: 1; letter-spacing: -1px; color: rgba(255,255,255,.10);
+  -webkit-text-stroke: 1.2px rgba(255,255,255,.40); paint-order: stroke fill;
+  text-shadow: -1px -1px 1px rgba(255,255,255,.18); }
+
+/* ---- the player column: everything centred on the cover's axis ---- */
+#col { position: absolute; top: 320px; width: 560px; text-align: center; }
+#card { position: relative; width: 560px; height: 560px; perspective: 1400px; }
+#tilt { position: absolute; inset: 0; transform-style: preserve-3d; }
+#cover { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 34px 70px rgba(0,0,0,.38), 0 6px 16px rgba(0,0,0,.18);
+  background:
+    radial-gradient(circle at 50% 118%, #ffd36e 0 15%, #ff9a4a 15% 24%, #ef5b45 24% 33%, #b6316a 33% 42%, #5a2b6e 42% 51%, transparent 51%),
+    linear-gradient(180deg, #13304a 0%, #1f5468 45%, #f0b25b 100%); }
+#cover .moon { position: absolute; left: 360px; top: 70px; width: 84px; height: 84px; border-radius: 50%; background: #fff3d6; box-shadow: 0 0 60px #fff3d6aa; }
+#cover .lantern { position: absolute; width: 42px; height: 56px; border-radius: 17px; background: radial-gradient(circle at 50% 40%, #fff2b0, #ff9b3d 70%); box-shadow: 0 0 40px #ffb04caa; }
+#cover .t { position: absolute; left: 32px; bottom: 28px; font: 800 50px/0.95 'SF Pro Display'; letter-spacing: -1px; color: #fff8ec; text-align: left; }
+#sheen { position: absolute; inset: 0; border-radius: 12px; mix-blend-mode: screen; pointer-events: none; }
+#cardglass { inset: -12px; border-radius: 24px; }   /* the pour, and the outline on hover: 12 + 12, the widgets' radius */
+
+#title { margin-top: 40px; font: 700 42px 'SF Pro Display'; }
+#artist { margin-top: 4px; font: 500 34px 'SF Pro Display'; color: rgba(var(--ink),.72); }
+/* the widget's progress (Progress.setInk): a thin track, the ink at 0.22, fill at 0.88 */
+.track { position: relative; height: 8px; border-radius: 4px; background: rgba(var(--ink),.22); }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: rgba(var(--ink),.88); }
+#prog { margin-top: 30px; }
+#prog .times { display: flex; justify-content: space-between; font: 600 21px 'SF Pro Text'; color: rgba(var(--ink),.72); margin-top: 12px; }
+/* the controls: SF Symbols floating on the swirl, no plate; hover = the widget's soft circle */
+.sym { font-family: 'SF Pro Text'; font-weight: 600; line-height: 1; color: rgb(var(--ink)); display: grid; place-items: center; border-radius: 9999px; }
+#ctl { display: flex; align-items: center; justify-content: center; gap: 40px; margin-top: 18px; height: 112px; }
+#ctl .small { font-size: 32px; width: 64px; height: 64px; color: rgba(var(--ink),.72); }
+#ctl .skip { font-size: 52px; width: 96px; height: 96px; }
+#ctl .play { font-size: 72px; width: 112px; height: 112px; }
+#ctl .hover { background: rgba(255,255,255,.14); }
+#vol { display: flex; align-items: center; gap: 22px; margin-top: 22px; }
+#vol .sym { font-size: 28px; color: rgba(var(--ink),.72); }
+#vol .track { flex: 1; }
+
+/* ---- lyrics: the widget's styling (.tahoe-music-lyric: SF Pro Display Bold in the cover's ink;
+        the lines not sung at LINE_SCALE 0.84 and DIM 125/255), larger, with the reference's blur ---- */
+#lyrics { position: absolute; top: 0; bottom: 0; width: 1000px; }
+#lyrics p { position: absolute; left: 0; width: 1000px; font: 700 72px/1.15 'SF Pro Display'; transform-origin: 0 50%; }
+
+/* ---- the chevron: back to the desktop, a capsule of the widgets' dark glass ---- */
+#chev { color: #fff; left: 50%; bottom: 34px; width: 112px; height: 52px; margin-left: -56px; border-radius: 9999px; display: grid; place-items: center; font: 600 26px 'SF Pro Text'; }
+
+.note { position: absolute; font: 600 24px 'SF Pro Text'; color: #fff; background: rgba(0,0,0,.6); padding: 8px 14px; border-radius: 12px; white-space: nowrap; }
+.note.margin { white-space: normal; width: 330px; }
+.note:not(.margin)::before { content: ''; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #ffd34d; left: -18px; top: 50%; margin-top: -5px; box-shadow: 0 0 0 3px rgba(0,0,0,.4); }
+#axis { position: absolute; top: 0; bottom: 0; left: 1279px; width: 2px; background: repeating-linear-gradient(#ffd34d 0 14px, transparent 14px 28px); opacity: .55; }
+</style></head><body>
+<div id="stage">
+  <div id="desk"><div class="wall"></div>
+    <div class="win"><div class="hb"><i></i><i></i><i></i></div><div class="ln m"></div><div class="ln"></div><div class="ln s"></div><div class="ln m"></div><div class="ln"></div><div class="ln s"></div><div class="ln m"></div></div>
+    <div class="win win2"><div class="hb"><i></i><i></i><i></i></div><div class="ln m"></div><div class="ln s"></div><div class="ln"></div><div class="ln s"></div></div>
+    <div class="bar"><span>Activities</span><span>Files</span><span class="r">Tue 21 Oct&nbsp;&nbsp;12:52</span></div>
+    <div class="dock"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+  </div>
+  <div id="sw"><div id="swirl"><div class="a"></div><div class="b"></div><div class="c"></div><div class="d"></div><div class="e"></div></div><div id="scrim"></div></div>
+  <div id="ui">
+    <div id="date">Tue Oct 21</div>
+    <div id="clock">12:52</div>
+    <div id="lyrics"></div>
+    <div id="col">
+      <div id="card"><div id="tilt">
+        <div id="cardglass" class="glass"></div>
+        <div id="cover"><div class="moon"></div>
+          <div class="lantern" style="left:84px;top:140px"></div><div class="lantern" style="left:178px;top:216px;transform:scale(.8)"></div><div class="lantern" style="left:282px;top:170px;transform:scale(.65)"></div><div class="lantern" style="left:470px;top:244px;transform:scale(.7)"></div>
+          <div class="t">PAPER<br>LANTERNS</div></div>
+        <div id="sheen"></div>
+      </div></div>
+      <div id="rest">
+        <div id="title">Paper Lanterns</div>
+        <div id="artist">The Quiet Hours</div>
+        <div id="prog"><div class="track"><div class="fill" style="width:34%"></div></div><div class="times"><span>1:14</span><span>-2:21</span></div></div>
+        <div id="ctl"><span class="sym small" data-s="shuffle"></span><span class="sym skip" data-s="backward.fill"></span><span class="sym play" data-s="pause.fill"></span><span class="sym skip" data-s="forward.fill"></span><span class="sym small" data-s="repeat"></span></div>
+        <div id="vol"><span class="sym" data-s="speaker.fill"></span><div class="track"><div class="fill" style="width:62%"></div></div><span class="sym" data-s="speaker.wave.3.fill"></span></div>
+      </div>
+    </div>
+    <div id="chev" class="glass"><span class="sym" data-s="chevron.down"></span></div>
+  </div>
+  <div id="drop" class="glass" style="display:none"></div>
+  <div id="notes"></div>
+</div>
+<script>
+// SF Symbols in SF Pro (found by shape in this font; the same code points at runtime)
+const SYMBOLS = {
+  'play.fill': 0x100284, 'pause.fill': 0x100286, 'backward.fill': 0x10028a, 'forward.fill': 0x10028c,
+  'shuffle': 0x10029d, 'repeat': 0x10029e, 'speaker.fill': 0x1002a1, 'speaker.wave.3.fill': 0x1002a9,
+  'ellipsis': 0x100360, 'chevron.down': 0x100188,
+};
+document.querySelectorAll('[data-s]').forEach(e => (e.textContent = String.fromCodePoint(SYMBOLS[e.dataset.s])));
+
+// the widget's text colour (palette.js inkColour, white ink): the cover's most colourful colour,
+// very light, with a little of its chroma. Same code as palette.js, over the cover's palette.
+const toLinear = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+const toSrgb = c => c <= 0.0031308 ? 12.92 * c : 1.055 * Math.max(c, 0) ** (1 / 2.4) - 0.055;
+function rgbToLab([r, g, b]) {
+  [r, g, b] = [toLinear(r), toLinear(g), toLinear(b)];
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+function labToRgb([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  const clamp = v => Math.min(1, Math.max(0, toSrgb(v)));
+  return [clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), clamp(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+}
+function inkColour(colours, dark) {
+  const chroma = c => Math.hypot(c[1], c[2]);
+  const pick = colours.reduce((best, c) => chroma(c) > chroma(best) ? c : best);
+  const C = chroma(pick);
+  const [L, maxC] = dark ? [0.27, 0.06] : [0.96, 0.035];
+  if (C < 0.03) return labToRgb([L, 0, 0]);
+  const f = Math.min(C, maxC) / C;
+  return labToRgb([L, pick[1] * f, pick[2] * f]);
+}
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const COVER = ['#e0743c', '#7b2f6e', '#1f6a78', '#d9b04a'].map(h => rgbToLab(hex(h)));   // the swirl's colours
+const INK = inkColour(COVER, false).map(v => Math.round(v * 255)).join(', ');
+document.documentElement.style.setProperty('--ink', INK);
+
+const q = new URLSearchParams(location.search);
+const num = (k, d) => q.has(k) ? parseFloat(q.get(k)) : d;
+const lyricsOn = num('lyrics', 1) > 0;
+const layout = num('layout', lyricsOn ? 1 : 0);
+const blur = num('blur', 0), swirl = num('swirl', 1), content = num('content', 1), ui = num('ui', 1);
+const card = q.get('card') || 'cover';
+
+const d = document.getElementById('desk');
+d.style.filter = `blur(${blur}px) brightness(${1 - Math.min(1, blur / 48) * 0.12})`;
+d.style.transform = blur ? 'scale(1.03)' : '';
+document.getElementById('sw').style.opacity = swirl;
+
+// Centring. With lyrics, the cover column (560) + a gap (200) + the lyrics (1000) are one group
+// centred on the screen: column x 400, lyrics x 1160. Without, the column is centred: x 1000.
+const W = 2560, COL = 560, GAP = 200, LYR = 1000;
+const groupLeft = (W - (COL + GAP + LYR)) / 2;
+const colLeft = (W - COL) / 2 + (groupLeft - (W - COL) / 2) * layout;
+const col = document.getElementById('col');
+col.style.left = `${colLeft}px`;
+
+// lyrics: the sung line level with the middle of the column (the cover's lower half)
+const LINES = ['the porch light burning low', 'so you could find the way back home', 'the river hums a borrowed tune', 'and every window holds the moon', '(hold on, hold on)', 'paper lanterns in the rain', 'we float them out and count to ten'];
+const SUNG = 2;
+const ly = document.getElementById('lyrics');
+ly.style.left = `${groupLeft + COL + GAP}px`;
+const SP = 30, centre = 670;   // a little under the cover's middle (600)
+const ps = LINES.map((t, i) => {
+  const p = document.createElement('p');
+  const a = Math.abs(i - SUNG);
+  p.textContent = t;
+  p.style.transform = a === 0 ? '' : 'scale(0.84)';
+  p.style.filter = a === 0 ? '' : `blur(${Math.min(5, 1 + a * 1.2)}px)`;
+  p.style.opacity = a === 0 ? 1 : (125 / 255) * Math.max(0, 1 - Math.max(0, a - 2) * .5);
+  ly.appendChild(p);
+  return p;
+});
+// measured, so wrapped lines never overlap: the sung line centred on `centre`
+let y = centre - ps[SUNG].offsetHeight / 2;
+for (let i = SUNG - 1; i >= 0; i--) y -= ps[i].offsetHeight + SP;
+ps.forEach(p => { p.style.top = `${y}px`; y += p.offsetHeight + SP; });
+ly.style.opacity = Math.max(0, (layout - 0.5) / 0.5) ** 1.5 * ui;
+ly.style.transform = `translateX(${(1 - layout) * 120}px)`;
+
+for (const id of ['rest', 'clock', 'date', 'chev'])
+  document.getElementById(id).style.opacity = ui;
+document.getElementById('rest').style.transform = `translateY(${(1 - ui) * 40}px)`;
+
+// the cover's way in: a drop of the widgets' dark glass pours into a glass card; the cover fades
+// in inside it and the glass dissolves, leaving the cover by itself
+const cover = document.getElementById('cover');
+const cg = document.getElementById('cardglass');
+const drop = document.getElementById('drop');
+cover.style.opacity = content;
+cover.style.transform = `scale(${0.94 + 0.06 * content})`;
+cg.style.opacity = card === 'glass' ? 1 - content * 0.6 : (q.has('tilt') || q.get('hoverCover') === '1') ? 1 : 0;
+if (card === 'drop' || card === 'pour') {
+  const cx = colLeft + COL / 2, cy = 320 + COL / 2;
+  const s = card === 'drop' ? 120 : 440, r = card === 'drop' ? 60 : 110, dy = card === 'drop' ? -40 : -10;
+  Object.assign(drop.style, {display: 'block', left: `${cx - s / 2}px`, top: `${cy - s / 2 + dy}px`, width: `${s}px`, height: `${s * (card === 'drop' ? 1.08 : 1)}px`, borderRadius: `${r}px`});
+}
+
+if (q.get('hover') === '1')
+  document.querySelector('#ctl .skip:last-of-type').classList.add('hover');
+
+// the 3D tilt: the cover leans toward the pointer, a sheen where the light catches it
+if (q.has('tilt')) {
+  const [px, py] = q.get('tilt').split(',').map(Number);
+  document.getElementById('tilt').style.transform = `rotateX(${-(py - 0.5) * 16}deg) rotateY(${(px - 0.5) * 16}deg) translateZ(20px)`;
+  cover.style.boxShadow = `${(0.5 - px) * 40}px ${34 + (0.5 - py) * 30}px 70px rgba(0,0,0,.42)`;
+  document.getElementById('sheen').style.background = `radial-gradient(circle at ${px * 100}% ${py * 100}%, rgba(255,255,255,.55), rgba(255,255,255,.12) 28%, transparent 55%), linear-gradient(${120 + (px - 0.5) * 60}deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 62%)`;
+  const ptr = document.createElement('div');
+  Object.assign(ptr.style, {position: 'absolute', left: `${colLeft + px * COL}px`, top: `${320 + py * COL}px`});
+  ptr.innerHTML = '<svg width="34" height="46" viewBox="0 0 17 23" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"><path d="M1 1v18l5-5 3.5 7.5 3-1.4L9 12.6h7z" fill="#fff" stroke="#000" stroke-width="1.2"/></svg>';
+  document.getElementById('stage').appendChild(ptr);
+}
+
+if (q.get('notes') === '1') {
+  const notes = document.getElementById('notes');
+  const add = (t, x, yy, margin) => { const n = document.createElement('div'); n.className = margin ? 'note margin' : 'note'; n.textContent = t; n.style.left = x + 'px'; n.style.top = yy + 'px'; notes.appendChild(n); };
+  const axis = document.createElement('div'); axis.id = 'axis'; notes.appendChild(axis);
+  // with lyrics the notes for the column go in the left margin (no dot), else to its right
+  const side = (t, yy) => lyricsOn ? add(t, 24, yy, true) : add(t, 1620, yy);
+  add('the lock screen glass clock: date above, time (light glass)', 1700, 120);
+  side('the cover by itself (24 px corners, soft shadow)', 560);
+  side('thin track as the widget: white 0.22, fill 0.88', 1080);
+  side('SF Symbols floating, no plates', 1220);
+  add('chevron: the widgets\' dark glass', 1340, 1360);
+  if (lyricsOn) add('sung line white; the rest dim, blurred by distance', 1700, 1180);
+  add('screen centre', 1300, 236);
+}
+</script></body></html>

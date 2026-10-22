@@ -272,8 +272,15 @@ class LyricsViewport extends St.Widget {
     }
 });
 
-class LyricsView {
-    constructor() {
+// options (tahoe-nowplaying's full-screen lyrics; the widgets use none of them):
+// labelStyle: CSS for every line (its size), before the ink; blur: px of blur for a line one
+// away from the sung one, more further off (Shell.BlurEffect, 0 = none); anchor: the sung line's
+// middle at this fraction of the view's height (null: the widget's, the line before it at the top)
+export class LyricsView {
+    constructor({labelStyle = '', blur = 0, anchor = null} = {}) {
+        this._labelStyle = labelStyle;
+        this._blur = blur;
+        this._anchor = anchor;
         this.actor = new LyricsViewport({
             style_class: 'tahoe-music-lyrics',
             layout_manager: new Clutter.FixedLayout(),
@@ -298,7 +305,11 @@ class LyricsView {
     // css: (alpha) => colour, or null for the stylesheet's colours
     setInk(css) {
         this._inkStyle = css ? `color: ${css()};` : null;
-        this._labels.forEach(l => l.set_style(this._inkStyle));
+        this._labels.forEach(l => l.set_style(this._style()));
+    }
+
+    _style() {
+        return `${this._labelStyle}${this._inkStyle ?? ''}` || null;
     }
 
     setLines(lines, message) {
@@ -308,8 +319,10 @@ class LyricsView {
         const texts = lines ? lines.map(l => l[1] || '♪') : [message];
         this._labels = texts.map(text => {
             const l = new St.Label({style_class: 'tahoe-music-lyric', text, pivot_point: new Graphene.Point({x: 0, y: 0.5})});
-            l.set_style(this._inkStyle);
+            l.set_style(this._style());
             l.clutter_text.line_wrap = true;
+            if (this._blur > 0)
+                l.add_effect_with_name('blur', new Shell.BlurEffect({mode: Shell.BlurMode.ACTOR, radius: 0, brightness: 1}));
             this._column.add_child(l);
             return l;
         });
@@ -345,12 +358,22 @@ class LyricsView {
             return;
         const lyrics = Boolean(this._lines);
         const top = this._labels[Math.max(0, this._shown - 1)];
-        const y = lyrics && this._shown > 0 && top ? -top.y : 0;
+        let y = lyrics && this._shown > 0 && top ? -top.y : 0;
+        const sung = this._labels[Math.max(0, this._shown)];
+        if (this._anchor !== null && lyrics && sung)
+            y = Math.round(this.actor.height * this._anchor - (sung.y + sung.height / 2));
         this._labels.forEach((l, i) => {
             const away = i - this._shown;
             const current = !lyrics || away === 0;
             const scale = current ? 1 : LINE_SCALE;
             const opacity = Math.abs(away) > NEAR && lyrics ? 0 : current ? 255 : DIM;
+            const blur = l.get_effect('blur');
+            if (blur) {
+                // by distance, at most three steps; off for the sung line and lines out of view
+                const radius = current || Math.abs(away) > NEAR ? 0 : Math.round(this._blur * (1 + 0.55 * (Math.min(3, Math.abs(away)) - 1)));
+                blur.radius = radius;
+                blur.enabled = radius > 0;
+            }
             if (!animate || Math.abs(away) > NEAR) {
                 l.remove_all_transitions();
                 l.set({translation_y: y, scale_x: scale, scale_y: scale, opacity});
