@@ -54,18 +54,34 @@ export class WidgetGlass {
         // Blur My Shell's glass (and its corners) is the box's
         this._copy.set_position(-x, -y);
         this._copy.set_size(this._backdrop.width, this._backdrop.height);
-        this._copy.set_clip(x, y, Math.ceil(this.actor.width), Math.ceil(this.actor.height));
+        // the size this glass is given (its allocation): `width` read mid-relayout is its natural
+        // size, the whole backdrop copy's, which drew the glass out to the screen's edge
+        const box = this.actor.get_allocation_box();
+        this._copy.set_clip(x, y, Math.ceil(box.get_width()), Math.ceil(box.get_height()));
     }
 
     // a parent moved by translation (the layout swap): place the copy again
     place() {
-        this._place();
+        if (!this.destroyed)
+            this._place();
+    }
+
+    // the corners (px), changed on the fly (the enter's circle opening into the cover)
+    set radius(radius) {
+        this._radius = radius;
+        try {
+            this._glass?.rounded.update();
+        } catch {}
+    }
+
+    get radius() {
+        return this._radius;
     }
 
     _build({Pipeline, RoundedPipeline, bms}) {
         const pipeline = new Pipeline(bms._effects_manager, bms._pipelines_manager, PIPELINE, this._copy);
         const rounded = new RoundedPipeline(bms._effects_manager,
-            () => this._radius === 'capsule' ? Math.round(this.actor.height / 2) : this._radius, () => 0);
+            () => this._radius === 'capsule' ? Math.round(this.actor.get_allocation_box().get_height() / 2) : this._radius, () => 0);
         rounded.bind(pipeline, this._copy);
         this._glass = {pipeline, rounded};
         this._place();

@@ -26,7 +26,7 @@ import {geometry} from './layout.js';
 import {EXPRESSIVE} from './shared/spring.js';
 import {Motion} from './motion.js';
 import {Swirl} from './swirl.js';
-import {EdgeFade, GlassEdge} from './effects.js';
+import {EdgeFade, GlassEdge, PourMask, RoundMask} from './effects.js';
 import {WidgetGlass} from './widgetglass.js';
 import {setSymbol, symbolActor} from './symbols.js';
 
@@ -39,8 +39,15 @@ const TEXT_MS = 300;              // a new title sliding in
 const TEXT_RISE = 8;              // px at 1440p
 const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at the top and bottom
 const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
-const EDGE_BAND = 5;              // px at 1440p: the hovered cover's glass edge (a card: 16 read as a thick embossed tile)
+const EDGE_BAND = 6;              // px at 1440p: the hovered cover's clear glass rim (a card: 16 read as a thick embossed tile)
 const EDGE_BEND = 2;              // px the art bends at the very edge
+// the enter (user, 2026-10-21): a circle of the widgets' glass at the cover's centre springs open into
+// the cover's shape, and once it is full size the cover fades in on it, as one piece
+const POUR_FROM = 64;             // px at 1440p: the circle's diameter
+const POUR_DELAY = 90;            // ms after opening (the view is fading in)
+const POUR = {damping: 0.72, stiffness: 260};   // a liquid spring; the glass never passes the cover
+const FULL_AT = 0.995;            // of the way open: full size, the cover fades in
+const ART_FADE_MS = 360;
 const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
 const TILT_LIFT = 10;             // px toward the viewer while hovered
 const DISABLED = 0.4;             // a control the player does not offer
@@ -83,6 +90,9 @@ export class NowPlayingView {
         this._buildColumn(g);
         this._buildLyrics(g);
         this._buildChevron(g, onChevron);
+        // the column and the lyrics stay hidden until the layout is decided (enter())
+        this._gate = 0;
+        this._column.opacity = 0;
         this.setBlend(1);
     }
 
@@ -226,6 +236,18 @@ export class NowPlayingView {
         cover.add_child(tilt);
         this._tilt = tilt;
 
+        // the glass the cover is set in: the widgets' Liquid Glass, the cover's size, seen only
+        // through the hovered cover's clear rim
+        this._edgeGlass = this._glassCard(radius);
+        this._edgeGlass.set_size(cw, ch);
+        // only inside the cover's rounded shape: the glass's own drop shadow would show past it.
+        // The clip keeps the masked area exactly the cover's (the shadow would widen it), the mask
+        // cuts its corners round
+        this._edgeGlass.clip_to_allocation = true;
+        this._edgeGlass.add_effect_with_name('round', new RoundMask(radius));
+        this._edgeGlass.opacity = 0;
+        tilt.add_child(this._edgeGlass);
+
         const stack = new St.Widget({layout_manager: new Clutter.BinLayout()});
         stack.set_size(cw, ch);
         tilt.add_child(stack);
@@ -359,6 +381,91 @@ export class NowPlayingView {
         track._fill.set_size(Math.round(track._bar.width * Math.min(1, Math.max(0, fraction))), track._bar.height);
     }
 
+    // ---- the enter: the cover pours out of a circle of glass ----
+    enter() {
+        const stack = this._coverBox;
+        if (this._entered)
+            return;
+        this._entered = true;
+        // the column and the lyrics fade in where the layout put them
+        this.motion.spring('gate', 0, 1, EXPRESSIVE.effects.slow, v => {
+            this._gate = Math.min(1, Math.max(0, v));
+            this._column.opacity = Math.round(255 * this._gate);
+            this.setBlend(this._blend);
+        });
+        if (!Motion.animating)
+            return;
+        const cw = this.parts.cover.width, ch = this.parts.cover.height;
+        const d0 = Math.round(POUR_FROM * this._u);
+        stack.opacity = 0;
+        // the glass is the cover's size from the start (Blur My Shell builds it once); a mask cuts
+        // the opening shape out of it, from a circle at the centre into the cover's shape
+        const drop = this._glassCard(this._coverRadius);
+        drop.set_size(cw, ch);
+        drop.clip_to_allocation = true;
+        const mask = new PourMask();
+        drop.add_effect_with_name('pour', mask);
+        drop.opacity = 0;
+        this._tilt.insert_child_below(drop, stack);
+        this._drop = drop;
+        this.entering = true;
+        const shape = (w, h, r) => {
+            this._dropShape = {width: w, height: h, radius: r};
+            mask.window = [(cw - w) / 2, (ch - h) / 2, w, h];
+            mask.radius = r;
+            mask.queue_repaint();
+        };
+        shape(d0, d0, d0 / 2);
+        const finish = () => {
+            if (this._drop === drop) {
+                this._drop = null;
+                drop.destroy();
+            }
+            this.entering = false;
+            this._dropShape = null;
+            // a pointer that waited over the cover now tilts it
+            if (this.parts.cover.hover && this._pointer)
+                this._tiltAt(...this._pointer);
+        };
+        let full = false;
+        this._pourId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, POUR_DELAY, () => {
+            this._pourId = 0;
+            this._guard(() => {
+                drop.opacity = 255;
+                this.motion.spring('pour', 0, 1, POUR, v => {
+                    if (this._drop !== drop)
+                        return;
+                    // never past the cover: a rim of glass would show around the art
+                    const t = Math.min(1, v);
+                    const w = d0 + (cw - d0) * t, h = d0 + (ch - d0) * t;
+                    // round while small, the cover's corners once open
+                    const k = Math.min(1, Math.max(0, (t - 0.25) / 0.75));
+                    const r = Math.min(w, h) / 2 + (this._coverRadius - Math.min(w, h) / 2) * k * k * (3 - 2 * k);
+                    shape(w, h, r);
+                    if (!full && t >= FULL_AT) {
+                        // full size: the cover fades in on the glass; the glass, exactly under it,
+                        // goes once the cover is opaque (nothing to see change)
+                        full = true;
+                        shape(cw, ch, this._coverRadius);
+                        mask.rim = 0;   // the glass's own edge from here
+                        stack.ease({
+                            opacity: 255, duration: ART_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                            onStopped: () => this._guard(finish),
+                        });
+                    }
+                });
+            });
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // the enter's state (for the tests)
+    get pour() {
+        const d = this._drop;
+        const sh = this._dropShape;
+        return d && sh ? {width: sh.width, height: sh.height, radius: sh.radius, opacity: d.opacity, art: this._coverBox.opacity} : null;
+    }
+
     // a card of the widgets' glass (widgetglass.js), the CSS stand-in until Blur My Shell's is there
     _glassCard(radius) {
         const card = new St.Widget({
@@ -384,7 +491,14 @@ export class NowPlayingView {
         if (!ok)
             return Clutter.EVENT_PROPAGATE;
         const w = this.parts.cover.width, h = this.parts.cover.height;
-        const px = Math.min(1, Math.max(0, x / w)), py = Math.min(1, Math.max(0, y / h));
+        this._pointer = [Math.min(1, Math.max(0, x / w)), Math.min(1, Math.max(0, y / h))];
+        // no tilt while the cover pours in; it starts from here once it has (enter's finish)
+        if (!this.entering)
+            this._tiltAt(...this._pointer);
+        return Clutter.EVENT_PROPAGATE;
+    }
+
+    _tiltAt(px, py) {
         const m = this.motion, t = this._tilt;
         const token = EXPRESSIVE.spatial.default;
         // the side under the pointer goes down, the far side comes up
@@ -401,6 +515,9 @@ export class NowPlayingView {
     }
 
     _untilt() {
+        this._pointer = null;
+        if (this.entering)
+            return Clutter.EVENT_PROPAGATE;
         const m = this.motion, t = this._tilt;
         const token = EXPRESSIVE.spatial.default;
         m.spring('tilt-x', t.rotation_angle_x, 0, token, v => this._lean('x', v));
@@ -424,6 +541,7 @@ export class NowPlayingView {
     _edgeTo(target) {
         this.motion.spring('edge', this._edge.strength, target, EXPRESSIVE.effects.default, v => {
             this._edge.strength = Math.min(1, Math.max(0, v));
+            this._edgeGlass.opacity = Math.round(255 * this._edge.strength);
             this._edge.queue_repaint();
         });
     }
@@ -625,7 +743,7 @@ export class NowPlayingView {
         this._column.translation_x = g.boxes.cover.x - g1.boxes.cover.x;
         this.parts.lyrics.translation_x = g.boxes.lyrics.x - this._lyricsX;
         // hidden by opacity only (an unallocated, invisible column warns while its lines ease)
-        this.parts.lyrics.opacity = Math.round(255 * g.lyricsOpacity);
+        this.parts.lyrics.opacity = Math.round(255 * g.lyricsOpacity * this._gate);
         this.geometry = g;
         // the cover's glass follows the column's translation
         for (const glass of this._glasses ?? [])
@@ -662,6 +780,9 @@ export class NowPlayingView {
     }
 
     destroy() {
+        if (this._pourId)
+            GLib.source_remove(this._pourId);
+        this._pourId = 0;
         this.motion.destroy();
         if (this._wallClock) {
             this._wallClock.disconnect(this._wallClockId);

@@ -110,13 +110,24 @@ export class Overlay {
             onControl: (name, value) => this._act(name, value),
             onChevron: () => this.close(),
         });
-        // the layout the lyrics decide: at once while the view is built, on a spring after
-        let built = false;
+        // the layout the lyrics decide. The first decision (at once for a known song, else when its
+        // lyrics are found or after a short wait) places the column and starts the enter (the cover
+        // pouring out of glass); later ones move it on a spring
+        let decided = false;
         this.player = new PlayerController(this.view, {
             guard: fn => this.guard(fn),
-            onLayout: blend => built ? this.view?.animateBlend(blend) : this.view?.setBlend(blend),
+            onLayout: blend => {
+                if (!this.view)
+                    return;
+                if (decided) {
+                    this.view.animateBlend(blend);
+                    return;
+                }
+                decided = true;
+                this.view.setBlend(blend);
+                this.view.enter();
+            },
         });
-        built = true;
 
         this._accelerators = this._settings.get_strv('toggle').map(parseAccelerator).filter(Boolean);
         this._connect(actor, 'key-press-event', (_a, event) => this._onKey(event));
