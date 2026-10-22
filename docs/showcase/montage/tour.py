@@ -173,7 +173,7 @@ def render_cuts(args, pts, enc, out_size):
     screen's edge, with motion blur along the camera's path. A clip may open with a push-in ("from_zoom",
     over "push" s: from the whole screen onto the cursor) or close with a pull-out ("to_zoom", over
     "pull" s): transitions inside the clip, eased, the camera's centre gliding between the screen's
-    middle and the cursor with the zoom"""
+    middle and the cursor with the zoom. "hold" keeps the camera still on one point instead"""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import edit
     clips = json.loads(args.cuts.read_text())['clips']
@@ -199,6 +199,10 @@ def render_cuts(args, pts, enc, out_size):
         for n, im in enumerate(frames(source, c['in'], c['out'] - c['in'] + 0.1)):
             if n >= count:
                 break
+            # a lock screen take as a clip of its own (placed anywhere, not only at the end): its stray
+            # top bar pill painted out, as --lock does
+            if c.get('unpill'):
+                im = unpill(im, args.lock_mask)
             t_in, t_out = n * dt, (count - 1 - n) * dt
             z = z_clip
             if 'from_zoom' in c and t_in < c.get('push', 0.8):
@@ -214,6 +218,10 @@ def render_cuts(args, pts, enc, out_size):
                 mid = np.array([W / 2, H / 2])
                 here = mid + w * (edit.position(cpts, t) - mid)
                 before = mid + w * (edit.position(cpts, t - edit.SHUTTER * dt) - mid)
+                # "hold": [x, y] in the recording: the camera stays still there and the cursor moves
+                # in the frame (user, 2026-10-22: the cover's tilt is hard to see while it follows)
+                if 'hold' in c:
+                    here = before = np.array(c['hold'], dtype=float)
                 moved = float(np.hypot(*(here - before)))
                 samples = 1 if args.draft or moved < 0.75 or moved > edit.JUMP else int(min(edit.MAX_SAMPLES, max(3, moved / 4)))
                 centres = [tuple(before + (here - before) * k / max(1, samples - 1)) for k in range(samples)]
