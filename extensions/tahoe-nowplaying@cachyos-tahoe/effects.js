@@ -1,5 +1,7 @@
-// Two small shaders of the view, each an OffscreenEffect with one Cogl snippet per module (not one
-// per instance: every new snippet is a new GL program, and the view is opened many times).
+// The view's shaders, each an OffscreenEffect with one Cogl snippet per module (not one per
+// instance: every new snippet is a new GL program, and the view is opened many times). Each samples
+// its texture with linear filtering (an offscreen effect's own is nearest: anything sampled off the
+// pixel grid, a bent rim or a leaning card, came out blocky).
 //
 // EdgeFade (user, 2026-10-21): the lyrics do not stop at a hard edge; toward the top and bottom of
 // their column they blur more and more (a Gaussian-like disc of samples, its radius growing) and fade
@@ -74,6 +76,7 @@ class TahoeNpEdgeFade extends Clutter.OffscreenEffect {
             pipeline.add_snippet(fadeSnippet);
             pipeline._tahoeNpFade = true;
         }
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
         const actor = this.get_actor();
         const w = Math.max(1, actor.width), h = Math.max(1, actor.height);
         const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
@@ -187,6 +190,7 @@ class TahoeNpGlassEdge extends Clutter.OffscreenEffect {
             pipeline.add_snippet(edgeSnippet);
             pipeline._tahoeNpEdge = true;
         }
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
         const actor = this.get_actor();
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
@@ -240,12 +244,101 @@ class TahoeNpRoundMask extends Clutter.OffscreenEffect {
             pipeline.add_snippet(maskSnippet);
             pipeline._tahoeNpMask = true;
         }
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
         const actor = this.get_actor();
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
         set('rm_w', Math.max(1, actor.width * scale));
         set('rm_h', Math.max(1, actor.height * scale));
         set('rm_radius', this.radius * scale);
+        super.vfunc_paint_target(node, paintContext);
+    }
+});
+
+// ---- Tilt: the cover leaning in 3D, drawn by a shader so its edges stay anti-aliased ----
+// Rotating actors in 3D draws their outline without anti-aliasing (the compositor has no MSAA) and
+// resamples the art at an angle: the tilted cover looked pixelated (user, 2026-10-21). Here the
+// actors stay flat; this effect draws them as one card leaning by (ax, ay) and lifted toward the
+// viewer, with the stage's perspective (60 degrees, as Clutter's): for each pixel it casts a ray from
+// the eye to the card's plane and samples the flat picture there, with linear filtering, so the
+// card's outline is its own anti-aliased rounded edge, smooth at any angle.
+
+const TILT_DECLARATIONS = `
+uniform float tl_w;
+uniform float tl_h;
+uniform float tl_ax;      // radians about the horizontal axis
+uniform float tl_ay;      // radians about the vertical axis
+uniform float tl_eye;     // px from the eye to the screen
+uniform float tl_lift;    // px toward the eye
+
+// the flat picture's colour seen at screen point P (px from the centre) on the leaning card
+vec4 tl_sample(vec2 P, vec2 size, vec3 ax, vec3 ay, vec3 az) {
+    vec3 eye = vec3(0.0, 0.0, tl_eye);
+    vec3 dir = vec3(P, 0.0) - eye;
+    vec3 o = vec3(0.0, 0.0, tl_lift);
+    float t = dot(az, o - eye) / dot(az, dir);
+    vec3 X = eye + t * dir - o;
+    vec2 src = (vec2(dot(X, ax), dot(X, ay)) + 0.5 * size) / size;
+    if (src.x < 0.0 || src.y < 0.0 || src.x > 1.0 || src.y > 1.0)
+        return vec4(0.0);
+    return texture2D(cogl_sampler0, src);
+}
+`;
+// four samples a pixel, on a rotated grid (4x supersampling): the outline and the 1 px rim lines
+// stay smooth at any lean, where one sample a pixel broke them into steps
+const TILT_SHADER = `
+    vec2 uv = cogl_tex_coord0_in.st;
+    vec2 size = vec2(tl_w, tl_h);
+    vec2 P = uv * size - 0.5 * size;
+    float cx = cos(tl_ax), sx = sin(tl_ax), cy = cos(tl_ay), sy = sin(tl_ay);
+    // R = Ry(ay) * Rx(ax); its columns are the card's axes in the world
+    vec3 ax = vec3(cy, 0.0, -sy);
+    vec3 ay = vec3(sy * sx, cx, cy * sx);
+    vec3 az = vec3(sy * cx, -sx, cy * cx);
+    vec4 col = 0.25 * (tl_sample(P + vec2(-0.125, -0.375), size, ax, ay, az) +
+                       tl_sample(P + vec2( 0.375, -0.125), size, ax, ay, az) +
+                       tl_sample(P + vec2( 0.125,  0.375), size, ax, ay, az) +
+                       tl_sample(P + vec2(-0.375,  0.125), size, ax, ay, az));
+    cogl_color_out = col * cogl_color_in.a;
+`;
+
+let tiltSnippet = null;
+
+export const Tilt = GObject.registerClass(
+class TahoeNpTilt extends Clutter.OffscreenEffect {
+    _init() {
+        super._init();
+        this.ax = 0;     // degrees
+        this.ay = 0;
+        this.lift = 0;   // logical px
+        tiltSnippet ??= (() => {
+            const s = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, TILT_DECLARATIONS, null);
+            s.set_replace(TILT_SHADER);
+            return s;
+        })();
+    }
+
+    vfunc_paint_target(node, paintContext) {
+        const pipeline = this.get_pipeline();
+        if (!pipeline)
+            return;
+        if (!pipeline._tahoeNpTilt) {
+            pipeline.add_snippet(tiltSnippet);
+            pipeline._tahoeNpTilt = true;
+        }
+        // linear filtering every time (the offscreen pipeline's own setting is nearest)
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
+        const actor = this.get_actor();
+        const k = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const rad = Math.PI / 180;
+        const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
+        set('tl_w', Math.max(1, actor.width * k));
+        set('tl_h', Math.max(1, actor.height * k));
+        set('tl_ax', this.ax * rad);
+        set('tl_ay', this.ay * rad);
+        // the stage's perspective: 60 degrees across its height
+        set('tl_eye', global.stage.height * k / 2 / Math.tan(30 * rad));
+        set('tl_lift', this.lift * k);
         super.vfunc_paint_target(node, paintContext);
     }
 });
@@ -307,6 +400,7 @@ class TahoeNpPourMask extends Clutter.OffscreenEffect {
             pipeline.add_snippet(pourSnippet);
             pipeline._tahoeNpPour = true;
         }
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
         const actor = this.get_actor();
         const k = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
@@ -375,6 +469,7 @@ class TahoeNpSheen extends Clutter.OffscreenEffect {
             pipeline.add_snippet(sheenSnippet);
             pipeline._tahoeNpSheen = true;
         }
+        pipeline.set_layer_filters(0, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
         const actor = this.get_actor();
         const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
         set('sh_w', Math.max(1, actor.width));
