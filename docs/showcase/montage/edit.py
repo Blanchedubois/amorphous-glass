@@ -22,6 +22,8 @@ Per shot:
   in, len        where in the clip the shot starts, and its length (s)
   cursor         [x, y]: where the cursor is when the source has none (a still, the lock screen)
   dissolve       frames of cross-dissolve from the previous shot (default 0: a cut)
+  zoom           this shot's zoom instead of the montage's (1: the whole screen; the lock screen,
+                 user 2026-10-21: "make that full screen"); a cut, never a zoom move
 """
 
 import argparse
@@ -196,7 +198,7 @@ def main():
                             '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', args.output], stdin=subprocess.PIPE)
     total, previous = 0, None
     for shot in shots:
-        count, previous = render_shot(shot, args.sources, args.work, edit.get('zoom', 1.6), out_size,
+        count, previous = render_shot(shot, args.sources, args.work, shot.get('zoom', edit.get('zoom', 1.6)), out_size,
                                       args.draft, enc.stdin, previous)
         total += count
     enc.stdin.close()
