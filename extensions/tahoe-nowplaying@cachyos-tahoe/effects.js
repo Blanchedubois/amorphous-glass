@@ -5,11 +5,10 @@
 // their column they blur more and more (a Gaussian-like disc of samples, its radius growing) and fade
 // to nothing, as Apple Music's.
 //
-// GlassEdge (user, 2026-10-21): while hovered, the cover's own edge is Liquid Glass, as if the art
-// were printed on a thick glass tile: near the edge the art bends a little toward the outside (a
-// round bevel), a rim light lit from the light's side, an edge shadow on the far side and the
-// widgets' 1 px white edge, in the widgets' dark-mode numbers (docs/STANDARD.md). The light moves
-// with the tilt, so the lit side of the edge follows the cover as it leans.
+// GlassEdge (user, 2026-10-21): while hovered, the cover is a thick Liquid Glass tile lit from above
+// the pointer: its face reflects the light softly, its rounded bevel catches a glint and falls into
+// shade (the thickness), with the widgets' rim light, edge shadow and 1 px edge (a flat reflection
+// over the art alone made the cover look flat, user 2026-10-21).
 //
 // Sheen: the light on the cover while it tilts: a soft highlight that follows the pointer and a
 // faint diagonal band that slides with the tilt, cut to the cover's rounded shape (an exact signed
@@ -94,38 +93,70 @@ uniform float ge_radius;
 uniform float ge_band;        // px of bevel inside the edge
 uniform float ge_bend;        // px the art is pushed at the very edge
 uniform float ge_strength;    // 0: the plain cover
-uniform float ge_lx;          // the light's direction (toward the light), unit
-uniform float ge_ly;
+uniform float ge_px;          // the light: above the pointer, 0..1 of the cover
+uniform float ge_py;
 
 float ge_sdf(vec2 p) {
     vec2 q = abs(p - 0.5 * vec2(ge_w, ge_h)) - (0.5 * vec2(ge_w, ge_h) - ge_radius);
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - ge_radius;
 }
 `;
+// The cover as a thick glass tile lit by one light above the pointer: a flat face and a rounded
+// bevel at the edge. The face shows a soft reflection of the light; the bevel, sloping away,
+// catches a sharp glint where it faces the light and falls into shade where it faces away, which
+// is what reads as thickness. Over that, the widgets' glass edge: rim light, edge shadow, 1 px
+// white edge (docs/STANDARD.md dark numbers), and the art bent slightly at the rim.
 const EDGE_SHADER = `
     vec2 uv = cogl_tex_coord0_in.st;
     vec2 size = vec2(ge_w, ge_h);
     vec2 p = uv * size;
-    float d = -ge_sdf(p);                         // px inside the edge
+    float d = -ge_sdf(p);                               // px inside the edge
     vec2 n = vec2(ge_sdf(p + vec2(1.0, 0.0)) - ge_sdf(p - vec2(1.0, 0.0)),
                   ge_sdf(p + vec2(0.0, 1.0)) - ge_sdf(p - vec2(0.0, 1.0)));
-    n = length(n) > 0.0001 ? normalize(n) : vec2(0.0);   // pointing outward
+    n = length(n) > 0.0001 ? normalize(n) : vec2(0.0);  // in the plane, pointing outward
     float x = clamp(1.0 - d / ge_band, 0.0, 1.0);       // 1 at the edge, 0 past the bevel
-    float dome = 1.0 - sqrt(max(1.0 - x * x, 0.0));     // steep only near the edge
-    // the art bends toward the outside near the edge (a lens at the rim)
+    float dome = 1.0 - sqrt(max(1.0 - x * x, 0.0));     // the bevel's drop: steep only at the edge
+    // the art, bent slightly outward at the rim (a lens)
     vec2 off = -n * dome * ge_bend * ge_strength / size;
     vec4 c = texture2D(cogl_sampler0, uv + off);
     float a = texture2D(cogl_sampler0, uv).a;
     vec3 rgb = c.a > 0.004 ? c.rgb / c.a : vec3(0.0);
-    // the light: the rim facing it lit (0.55 over 0.45 of the band), the far side shaded
-    // (0.30 over 0.20), as the widgets' glass; the 1 px white edge at 0.16
-    float facing = dot(n, vec2(ge_lx, ge_ly));
+
+    // the surface normal: up on the face, tilting outward over the bevel
+    float slope = x / sqrt(max(1.0 - x * x, 0.04));
+    vec3 N = normalize(vec3(n * slope * ge_strength, 1.0));
+    // two views of one light: for the face, a lamp just above the pointer (its reflection sits under
+    // the pointer); for the bevel, the light coming from the pointer's side of the cover, so the
+    // edges nearest the pointer catch it and the far ones fall into shade
+    vec2 ptr = vec2(ge_px, ge_py);
+    vec3 V = vec3(0.0, 0.0, 1.0);
+    float lift = 0.55 * max(size.x, size.y);
+    vec3 Lp = normalize(vec3(ptr * size - p, lift));
+    vec2 side = ptr - 0.5;
+    side = length(side) > 0.001 ? normalize(side) * min(1.0, 2.0 * length(side)) : vec2(0.0);
+    vec3 L = normalize(vec3(side * 0.85, 0.55));
+    float onBevel = smoothstep(0.02, 0.25, x);
+    // the face: a soft, broad reflection; the bevel: a sharp glint
+    float faceSpec = 0.22 * pow(max(dot(V, normalize(Lp + V)), 0.0), 18.0) * (1.0 - onBevel);
+    float bevelSpec = 0.85 * pow(max(dot(N, normalize(L + V)), 0.0), 40.0) * onBevel;
+    // the bevel turned from the light is darker than the face, turned to it a little lighter
+    float turn = dot(N, L) - dot(V, L);
+    float shadeBevel = 0.55 * max(-turn, 0.0) * onBevel;
+    float lightBevel = 0.25 * max(turn, 0.0) * onBevel;
+
+    // the widgets' glass edge, its light on the side of the edge facing the light
+    float facing = length(side) > 0.001 ? dot(n, normalize(side)) : 0.0;
     float rimBand = 1.0 - smoothstep(0.0, 0.45 * ge_band, d);
     float aoBand = 1.0 - smoothstep(0.0, 0.20 * ge_band, d);
     float hair = 1.0 - smoothstep(0.6, 1.4, d);
-    float lift = (0.55 * rimBand * max(facing, 0.0) + 0.16 * hair) * ge_strength;
-    float shade = 0.30 * aoBand * max(-facing, 0.0) * ge_strength;
-    rgb = rgb * (1.0 - shade) + (1.0 - rgb) * lift;
+    float rim = 0.55 * rimBand * max(facing, 0.0) + 0.16 * hair;
+    float ao = 0.30 * aoBand * max(-facing, 0.0);
+
+    float k = ge_strength;
+    float shade = clamp((shadeBevel + ao) * k, 0.0, 0.85);
+    float light = clamp((faceSpec + bevelSpec + lightBevel + rim) * k, 0.0, 1.0);
+    rgb = rgb * (1.0 - shade);
+    rgb = rgb + (1.0 - rgb) * light;
     cogl_color_out = vec4(rgb * a, a) * cogl_color_in.a;
 `;
 
@@ -140,7 +171,7 @@ class TahoeNpGlassEdge extends Clutter.OffscreenEffect {
         this.band = band;
         this.bend = bend;
         this.strength = 0;
-        this.light = [-Math.SQRT1_2, -Math.SQRT1_2];   // from the top left
+        this.pointer = [0.25, 0.25];   // the light, above this point of the cover (0..1)
         edgeSnippet ??= (() => {
             const s = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, EDGE_DECLARATIONS, null);
             s.set_replace(EDGE_SHADER);
@@ -165,8 +196,8 @@ class TahoeNpGlassEdge extends Clutter.OffscreenEffect {
         set('ge_band', this.band);
         set('ge_bend', this.bend);
         set('ge_strength', this.strength);
-        set('ge_lx', this.light[0]);
-        set('ge_ly', this.light[1]);
+        set('ge_px', this.pointer[0]);
+        set('ge_py', this.pointer[1]);
         super.vfunc_paint_target(node, paintContext);
     }
 });
