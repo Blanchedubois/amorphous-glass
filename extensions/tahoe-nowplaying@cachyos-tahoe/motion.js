@@ -57,6 +57,21 @@ export class Motion {
         return this._springs.get(name)?.spring.value;
     }
 
+    // a running spring's {value, velocity, target}, or null when it has settled (or never ran)
+    state(name) {
+        const sp = this._springs.get(name)?.spring;
+        return sp ? {value: sp.value, velocity: sp.velocity, target: sp.target} : null;
+    }
+
+    // ends a spring where it is going, at once (its last sub-pixel wobble is not worth waiting for)
+    stop(name) {
+        const entry = this._springs.get(name);
+        if (!entry)
+            return;
+        this._springs.delete(name);
+        entry.apply(entry.spring.target);
+    }
+
     // fn(dt) each frame until it returns false
     task(fn) {
         this._tasks.add(fn);

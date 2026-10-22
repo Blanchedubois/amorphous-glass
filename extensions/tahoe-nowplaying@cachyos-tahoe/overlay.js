@@ -23,7 +23,7 @@ import {Action, decide, parseAccelerator} from './keys.js';
 import {PlayerController} from './player.js';
 import {NowPlayingView} from './view.js';
 
-const ENTER_MS = 500;   // the view fading in (slow on purpose: it is cosmetic)
+const ENTER_MS = 300;   // the view fading in
 const EXIT_MS = 200;
 const WATCHDOG_MS = 3000;
 

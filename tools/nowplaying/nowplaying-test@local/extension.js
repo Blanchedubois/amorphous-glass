@@ -963,10 +963,22 @@ test('enter: the cover pours out of a circle of glass, then the art fades in', a
     await sleep(600);
     ext().toggle();
     const samples = [];
+    const opened = GLib.get_monotonic_time();
+    let enterEnd = null, firstDrop = null, landed = null, artStart = null;
     const paintId = global.stage.connect('after-paint', () => {
-        const p = ext().overlay?.view?.pour;
-        if (p)
+        const view = ext().overlay?.view;
+        const p = view?.pour;
+        if (p) {
             samples.push(p);
+            if (p.opacity > 0 && firstDrop === null)
+                firstDrop = GLib.get_monotonic_time() - opened;
+            if (Math.abs(p.dy ?? 1) < 0.5 && landed === null)
+                landed = GLib.get_monotonic_time() - opened;
+            if (p.art > 0 && artStart === null)
+                artStart = GLib.get_monotonic_time() - opened;
+        }
+        if (enterEnd === null && samples.length && view && !view.entering)
+            enterEnd = GLib.get_monotonic_time() - opened;
     });
     try {
         await sleep(3800);
@@ -990,6 +1002,8 @@ test('enter: the cover pours out of a circle of glass, then the art fades in', a
     expect(!early, `the cover started to fade in before the glass had settled on its shape: ${JSON.stringify(early)}`);
     expect(!v.pour && v._coverBox.opacity === 255, `after the enter: pour ${JSON.stringify(v.pour)}, art ${v._coverBox.opacity}`);
     const tallest = samples.reduce((m, p) => Math.max(m, p.height), 0);
+    append('timing.jsonl', JSON.stringify({test: 'enter', ms: Math.round((enterEnd ?? 0) / 1000)}));
+    log(`  enter: drop ${((firstDrop ?? 0) / 1000).toFixed(0)} ms, landed ${((landed ?? 0) / 1000).toFixed(0)} ms, cover fading in ${((artStart ?? 0) / 1000).toFixed(0)} ms, in place ${((enterEnd ?? 0) / 1000).toFixed(0)} ms after the hotkey`);
     log(`  pour: ${samples.length} frames, from ${first.width.toFixed(0)} px round, overshooting to ${widest.toFixed(0)} x ${tallest.toFixed(0)} px (cover ${cover})`);
     ext().overlay.close();
     await sleep(SETTLE);
