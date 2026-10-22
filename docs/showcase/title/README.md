@@ -11,7 +11,7 @@ storyboard and decisions are in [PLAN.md](PLAN.md).
 | `scene.glsl` | pass 1: wallpaper or plate under the camera, the word, the melt |
 | `glass.glsl` | pass 2: the Blur My Shell refraction recipe (`config/bms-tahoe-glass.patch`, `glass_params()`), clear |
 | `render.py` | stills, MP4 and looping WebP, through headless Chromium and ffmpeg; `--scene glass` for the glass title |
-| `glass/` | the second title (2026-10-22, [PLAN-glass-title.md](PLAN-glass-title.md)): the words as liquid glass, formed from a drop that falls in and spreads out; `sdf.js` (the word's distance field), `blur.glsl` (the frost), `glass.glsl` (the lock clock's material with the widgets' edge), its own `timeline.js` |
+| `glass/` | the second title (2026-10-22, [PLAN-glass-title.md](PLAN-glass-title.md)): the words as liquid glass, sharpening in out of a blur and softening out; `sdf.js` (the word's distance field), `blur.glsl` (the frost, and the word's blur), `glass.glsl` (the lock clock's material with the widgets' edge and a slight bend), its own `timeline.js` |
 | `fonts/` | Space Grotesk (SIL OFL 1.1) |
 | `plates/` | the wallpaper and the stand-in montage frames, with their credits |
 

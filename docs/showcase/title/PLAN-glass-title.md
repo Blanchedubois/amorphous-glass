@@ -1,4 +1,10 @@
-# Glass title: "amorphous glass" formed from a drop of liquid glass (plan)
+# Glass title: "amorphous glass" in liquid glass (plan)
+
+**Where it ended up (2026-10-22, phase 5):** after seeing the drop, the bounce and the morph, the
+user asked for something cleaner: the glass word now comes in out of a Gaussian blur (sharpening as
+it fades in, as the Now Playing cover does) and goes out the same way, with a slight refraction at
+the letters' edges. The drop and the morph below are kept as the record of how it got there; their
+code is in git history (commits up to "a cleaner morph").
 
 A new title card for the showcase loop, beside the current one (the capsule gliding over plain
 text, [PLAN.md](PLAN.md)). The user's brief (2026-10-22): the words themselves are liquid glass,
@@ -19,9 +25,9 @@ drawn by `widgets/paneglass.js`). Its material, ported to the title's WebGL2 sha
 | | Lock clock (B2, logical px at the lock's scale) | Title (1920x1080 px) |
 |---|---|---|
 | Type | Space Grotesk SemiBold | the same: `600 184px`, tracking -4 px, one line, centred (the old title's metrics) |
-| Backdrop | the wallpaper, frosted: `Shell.BlurEffect` radius 18 | a Gaussian blur of pass 1 (wallpaper + plate), sigma ≈ 18 px, half-res two-pass |
+| Backdrop | the wallpaper, frosted: `Shell.BlurEffect` radius 18 | a Gaussian blur of pass 1 (wallpaper + plate), sigma 12 px (so the bend has detail to show), half-res two-pass |
 | Colour | brightness +0.10, milk 0.10 (white over it), saturation 1.1, no tint | +0.14, milk 0.16 (the user, phase 1: "slightly tinted lighter") |
-| Bend | 0 (no refraction) | 0: the user asked for glass **without refraction** |
+| Bend | 0 (no refraction) | 6 px over a 14 px edge band, colour split 0.06 (paneglass.js's dome profile, between the widgets' A2 and A3): "glassier with slight refraction" (the user, phase 5; the first brief had the drop without refraction) |
 | Edge | the desktop widgets' edge model: band 8, rim light 0.35 (width 0.45 of the band, lit from the top left, `tahoe_lens_slope`), no inner shadow, a 1 px hairline at alpha 0.16 | the widgets' own values (paneglass.js DESKTOP: band 12.6, rim light 0.55, inner shade 0.30) and a 2.5 px line at alpha 0.40: "a slightly thicker outline, look at the widgets" (the user, phase 1); from the text's signed distance field (section 3) |
 | Shadow | none on the clock | none: "there shouldn't really be a shadow if it's liquid glass" (the user, phase 1; `shadow=` stays as a dial) |
 | Anti-aliasing | cairo mask | exact from the SDF: coverage = clamp(0.5 - sd) |
@@ -47,8 +53,12 @@ exact damped oscillator), with the tokens the desktop already uses. No new easin
 | Hold | still | ~1.1 s |
 | The fade | the glass's coverage and the shadow fade out (0.55 s, `smooth`); the plate's bar, dock and widgets fade back in over the same beat (as the old title's `uiIn`) | ends on the montage's first frame |
 
-Timeline, as rendered in phase 5 (5.1 s; the first numbers were 0.25 s earlier and held the end
-plate 1.6 s; the bounce added 0.2 s):
+Final timeline (4.7 s): the plate held 0.3 s; bar, dock and widgets out 0.3–0.8; the word in
+0.6–1.5 (a 28 px blur sharpening on an ease-out, the fade leading it); hold to 3.3; out 3.3–4.0
+(the reverse); bar, dock and widgets in 3.5–4.1; the plate held to 4.7. The glass is drawn as a
+premultiplied layer, blurred at half res with the frost's shader, then laid over the scene.
+
+The drop's timeline, as it was rendered before that (5.1 s):
 
 | Time (s) | |
 |---|---|
@@ -96,7 +106,7 @@ sheet); SwiftShader render time (3 passes, 6 moments: ~10 min per clip, run in t
 | 2 | The drop: the circle's fall and elastic landing (no morph yet: it holds as the landed ellipse) | a contact sheet of the landing (every 2 frames around it) and a short MP4 |
 | 3 | The morph: ellipse → word, the width spring carrying into the letters | contact sheet + MP4 of 0.4 – 2.6 s |
 | 4 | The joins: plate in, UI out / in, the fade; first and last frames checked against the plates pixel for pixel | done: the first frame differs from the montage's last by 1.5 levels per channel on average, the last from the montage's first by 1.4 (encoding noise); the plates are version 2 (widget-drag.mp4 at 0.20 s, search-click.mp4 at 6.90 s, scaled from 1440p), `renders/plate-{in,out}-v2.png` |
-| 5 | Timing polish, the montage's final plates from the amorphous-title session, the final render | `docs/showcase/title/renders/title-glass.mp4` (1920x1080, 60 fps, silent, 5.1 s); its path to the amorphous-title session for loop.sh |
+| 5 | Timing polish, the montage's final plates from the amorphous-title session, the final render | `docs/showcase/title/renders/title-glass.mp4` (1920x1080, 60 fps, silent, 4.7 s); its path to the amorphous-title session for loop.sh |
 
 Commits on this worktree's branch; renders stay out of git (`renders/` is ignored); no README or
 hero changes here.
