@@ -480,9 +480,11 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
 ### Phase 6: enter and exit animations
 - **Done so far (user's design, 2026-10-21).** The view fades in; the layout is decided first (the
   opening song's lyrics, at most 0.7 s; a "no player" at opening waits for the asynchronous player
-  discovery when players are on the bus), then a circle of the widgets' glass at the cover's centre
-  springs open into the cover's shape (`PourMask` over a full-size glass card, never past the cover)
-  and only at full size the cover fades in on it, as one piece; no tilt during it.
+  discovery when players are on the bus), then a drop of the widgets' glass falls to the cover's
+  middle, stretching as it speeds up, lands and spreads into the cover's shape, its width leading
+  its height (a squash, a liquid wobble), cut by `PourMask` from a full-size glass card and never
+  past the cover; only at full size the cover fades in on it (0.7 s), as one piece; no tilt during
+  it. Slow on purpose (user: it is cosmetic): about 2 s, the view fading in over 0.5 s.
   `docs/nowplaying/shots/phase6-enter-cover.webp`. Still to do: the desktop snapshot's blur in and
   out, the swirl taking over, the exit.
 - **The tilt, anti-aliased (user: it looked pixelated).** Rotating actors in 3D drew the outline

@@ -41,13 +41,21 @@ const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at th
 const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
 const EDGE_BAND = 6;              // px at 1440p: the hovered cover's clear glass rim (a card: 16 read as a thick embossed tile)
 const EDGE_BEND = 2;              // px the art bends at the very edge
-// the enter (user, 2026-10-21): a circle of the widgets' glass at the cover's centre springs open into
-// the cover's shape, and once it is full size the cover fades in on it, as one piece
-const POUR_FROM = 64;             // px at 1440p: the circle's diameter
-const POUR_DELAY = 90;            // ms after opening (the view is fading in)
-const POUR = {damping: 0.72, stiffness: 260};   // a liquid spring; the glass never passes the cover
-const FULL_AT = 0.995;            // of the way open: full size, the cover fades in
-const ART_FADE_MS = 360;
+// the enter (user, 2026-10-21; slow on purpose, it is cosmetic): a drop of the widgets' glass falls
+// to the cover's middle, stretching as it speeds up (its volume kept), lands, and spreads into the
+// cover's shape, its width leading its height (a squash, a liquid wobble); once it is full size the
+// cover fades in on it, as one piece
+const DROP = 72;                  // px at 1440p: the drop's diameter
+const DROP_FROM = 0.30;           // of the cover's height above its middle: where the drop appears
+const DROP_DELAY = 220;           // ms after the layout is decided (the view is fading in)
+const DROP_IN_MS = 200;           // the drop fading in as it starts to fall
+const FALL_MS = 620;              // the fall, accelerating (a drop under its own weight)
+const STRETCH_PER_SPEED = 0.0009; // stretch per px/s of fall (tahoe-motion's 0.0012, a little less)
+const MAX_STRETCH = 0.45;
+const SPREAD_W = {damping: 0.62, stiffness: 46};   // the width leads, overshooting a little
+const SPREAD_H = {damping: 0.72, stiffness: 34};   // the height follows, softer
+const ART_FADE_MS = 700;          // the cover fading in on the full-size glass
+const GATE = {damping: 1, stiffness: 110};          // the column and lyrics fading in, slowly
 const TILT_PAD = 24;              // px at 1440p of room around the cover for the leaning card
 const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
 const TILT_LIFT = 10;             // px toward the viewer while hovered
@@ -400,7 +408,7 @@ export class NowPlayingView {
             return;
         this._entered = true;
         // the column and the lyrics fade in where the layout put them
-        this.motion.spring('gate', 0, 1, EXPRESSIVE.effects.slow, v => {
+        this.motion.spring('gate', 0, 1, GATE, v => {
             this._gate = Math.min(1, Math.max(0, v));
             this._column.opacity = Math.round(255 * this._gate);
             this.setBlend(this._blend);
@@ -408,10 +416,10 @@ export class NowPlayingView {
         if (!Motion.animating)
             return;
         const cw = this.parts.cover.width, ch = this.parts.cover.height;
-        const d0 = Math.round(POUR_FROM * this._u);
+        const d0 = Math.round(DROP * this._u);
         stack.opacity = 0;
         // the glass is the cover's size from the start (Blur My Shell builds it once); a mask cuts
-        // the opening shape out of it, from a circle at the centre into the cover's shape
+        // the drop's shape out of it, wherever it is and however stretched
         const drop = this._glassCard(this._coverRadius);
         drop.set_size(cw, ch);
         drop.clip_to_allocation = true;
@@ -421,13 +429,22 @@ export class NowPlayingView {
         this._tilt.insert_child_below(drop, stack);
         this._drop = drop;
         this.entering = true;
-        const shape = (w, h, r) => {
-            this._dropShape = {width: w, height: h, radius: r};
-            mask.window = [(cw - w) / 2, (ch - h) / 2, w, h];
+        // the shape: w x h, its middle dy below the cover's middle; never past the cover
+        const shape = (w, h, dy) => {
+            w = Math.min(cw, Math.max(1, w));
+            h = Math.min(ch, Math.max(1, h));
+            // round while small, the cover's corners once it fills the cover
+            const p = Math.min(w / cw, h / ch);
+            const k = Math.min(1, Math.max(0, (p - 0.35) / 0.65));
+            const r = Math.min(w, h) / 2 + (this._coverRadius - Math.min(w, h) / 2) * k * k * (3 - 2 * k);
+            this._dropShape = {width: w, height: h, radius: r, dy};
+            mask.window = [(cw - w) / 2, (ch - h) / 2 + dy, w, h];
             mask.radius = r;
             mask.queue_repaint();
+            return [w, h];
         };
-        shape(d0, d0, d0 / 2);
+        const fall = DROP_FROM * ch;
+        shape(d0, d0, -fall);
         const finish = () => {
             if (this._drop === drop) {
                 this._drop = null;
@@ -439,32 +456,63 @@ export class NowPlayingView {
             if (this.parts.cover.hover && this._pointer)
                 this._tiltAt(...this._pointer);
         };
+        // full size: the cover fades in on the glass; the glass, exactly under it, goes once the
+        // cover is opaque (nothing to see change)
         let full = false;
-        this._pourId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, POUR_DELAY, () => {
+        const fill = () => {
+            if (full || this._drop !== drop)
+                return;
+            full = true;
+            shape(cw, ch, 0);
+            mask.rim = 0;   // the glass's own edge from here
+            stack.ease({
+                opacity: 255, duration: ART_FADE_MS, mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+                onStopped: () => this._guard(finish),
+            });
+        };
+        // the spread: width and height on their own springs, from the landed drop's shape
+        let w = d0, h = d0;
+        const spread = speed => {
+            const m = this.motion;
+            const each = () => {
+                if (full)   // the cover is fading in on the full glass: the shape stays put
+                    return;
+                [w, h] = shape(w, h, 0);
+                if (w >= cw - 0.5 && h >= ch - 0.5)
+                    fill();
+            };
+            // landing: the width springs out with the fall's momentum, the height squashes first
+            m.spring('drop-w', w, cw, SPREAD_W, v => {
+                w = v;
+                each();
+            }, {velocity: speed * 0.9});
+            m.spring('drop-h', h, ch, SPREAD_H, v => {
+                h = v;
+                each();
+            }, {velocity: -speed * 0.35});
+        };
+        this._pourId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DROP_DELAY, () => {
             this._pourId = 0;
             this._guard(() => {
-                drop.opacity = 255;
-                this.motion.spring('pour', 0, 1, POUR, v => {
+                drop.ease({opacity: 255, duration: DROP_IN_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+                // the fall: accelerating, stretched along its speed (volume kept)
+                let t = 0, lastY = -fall;
+                this.motion.task(dt => {
                     if (this._drop !== drop)
-                        return;
-                    // never past the cover: a rim of glass would show around the art
-                    const t = Math.min(1, v);
-                    const w = d0 + (cw - d0) * t, h = d0 + (ch - d0) * t;
-                    // round while small, the cover's corners once open
-                    const k = Math.min(1, Math.max(0, (t - 0.25) / 0.75));
-                    const r = Math.min(w, h) / 2 + (this._coverRadius - Math.min(w, h) / 2) * k * k * (3 - 2 * k);
-                    shape(w, h, r);
-                    if (!full && t >= FULL_AT) {
-                        // full size: the cover fades in on the glass; the glass, exactly under it,
-                        // goes once the cover is opaque (nothing to see change)
-                        full = true;
-                        shape(cw, ch, this._coverRadius);
-                        mask.rim = 0;   // the glass's own edge from here
-                        stack.ease({
-                            opacity: 255, duration: ART_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                            onStopped: () => this._guard(finish),
-                        });
+                        return false;
+                    t = Math.min(1, t + dt / (FALL_MS / 1000));
+                    const y = -fall * (1 - t * t);
+                    const speed = dt > 0 ? (y - lastY) / dt : 0;
+                    lastY = y;
+                    const s = Math.min(MAX_STRETCH, Math.abs(speed) * STRETCH_PER_SPEED);
+                    w = d0 / Math.sqrt(1 + s);
+                    h = d0 * Math.sqrt(1 + s);
+                    shape(w, h, y);
+                    if (t >= 1) {
+                        spread(Math.abs(speed));
+                        return false;
                     }
+                    return true;
                 });
             });
             return GLib.SOURCE_REMOVE;

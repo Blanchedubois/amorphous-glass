@@ -53,7 +53,7 @@ async function click(x, y) {
 }
 
 // ---- the tests ----
-const SETTLE = 450;   // ms: longer than the enter (250) and the exit (200)
+const SETTLE = 700;   // ms: longer than the view's fade in (500) and the exit (200)
 let actions = [];
 
 async function openView() {
@@ -762,7 +762,7 @@ async function openOn(index) {
     fake.setTrack(index, 40);
     await sleep(400);
     const ov = await openView();
-    await sleep(2400);
+    await sleep(3400);   // the enter (the drop, its spread, the cover fading in) is slow
     return ov;
 }
 
@@ -969,7 +969,7 @@ test('enter: the cover pours out of a circle of glass, then the art fades in', a
             samples.push(p);
     });
     try {
-        await sleep(1800);
+        await sleep(3800);
     } finally {
         global.stage.disconnect(paintId);
     }
@@ -1011,7 +1011,7 @@ test('enter: no tilt while the cover pours in, then the tilt', async () => {
     expect(v.entering, 'the enter was already over (test timing)');
     const during = v.tilt;
     expect(Math.abs(during.x) < 0.01 && Math.abs(during.y) < 0.01 && during.edge < 0.01, `tilted during the enter: ${JSON.stringify(during)}`);
-    await sleep(1600);
+    await sleep(3600);
     expect(!v.entering, 'the enter did not finish');
     const after = v.tilt;
     expect(Math.abs(after.x) > 1 && Math.abs(after.y) > 1 && after.edge > 0.9, `no tilt after the enter: ${JSON.stringify(after)}`);
@@ -1032,13 +1032,15 @@ test('record: enter', async () => {
     // the cover's area only (a small shot is fast enough to catch the pour)
     const area = [300, 200, 760, 760];
     const start = GLib.get_monotonic_time();
-    for (let i = 0; i < 40 && GLib.get_monotonic_time() - start < 1600000; i++) {
+    for (let i = 0; i < 120 && GLib.get_monotonic_time() - start < 3400000; i++) {
         await shot(`enter-${String(i).padStart(2, '0')}`, area);
         const v = ext().overlay?.view;
         const d = v?._drop;
         const box = d ? [...d.get_transformed_position(), ...d.get_transformed_size()].map(n => Math.round(n)) : null;
         const clip = d?._glass?._copy?.has_clip ? d._glass._copy.get_clip().map(n => Math.round(n)) : null;
-        append('enter-times.txt', `${i} ${((GLib.get_monotonic_time() - start) / 1000).toFixed(0)} drop ${JSON.stringify(box)} clip ${JSON.stringify(clip)} glass ${d?._glass?.hasGlass} cover ${JSON.stringify(v ? [...v.parts.cover.get_transformed_position(), ...v.parts.cover.get_transformed_size()].map(n => Math.round(n)) : null)}`);
+        const ov = ext().overlay;
+        ov._id ??= Math.random().toString(36).slice(2, 6);
+        append('enter-times.txt', `${i} ${((GLib.get_monotonic_time() - start) / 1000).toFixed(0)} ov ${ov?._id} ${ov?.state} entering ${v?.entering} stack ${v?._coverBox.opacity} pour ${JSON.stringify(v?.pour)} col ${v?._column.opacity} art ${v?._coverArt ? 1 : 0}`);
     }
     ext().overlay.close();
     await sleep(SETTLE);
