@@ -1,5 +1,5 @@
 {
-  "about": "Version 2, final cut (user, 2026-10-22): the app grid through a blur with a push onto the Utilities folder; the dock menu straight into the search (no Settings clip); Now Playing (the user's Spotify playing \"Hey Ladies\", Beastie Boys; tools/showcase/screensaver-video.sh NPV_SPOTIFY=1), the lock screen recorded in the same minute, the desktop, the title.",
+  "about": "Version 2, final cut (user, 2026-10-22): the app grid through a blur with a push onto the Utilities folder; the dock menu straight into the search (no Settings clip); Now Playing (the user's Spotify playing \"Hey Ladies\", Beastie Boys; tools/showcase/screensaver-video.sh NPV_SPOTIFY=1), the lock screen recorded in the same minute, the desktop, the title. Round 2: the widget-to-menu and files-to-folder takes (extra4) replace the widget, calendar, Files and grid clips.",
   "clips": [
     {
       "name": "home-to-widget",
@@ -20,46 +20,44 @@
       "where": "top right: the panel grows from its icon, the Wi-Fi submenu"
     },
     {
-      "name": "desktop-widget",
-      "source": "~/Videos/liquid-glass-showcase/extra1/desktop-widget.mp4",
-      "track": "~/Videos/liquid-glass-showcase/work-extra/desktop-widget.track.json",
+      "name": "widget-to-menu",
+      "source": "~/Videos/liquid-glass-showcase/extra4/widget-to-menu.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/widget-to-menu.track.json",
       "in": 0.45,
-      "out": 6.0,
-      "zoom": 1.5,
-      "where": "middle: right-click the wallpaper, Add Widget, a clock drops in"
-    },
-    {
-      "name": "menu-slide",
-      "in": 14.64,
-      "out": 18.85,
-      "zoom": 1.35,
-      "where": "top: the calendar, sliding across the status menus"
+      "out": 12.3,
+      "zoom": 1.4,
+      "where": "one take (user, 2026-10-22): right-click the wallpaper, Add Widget, the clock drops in; the cursor rises to the date, the calendar grows out of it and glides into quick settings"
     },
     {
       "name": "files-drag",
-      "in": 29.25,
-      "out": 32.65,
+      "source": "~/Videos/liquid-glass-showcase/extra4/files-to-folder.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/files-to-folder.track.json",
+      "in": 3.3,
+      "out": 7.6,
       "zoom": 1.4,
-      "where": "middle: only the drag of the Files window, a pause once it is set down, the camera pulling back",
       "to_zoom": 1.0,
-      "pull": 0.6
+      "pull": 1.0,
+      "where": "one take (user, 2026-10-22): the Files window dragged, closed with Ctrl+W, the cursor down to the dock as the camera pulls back"
     },
     {
       "name": "app-grid",
-      "in": 49.15,
-      "out": 50.6,
+      "source": "~/Videos/liquid-glass-showcase/extra4/files-to-folder.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/files-to-folder.track.json",
+      "in": 7.6,
+      "out": 10.3,
       "zoom": 1.0,
-      "blur_in": 24,
-      "where": "the app grid, already open, through a short blur (the recording dropped the overview animation to black at 48.95-49.15; user, 2026-10-22: the folder opening was abrupt)"
+      "where": "the grid button clicked, the grid opens, the cursor goes up to Utilities"
     },
     {
       "name": "utilities",
-      "in": 50.6,
-      "out": 52.95,
+      "source": "~/Videos/liquid-glass-showcase/extra4/files-to-folder.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/files-to-folder.track.json",
+      "in": 10.3,
+      "out": 11.9,
       "zoom": 1.25,
       "from_zoom": 1.0,
-      "push": 1.1,
-      "where": "the camera eases onto the cursor as the Utilities folder opens; it closes and the overview closes"
+      "push": 1.0,
+      "where": "the folder opens under the click as the camera eases in; it closes (cut before the recording goes black at 12.1)"
     },
     {
       "name": "music",
