@@ -5,6 +5,7 @@
 // other shell code listens to it; no PAM, no GDM).
 // Results: $NP_OUT/results.jsonl (one line per test) and driver.log; the shell ends when done.
 
+import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -17,6 +18,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 const OUT = GLib.getenv('NP_OUT');
 const UUID = 'tahoe-nowplaying@cachyos-tahoe';
 const ONLY = GLib.getenv('NP_ONLY');   // a test name prefix, to run some only
+const FIXTURES = GLib.getenv('NP_FIXTURES');
 
 function append(file, text) {
     const st = Gio.File.new_for_path(`${OUT}/${file}`).append_to(Gio.FileCreateFlags.NONE, null);
@@ -379,6 +381,8 @@ test('layout: both layouts', async () => {
     const ov = await openView();
     await sleep(1500);   // the clock's glyph masks are drawn after the first layout
     const tag = `${global.stage.width}x${global.stage.height}`;
+    ov.view.setBlend(1);   // nothing plays here, so the view opened centred
+    await sleep(300);
     await shot(`layout-lyrics-${tag}`);
     checkLayout(ov.view, 1);
     ov.view.setBlend(0);
@@ -388,6 +392,339 @@ test('layout: both layouts', async () => {
     ov.close();
     await sleep(SETTLE);
     assertClean('after the layout test');
+});
+
+// ---- Phase 3: a fake MPRIS player (made-up tracks, generated covers, the fixtures' .lrc) ----
+
+const MPRIS_XML = `<node>
+<interface name="org.mpris.MediaPlayer2"><method name="Raise"/><property name="Identity" type="s" access="read"/>
+  <property name="DesktopEntry" type="s" access="read"/><property name="CanRaise" type="b" access="read"/></interface>
+<interface name="org.mpris.MediaPlayer2.Player">
+  <method name="PlayPause"/><method name="Play"/><method name="Pause"/><method name="Stop"/>
+  <method name="Next"/><method name="Previous"/>
+  <method name="Seek"><arg type="x" direction="in"/></method>
+  <method name="SetPosition"><arg type="o" direction="in"/><arg type="x" direction="in"/></method>
+  <signal name="Seeked"><arg type="x"/></signal>
+  <property name="PlaybackStatus" type="s" access="read"/>
+  <property name="Metadata" type="a{sv}" access="read"/>
+  <property name="Position" type="x" access="read"/>
+  <property name="CanGoNext" type="b" access="read"/>
+  <property name="CanGoPrevious" type="b" access="read"/>
+  <property name="CanSeek" type="b" access="read"/>
+  <property name="Shuffle" type="b" access="readwrite"/>
+  <property name="LoopStatus" type="s" access="readwrite"/>
+</interface></node>`;
+
+// a square cover in two colours with a disc (made up, drawn here)
+function cover(name, c0, c1) {
+    const path = `${OUT}/${name}.png`;
+    const surface = new Cairo.ImageSurface(Cairo.Format.ARGB32, 400, 400);
+    const cr = new Cairo.Context(surface);
+    const g = new Cairo.LinearGradient(0, 0, 400, 400);
+    g.addColorStopRGB(0, ...c0);
+    g.addColorStopRGB(1, ...c1);
+    cr.setSource(g);
+    cr.paint();
+    cr.setSourceRGBA(1, 0.92, 0.75, 0.9);
+    cr.arc(270, 130, 60, 0, 2 * Math.PI);
+    cr.fill();
+    surface.writeToPNG(path);
+    cr.$dispose();
+    return `file://${path}`;
+}
+
+function copyLrc(fixture, name) {
+    const [, bytes] = GLib.file_get_contents(`${FIXTURES}/${fixture}`);
+    GLib.file_set_contents(`${OUT}/${name}.lrc`, bytes);
+}
+
+class FakePlayer {
+    constructor() {
+        copyLrc('paper-lanterns.lrc', 'track1');
+        copyLrc('plain.lrc', 'track2');
+        this.tracks = [
+            {id: '/fake/track/1', title: 'Paper Lanterns', artist: 'The Quiet Hours', file: 'track1', art: cover('cover1', [0.95, 0.45, 0.25], [0.45, 0.18, 0.45]), length: 214},
+            {id: '/fake/track/2', title: 'Second Light', artist: 'The Quiet Hours', file: 'track2', art: cover('cover2', [0.15, 0.35, 0.75], [0.10, 0.65, 0.60]), length: 180},
+            {id: '/fake/track/3', title: 'No Cover Here', artist: 'Test Artist', file: 'track3', art: null, length: 150},
+        ];
+        this.index = 0;
+        this.status = 'Playing';
+        this.position = 38;          // s, at `since`
+        this.since = GLib.get_monotonic_time();
+        this.shuffle = false;
+        this.loop = 'None';
+        this.calls = [];
+        this._ids = [];
+        const info = Gio.DBusNodeInfo.new_for_xml(MPRIS_XML);
+        for (const iface of info.interfaces) {
+            this._ids.push(Gio.DBus.session.register_object('/org/mpris/MediaPlayer2', iface,
+                (c, sender, path, ifaceName, method, params, invocation) => {
+                    this._method(method, params.deep_unpack());
+                    invocation.return_value(null);
+                },
+                (c, sender, path, ifaceName, name) => this._props()[name] ?? null,
+                (c, sender, path, ifaceName, name, value) => {
+                    this.calls.push(`Set ${name}=${value.unpack()}`);
+                    if (name === 'Shuffle')
+                        this.shuffle = value.unpack();
+                    if (name === 'LoopStatus')
+                        this.loop = value.unpack();
+                    this._changed([name]);
+                    return true;
+                }));
+        }
+        this._own = Gio.DBus.session.own_name('org.mpris.MediaPlayer2.npfake', Gio.BusNameOwnerFlags.NONE, null, null);
+    }
+
+    get track() {
+        return this.tracks[this.index];
+    }
+
+    now() {
+        return this.position + (this.status === 'Playing' ? (GLib.get_monotonic_time() - this.since) / 1e6 : 0);
+    }
+
+    _at(seconds) {
+        this.position = Math.max(0, seconds);
+        this.since = GLib.get_monotonic_time();
+    }
+
+    _props() {
+        const t = this.track;
+        return {
+            Identity: new GLib.Variant('s', 'Fake Player'),
+            DesktopEntry: new GLib.Variant('s', 'fake-player'),
+            CanRaise: new GLib.Variant('b', false),
+            PlaybackStatus: new GLib.Variant('s', this.status),
+            Metadata: new GLib.Variant('a{sv}', {
+                'mpris:trackid': new GLib.Variant('o', t.id),
+                'xesam:title': new GLib.Variant('s', t.title),
+                'xesam:artist': new GLib.Variant('as', [t.artist]),
+                'xesam:album': new GLib.Variant('s', 'Made-Up Album'),
+                'xesam:url': new GLib.Variant('s', `file://${OUT}/${t.file}.ogg`),
+                ...t.art ? {'mpris:artUrl': new GLib.Variant('s', t.art)} : {},
+                'mpris:length': new GLib.Variant('x', t.length * 1e6),
+            }),
+            Position: new GLib.Variant('x', Math.round(this.now() * 1e6)),
+            CanGoNext: new GLib.Variant('b', true),
+            CanGoPrevious: new GLib.Variant('b', true),
+            CanSeek: new GLib.Variant('b', true),
+            Shuffle: new GLib.Variant('b', this.shuffle),
+            LoopStatus: new GLib.Variant('s', this.loop),
+        };
+    }
+
+    _changed(names) {
+        const props = this._props();
+        const changed = Object.fromEntries(names.map(n => [n, props[n]]));
+        Gio.DBus.session.emit_signal(null, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'PropertiesChanged',
+            new GLib.Variant('(sa{sv}as)', ['org.mpris.MediaPlayer2.Player', changed, []]));
+    }
+
+    _seeked() {
+        Gio.DBus.session.emit_signal(null, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'Seeked',
+            new GLib.Variant('(x)', [Math.round(this.now() * 1e6)]));
+    }
+
+    _method(method, args) {
+        this.calls.push(args.length ? `${method} ${args.join(' ')}` : method);
+        switch (method) {
+        case 'PlayPause':
+            this._at(this.now());
+            this.status = this.status === 'Playing' ? 'Paused' : 'Playing';
+            this._changed(['PlaybackStatus']);
+            break;
+        case 'Pause':
+            this._at(this.now());
+            this.status = 'Paused';
+            this._changed(['PlaybackStatus']);
+            break;
+        case 'Next':
+        case 'Previous':
+            this.index = (this.index + (method === 'Next' ? 1 : this.tracks.length - 1)) % this.tracks.length;
+            this._at(0);
+            this._changed(['Metadata']);
+            break;
+        case 'Seek':
+            this._at(this.now() + Number(args[0]) / 1e6);
+            this._seeked();
+            break;
+        case 'SetPosition':
+            this._at(Number(args[1]) / 1e6);
+            this._seeked();
+            break;
+        }
+    }
+
+    // a track straight away (no method call): the tests' setup
+    setTrack(index, position = 38) {
+        this.index = index;
+        this._at(position);
+        this.status = 'Playing';
+        this._changed(['Metadata', 'PlaybackStatus']);
+    }
+
+    destroy() {
+        this._ids.forEach(id => Gio.DBus.session.unregister_object(id));
+        Gio.bus_unown_name(this._own);
+    }
+}
+
+let fake = null;
+const view = () => ext().overlay?.view;
+
+function expect(cond, what) {
+    if (!cond)
+        throw new Error(what);
+}
+
+test('player: placeholder when nothing plays', async () => {
+    const ov = await openView();
+    await sleep(600);
+    const v = ov.view;
+    expect(v._title.text === 'Not Playing', `title "${v._title.text}"`);
+    expect(v.coverUri === null && v._coverGlass.visible, 'no glass card in the cover\'s place');
+    expect(!v.coloursOn, 'cover colours shown with nothing playing');
+    expect(v.blend === 0, `blend ${v.blend}, wanted 0 (centred)`);
+    expect(!v.controls['play-pause'].reactive, 'play is live with no player');
+    await shot('player-placeholder');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the placeholder');
+});
+
+test('player: playing, with lyrics', async () => {
+    fake = new FakePlayer();
+    await sleep(800);
+    const ov = await openView();
+    await sleep(2200);   // LOOKUP_DELAY, the .lrc, the cover's colours
+    const v = ov.view;
+    expect(v._title.text === 'Paper Lanterns' && v._artist.text === 'The Quiet Hours', `text "${v._title.text}" / "${v._artist.text}"`);
+    expect(v.coverUri?.endsWith('cover1.png'), `cover ${v.coverUri}`);
+    expect(v.coloursOn, 'no cover colours');
+    expect(v.blend === 1, `blend ${v.blend}, wanted 1 (lyrics)`);
+    expect(v._ink.some(c => c !== 255), `ink still white ${v._ink}`);
+    // at about 40 s the sung line is the one from 36 s (index 1)
+    const shown = v._lyrics._shown;
+    expect(shown === 1 || shown === 2, `sung line ${shown} at ${fake.now().toFixed(1)} s`);
+    expect(v.controls['play-pause'].child.text === String.fromCodePoint(0x100286), 'play button is not pause.fill while playing');
+    await shot('player-lyrics');
+    // the line moves on by itself (the next at 41 s)
+    await sleep(Math.max(0, (42 - fake.now()) * 1000));
+    expect(v._lyrics._shown === 2, `sung line ${v._lyrics._shown} at ${fake.now().toFixed(1)} s, wanted 2`);
+    checkLayout(v, 1);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after playing');
+});
+
+test('player: controls and keys reach the player', async () => {
+    fake.setTrack(0, 40);
+    await sleep(300);
+    const ov = await openView();
+    await sleep(600);
+    const v = ov.view;
+    fake.calls = [];
+    const clickOn = async actor => {
+        const [x, y] = actor.get_transformed_position();
+        const [w, h] = actor.get_transformed_size();
+        await click(x + w / 2, y + h / 2);
+        await sleep(300);
+    };
+    await clickOn(v.controls['play-pause']);
+    expect(fake.status === 'Paused', `status ${fake.status} after play-pause`);
+    await sleep(200);
+    expect(v.controls['play-pause'].child.text === String.fromCodePoint(0x100284), 'play button is not play.fill while paused');
+    keys('space');
+    await sleep(300);
+    expect(fake.status === 'Playing', `status ${fake.status} after Space`);
+    keys('Shift_L', 'Right');
+    await sleep(300);
+    expect(fake.calls.some(c => c === 'Seek 10000000'), `no Seek +10 s: ${fake.calls}`);
+    await clickOn(v.controls.previous);   // past 3 s: restart
+    expect(fake.calls.some(c => c.startsWith('SetPosition /fake/track/1 0')), `no restart: ${fake.calls}`);
+    await clickOn(v.controls.shuffle);
+    expect(fake.shuffle === true, `shuffle ${fake.shuffle}`);
+    await clickOn(v.controls.repeat);
+    expect(fake.loop === 'Playlist', `loop ${fake.loop}`);
+    // a click at three quarters of the progress bar
+    const [px, py] = v._progress.get_transformed_position();
+    await click(px + v._progress.width * 0.75, py + v._progress.height / 2);
+    await sleep(300);
+    const set = fake.calls.filter(c => c.startsWith('SetPosition')).pop();
+    expect(set && Math.abs(Number(set.split(' ')[2]) / 1e6 - 0.75 * 214) < 1, `no seek to 75 %: ${set}`);
+    expect(ext().overlay?.state === 'open', 'a control closed the view');
+    log(`  calls: ${fake.calls.join(', ')}`);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the controls');
+});
+
+test('player: next track without lyrics centres, without a cover shows the glass', async () => {
+    fake.setTrack(0, 40);
+    await sleep(300);
+    const ov = await openView();
+    await sleep(2000);
+    const v = ov.view;
+    expect(v.blend === 1, `blend ${v.blend} before`);
+    keys('Right');   // next: plain lyrics only, so none
+    await sleep(400);
+    expect(v.blend === 1, 'the layout jumped before the lookup');
+    await sleep(1600);
+    expect(v._title.text === 'Second Light', `title ${v._title.text}`);
+    expect(v.blend === 0, `blend ${v.blend} with no synced lyrics`);
+    expect(v.coverUri?.endsWith('cover2.png'), `cover ${v.coverUri}`);
+    await shot('player-nolyrics');
+    keys('Right');   // no cover
+    await sleep(1800);
+    expect(v._title.text === 'No Cover Here', `title ${v._title.text}`);
+    expect(v.coverUri === null && v._coverGlass.visible, 'no glass card without a cover');
+    expect(!v.coloursOn, 'cover colours with no cover');
+    await sleep(700);
+    await shot('player-nocover');
+    checkLayout(v, 0);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the track changes');
+});
+
+test('player: the player leaving and coming back', async () => {
+    fake.setTrack(0, 40);
+    await sleep(300);
+    const ov = await openView();
+    await sleep(800);
+    fake.destroy();
+    fake = null;
+    await sleep(800);
+    expect(view()._title.text === 'Not Playing', `title ${view()?._title.text} after the player left`);
+    expect(ext().overlay?.state === 'open', 'the view closed when the player left');
+    fake = new FakePlayer();
+    await sleep(1200);
+    expect(view()._title.text === 'Paper Lanterns', `title ${view()?._title.text} after it came back`);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the player came back');
+});
+
+test('player: stay-closed setting', async () => {
+    const settings = ext().getSettings();
+    settings.set_string('when-nothing-plays', 'stay-closed');
+    try {
+        fake?.destroy();
+        fake = null;
+        await sleep(500);
+        ext().toggle();
+        await sleep(300);
+        expect(!ext().overlay, 'opened with nothing playing and stay-closed');
+        fake = new FakePlayer();
+        await sleep(800);
+        await openView();
+        ext().overlay.close();
+        await sleep(SETTLE);
+    } finally {
+        settings.set_string('when-nothing-plays', 'placeholder');
+    }
+    assertClean('after stay-closed');
 });
 
 async function run() {
@@ -417,6 +754,7 @@ async function run() {
         append('results.jsonl', JSON.stringify(result));
         log(`${result.ok ? 'PASS' : 'FAIL'} ${name}${result.ok ? '' : `: ${result.error}`}`);
     }
+    fake?.destroy();
     log(`done, ${failed} failed`);
 }
 

@@ -2,6 +2,7 @@
 // (default Super+Shift+M, the settings key `toggle`). See docs/NOWPLAYING_PLAN.md.
 // overlay.js holds the view and its safety rules; keys.js the key map.
 
+import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 
@@ -10,11 +11,22 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {Overlay} from './overlay.js';
 
+// an MPRIS player on the session bus (one quick local call, only for the hotkey)
+function anyPlayer() {
+    try {
+        const [names] = Gio.DBus.session.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'ListNames', null, null, Gio.DBusCallFlags.NONE, 500, null).deep_unpack();
+        return names.some(n => n.startsWith('org.mpris.MediaPlayer2.'));
+    } catch {
+        return true;   // unsure: open (the placeholder shows if nothing plays)
+    }
+}
+
 export default class TahoeNowPlaying extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._overlay = null;
-        // the player's keys and buttons; the test driver listens here (Phase 3 wires MPRIS)
+        // told of the player's keys and buttons (the test driver listens here)
         this.onAction = null;
         Main.wm.addKeybinding('toggle', this._settings, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
@@ -33,13 +45,15 @@ export default class TahoeNowPlaying extends Extension {
             return;
         }
         old?.teardown();
+        if (this._settings.get_string('when-nothing-plays') === 'stay-closed' && !anyPlayer())
+            return;
         const overlay = new Overlay({
             settings: this._settings,
             onClosed: () => {
                 if (this._overlay === overlay)
                     this._overlay = null;
             },
-            onAction: action => this.onAction?.(action),
+            onAction: (action, value) => this.onAction?.(action, value),
         });
         this._overlay = overlay;
         let opened = false;
