@@ -292,6 +292,8 @@ def setup():
 def restore():
     """everything back, each step on its own so one failure does not stop the rest"""
     steps = []
+    if STATE.get('mode'):                      # a mode switch cut short: the user's mode back
+        steps.append(lambda: subprocess.run(['bash', GLASS_BAR, 'mode', STATE['mode']], check=True))
     if STATE.get('workspace'):
         steps.append(lambda: press('Super_L', 'Page_Up'))
     if STATE.get('fake'):
@@ -645,11 +647,150 @@ def s_settings_window():
         move(*HOME_XY, 900)
 
 
+# ---- the README's feature clips (--features): one short clip per row of the front page ----------
+# the four songs the user picked for the music widgets (2026-10-21), played by their own Spotify
+# (TAHOE_SHOWCASE_PLAYER=spotify): real covers, real synced lyrics from lrclib.net (user's choice).
+# (track, song title, seconds in); the IDs are from each album's open.spotify.com page, checked by title
+SONGS = [('spotify:track:4tQcyj5488alHT1ZgFduzn', 'How Much A Dollar Cost', 70),     # To Pimp a Butterfly
+         ('spotify:track:35YyxFpE0ZTOoqFx5bADW8', 'Nude', 75),                       # In Rainbows
+         ('spotify:track:2lTm559tuIvatlT1u0JYG2', 'BAILE INoLVIDABLE', 60),          # DeBÍ TiRAR MáS FOToS
+         ('spotify:track:3k2kIiJqUiIP49iUcOLpWT', 'The Place Where He Inserted the Blade', 60)]  # Ants From Up There
+SPOTIFY = 'org.mpris.MediaPlayer2.spotify'
+
+
+def spotify_meta():
+    return BUS.call_sync(SPOTIFY, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'Get',
+                         GLib.Variant('(ss)', ('org.mpris.MediaPlayer2.Player', 'Metadata')), None,
+                         Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+
+
+def empty_workspace():
+    """the empty last workspace: none of the user's windows on camera"""
+    press('Super_L', 'End')
+    settle(1000)
+
+
+def open_uri(uri):
+    BUS.call_sync(SPOTIFY, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'OpenUri',
+                  GLib.Variant('(s)', (uri,)), None, Gio.DBusCallFlags.NONE, 5000, None)
+    settle(1800)
+
+
+def play_track(uri, seconds):
+    open_uri(uri)
+    if status(SPOTIFY) != 'Playing':
+        player(SPOTIFY, 'Play')
+        settle(500)
+    meta = spotify_meta()
+    BUS.call_sync(SPOTIFY, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'SetPosition',
+                  GLib.Variant('(ox)', (meta['mpris:trackid'], int(seconds * 1e6))), None, Gio.DBusCallFlags.NONE, 5000, None)
+    log(song=meta.get('xesam:title'), track=uri, art=meta.get('mpris:artUrl'))
+    return meta.get('xesam:title')
+
+
+def s_albums():
+    """one clip per song: the cover, the swirl of its colours under the glass, the synced lyrics. Each
+    song plays a few seconds first (opening a track raises Spotify: never inside a clip), so lrclib.net's lyrics are cached when the camera rolls"""
+    for uri, title, sec in SONGS:
+        play_track(uri, sec)
+        settle(2500)
+    for i, (uri, title, sec) in enumerate(SONGS):
+        got = play_track(uri, sec)
+        if (got or '').lower() != title.lower():
+            raise LookupError(f'{uri} played {got}, not {title}')
+        empty_workspace()
+        settle(2000)                           # the swirl settles on the new colours
+        mx, my, mw, mh = widget_at(16, 64)     # Music: Large
+        with Clip(f'song-{i + 1}'):
+            move(mx + mw // 2, my + mh // 3, 900)
+            pause(1500)
+            move(mx + mw // 2, my + mh + 200, 900)   # down to the lyrics
+            pause(2500)
+            move(*HOME_XY, 900)
+
+
+def s_live_blur():
+    """the Music widget, its swirl always moving, carried under where the calendar opens: the calendar's
+    glass blurs what is under it every frame, so the swirl keeps moving through it; then carried back"""
+    x, y, w, h = widget_at(16, 64)
+    dx, dy = center('date')
+    tx = dx - w // 2
+    with Clip('live-blur'):
+        move(x + w // 2, y + 90, 800)
+        pause(200)
+        drag(tx + w // 2, y + 90, 1500)
+        pause(500)
+        move(dx, dy, 700)
+        click()
+        pause(1200)
+        move(dx + 120, dy + 260, 1400)         # over the calendar, the swirl moving under it
+        pause(2200)
+        close_all()
+        move(tx + w // 2, y + 90, 600)
+        drag(x + w // 2, y + 90, 1400)
+        pause(500)
+        move(*HOME_XY, 800)
+
+
+def s_icons():
+    """quick settings: Wi-Fi off and on, its icon redrawn (the slash draws itself across, then the arcs
+    light up from the dot: tahoe-motion's iconmorph). Wi-Fi is off for about two seconds"""
+    empty_workspace()
+    with Clip('icons'):
+        move(*center('quick-settings'), 900)
+        click()
+        pause(900)
+        ax, ay = qs_arrow()
+        move(ax - 80, ay, 700)                 # the toggle's own half (its icon), not its arrow
+        pause(300)
+        click()
+        pause(2000)
+        click()
+        pause(2400)
+        close_all()
+        move(*HOME_XY, 800)
+
+
+GLASS_BAR = os.path.join(os.path.dirname(os.path.dirname(HERE)), 'scripts', 'glass-bar.sh')
+
+
+def s_modes():
+    """light, milky and back to dark: one command switches the whole desktop"""
+    before = gset_mode()
+    STATE['mode'] = before
+    empty_workspace()
+    with Clip('modes'):
+        move(1280, 600, 600)
+        for mode in ('light', 'milky', before):
+            pause(1600)
+            subprocess.run(['bash', GLASS_BAR, 'mode', mode], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            settle(900)
+            if mode != before:
+                move(*center('quick-settings'), 800)
+                click()
+                pause(1600)
+                close_all()
+                move(1280, 600, 700)
+        pause(800)
+    STATE.pop('mode')
+
+
+def gset_mode():
+    with open(os.path.expanduser('~/.config/tahoe-glass/state')) as fh:
+        modes = [l.split('=', 1)[1].strip() for l in fh if l.startswith('mode=')]
+    return modes[-1] if modes else 'dark'
+
+
 # in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left;
 # the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
 # of the desktop menu, window menu and volume shots
 SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
          s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click]
+# the README's rows: live blur, motion, spacing (the calendar), icons, widgets, modes
+FEATURE_SHOTS = [s_live_blur, s_files_window, s_menu_slide, s_quick_settings, s_desktop_widget, s_calendar,
+                 s_icons, s_dock_menu, s_albums, s_modes]
+if '--features' in sys.argv:
+    SHOTS = FEATURE_SHOTS
 
 
 def main():
@@ -692,6 +833,7 @@ def run_shots(shots):
             log(failed=shot.__name__[2:], error=f'{type(e).__name__}: {e}')
             try:
                 close_all()
+                empty_workspace()
             except GLib.Error:
                 pass
 
