@@ -18,12 +18,11 @@ export const SEQ = {
     uiOut: [0.3, 0.8],     // bar, dock and widgets fade out: the bare wallpaper
     drop: 0.7,             // the drop appears above the line and starts to fall
     dropIn: 0.2,           // fading in as it starts (Now Playing: 0.11; longer, less abrupt)
-    fall: 0.42,            // the fall, accelerating; it lands at 1.12 and bounces (0.4 s)
-    morph: 1.6,            // the spread into a bar begins
-    rise: 1.78,            // the letters start to rise out of it, from the middle
-    fadeOut: [3.85, 4.45], // the glass fades out
-    uiIn: [3.85, 4.45],    // bar, dock and widgets fade back in
-    end: 5.1,              // the montage's first frame, still, until it cuts in
+    fall: 0.42,            // the fall, accelerating; it lands at 1.12
+    rise: 1.3,             // the letters start to inflate out of the drop, from the middle
+    fadeOut: [3.65, 4.25], // the glass fades out
+    uiIn: [3.65, 4.25],    // bar, dock and widgets fade back in
+    end: 4.9,              // the montage's first frame, still, until it cuts in
 };
 
 // Now Playing's drop (view.js): the stretch along the fall, the volume kept; the landing's springs,
@@ -37,21 +36,12 @@ export const SPREAD_H = { damping: 0.66, stiffness: 320 };
 // scaled to keep the overshoot a small fraction of the drop (about 10 %: 0.2 read as timid)
 export const LAND_W = 0.9 * 0.6;
 export const LAND_H = -0.35 * 0.6;
-/// the landing itself: the drop bounces off the line (the user, phase 5: "there should be
-/// bounce"): it leaves the line with this share of its speed, flies up under the same gravity
-/// as the fall, comes back and squashes again, twice, before it settles
-export const BOUNCE = 0.35;
 /// the drop's diameter, as a fraction of the circle with the word's ink area ("make the drop
 /// smaller and expand out": the bar it spreads into keeps the word's volume, not the drop's)
 export const DROP_SIZE = 0.6;
-/// the spread and the rise: the first title's "follow" spring (../timeline.js FOLLOW), softer
-/// than the OS tokens, which settle in a fraction of a second, too fast to read across a 1500 px
-/// word; under-damped, so the bar overshoots its length and swings back (inertia)
-export const SPREAD = { damping: 0.38, stiffness: 60 };
-/// the rise: the same damping, a third of the stiffness: the front crosses the word in about
-/// half a second (at 90 the word was whole 0.2 s after the bar, too quick to read as rising)
-export const MORPH = { damping: 0.4, stiffness: 25 };
-const BAR_H = 95;         // px: the bar's height at the word's length (it expands out of the small drop)
+/// the rise: the front crosses the word in about half a second, softer than the OS tokens
+/// (which settle in a fraction of a second, too fast to read across a 1500 px word)
+export const MORPH = { damping: 0.5, stiffness: 25 };
 const BAND = 420;         // px: how wide the rise is at any moment
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
@@ -62,10 +52,10 @@ export const smooth = (a, b, x) => {
 
 /// the state of frame `t`. `word`: { cx, cy, w, h, d } (px): the word's ink box and the drop's
 /// diameter (its area is the word's ink area)
-export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, spread = SPREAD, morph = MORPH } = {}) {
+export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, morph = MORPH } = {}) {
     const s = {
         wallpaper: smooth(SEQ.uiOut[0], SEQ.uiOut[1], t) * (1 - smooth(SEQ.uiIn[0], SEQ.uiIn[1], t)),
-        plateOut: t > (SEQ.morph + SEQ.fadeOut[0]) / 2,
+        plateOut: t > (SEQ.rise + SEQ.fadeOut[0]) / 2,
         fade: 0, morph: 0, front: -BAND, band: BAND,
         cx: word.cx, cy: word.cy, w: word.d, h: word.d,
     };
@@ -86,62 +76,32 @@ export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, spre
         s.h = d * Math.sqrt(1 + st);
         return s;
     }
-    // landed: the width and height on their springs, kicked with the fall's momentum at each
-    // contact; between contacts the drop is in the air, stretched along its speed
+    // landed: the width and height on their springs, with the fall's momentum (one soft squash)
     const tl = SEQ.drop + SEQ.fall;
     const v0 = g * SEQ.fall;
-    const contacts = [tl];
-    for (let v = v0 * BOUNCE, at = tl, i = 0; i < 2; i++, v *= BOUNCE) {
-        at += (2 * v) / g;
-        contacts.push(at);
-    }
-    const w = new Spring(d, spreadW);
-    const h = new Spring(d, spreadH);
+    const w = new Spring(d / Math.sqrt(1 + stretched(v0)), spreadW, { velocity: v0 * LAND_W });
+    const h = new Spring(d * Math.sqrt(1 + stretched(v0)), spreadH, { velocity: v0 * LAND_H });
     const m = new Spring(0, morph);
     w.retarget(d, d);
     h.retarget(d, d);
-    let spreading = false, rising = false, next = 0, airborne = 0;
+    let rising = false;
     for (let k = 0; tl + k * DT < t; k++) {
         const now = tl + k * DT;
-        if (next < contacts.length && now >= contacts[next]) {
-            // a contact: the width springs out, the height squashes, with the arriving speed
-            const v = v0 * BOUNCE ** next;
-            w.velocity += v * LAND_W;
-            h.velocity += v * LAND_H;
-            w.settled = h.settled = false;
-            next++;
-        }
-        if (!spreading && now >= SEQ.morph) {
-            // the spread: the body expands out into a bar the word's length, the velocity kept
-            spreading = true;
-            w.setToken(spread);
-            w.retarget(word.w + 60, word.w);
-        }
-        // the bar's height chases its area over its length: the area grows from the drop's to
-        // the bar's as it expands out, so it thins as it overshoots and thickens as it swings back
-        if (spreading) {
-            const p = clamp01((w.value - d) / (word.w + 60 - d));
-            h.retarget((d * d + (BAR_H * (word.w + 60) - d * d) * p) / Math.max(w.value, 1), d);
-        }
         if (!rising && now >= SEQ.rise) {
             rising = true;
             m.retarget(1, 1);
         }
+        // the drop drains into the letters as they inflate: gone when the front is well out
+        const drain = 1 - smooth(0.1, 0.7, m.value);
+        w.retarget(d * drain, d);
+        h.retarget(d * drain, d);
         w.step(DT);
         h.step(DT);
         m.step(DT);
     }
-    // in the air between contacts: up with the bounce's speed, back under gravity
-    let cy = word.cy, st = 0;
-    if (next >= 1 && next <= 2) {
-        const v = v0 * BOUNCE ** next;
-        const tau = t - contacts[next - 1];
-        cy = word.cy - v * tau + (g * tau * tau) / 2;
-        st = stretched(v - g * tau);
-    }
-    s.cy = Math.min(cy, word.cy);
-    s.w = Math.max(10, w.value) / Math.sqrt(1 + st);
-    s.h = Math.max(10, h.value) * Math.sqrt(1 + st);
+    s.cy = word.cy;
+    s.w = Math.max(1, w.value);
+    s.h = Math.max(1, h.value);
     s.morph = 1;
     // the front starts a band before the middle (nothing has risen) and ends a band past the end
     s.front = m.value * (word.w / 2 + 2 * BAND) - BAND;

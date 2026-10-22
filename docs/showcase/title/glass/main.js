@@ -5,7 +5,7 @@
 //   theme=dark|light        the wallpaper and the stand-in plates
 //   plateIn=URL, plateOut=URL   the montage's last frame (the clip starts on it) and first frame
 //   shadow=0, bright=0.14, milk=0.16, hair=2.5, hairAlpha=0.4   the material's dials
-//   spreadW=D,S spreadH=D,S spread=D,S morph=D,S   other springs (timeline.js)
+//   spreadW=D,S spreadH=D,S morph=D,S   other springs (timeline.js)
 //   morphAt=SECONDS         when the blend into the word begins (SEQ.morph; 99: never)
 //   t=SECONDS               draw one frame and stop
 //   render=1&fps=N&blur=M&from=S&to=S   render.py: every frame POSTed to /frame/<n>, then /done; M moments
@@ -16,7 +16,7 @@ import { signedDistance } from './sdf.js';
 
 const Q = new URLSearchParams(location.search);
 if (Q.has('morphAt'))
-    SEQ.morph = parseFloat(Q.get('morphAt'));
+    SEQ.rise = parseFloat(Q.get('morphAt'));
 const THEME = Q.get('theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 const SHADOW = parseFloat(Q.get('shadow') ?? '0');
 // the material's dials (glass.glsl): the light, the line
@@ -30,7 +30,7 @@ const spring = key => {
     const [damping, stiffness] = (Q.get(key) ?? '').split(',').map(Number);
     return stiffness > 0 ? { damping, stiffness } : undefined;
 };
-const SPRINGS = { spreadW: spring('spreadW'), spreadH: spring('spreadH'), spread: spring('spread'), morph: spring('morph') };
+const SPRINGS = { spreadW: spring('spreadW'), spreadH: spring('spreadH'), morph: spring('morph') };
 const W = 1920;
 const H = 1080;
 
