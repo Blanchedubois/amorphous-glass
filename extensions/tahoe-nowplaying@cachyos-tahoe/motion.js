@@ -31,11 +31,12 @@ export class Motion {
         return St.Settings.get().enable_animations;
     }
 
-    // a spring named `name` toward target; apply(value) each step. token: {damping, stiffness}
-    spring(name, from, target, token, apply) {
+    // a spring named `name` toward target; apply(value) each step. token: {damping, stiffness};
+    // velocity: a new spring's starting speed (units/s)
+    spring(name, from, target, token, apply, {velocity = 0} = {}) {
         let entry = this._springs.get(name);
         if (!entry) {
-            entry = {spring: new Spring(from, token), apply};
+            entry = {spring: new Spring(from, token, {velocity}), apply};
             this._springs.set(name, entry);
         } else {
             entry.spring.setToken(token);
