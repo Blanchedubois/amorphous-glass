@@ -270,22 +270,32 @@ uniform float tl_ax;      // radians about the horizontal axis
 uniform float tl_ay;      // radians about the vertical axis
 uniform float tl_eye;     // px from the eye to the screen
 uniform float tl_lift;    // px toward the eye
+uniform float tl_cw;      // the card inside (px): its size and corners, and the band along its
+uniform float tl_ch;      // edge that is supersampled
+uniform float tl_radius;
+uniform float tl_band;
 
-// the flat picture's colour seen at screen point P (px from the centre) on the leaning card
-vec4 tl_sample(vec2 P, vec2 size, vec3 ax, vec3 ay, vec3 az) {
+// the point on the leaning card's plane (px from its centre) seen at screen point P
+vec2 tl_local(vec2 P, vec3 ax, vec3 ay, vec3 az) {
     vec3 eye = vec3(0.0, 0.0, tl_eye);
     vec3 dir = vec3(P, 0.0) - eye;
     vec3 o = vec3(0.0, 0.0, tl_lift);
     float t = dot(az, o - eye) / dot(az, dir);
     vec3 X = eye + t * dir - o;
-    vec2 src = (vec2(dot(X, ax), dot(X, ay)) + 0.5 * size) / size;
+    return vec2(dot(X, ax), dot(X, ay));
+}
+
+// the flat picture's colour at that point
+vec4 tl_at(vec2 local, vec2 size) {
+    vec2 src = (local + 0.5 * size) / size;
     if (src.x < 0.0 || src.y < 0.0 || src.x > 1.0 || src.y > 1.0)
         return vec4(0.0);
     return texture2D(cogl_sampler0, src);
 }
 `;
-// four samples a pixel, on a rotated grid (4x supersampling): the outline and the 1 px rim lines
-// stay smooth at any lean, where one sample a pixel broke them into steps
+// Near the card's edge four samples a pixel on a rotated grid (4x supersampling): the outline and
+// the 1 px rim lines stay smooth at any lean, where one sample a pixel broke them into steps.
+// Inside, one exact sample: supersampling everywhere softened the art (user: keep it sharp).
 const TILT_SHADER = `
     vec2 uv = cogl_tex_coord0_in.st;
     vec2 size = vec2(tl_w, tl_h);
@@ -295,10 +305,18 @@ const TILT_SHADER = `
     vec3 ax = vec3(cy, 0.0, -sy);
     vec3 ay = vec3(sy * sx, cx, cy * sx);
     vec3 az = vec3(sy * cx, -sx, cy * cx);
-    vec4 col = 0.25 * (tl_sample(P + vec2(-0.125, -0.375), size, ax, ay, az) +
-                       tl_sample(P + vec2( 0.375, -0.125), size, ax, ay, az) +
-                       tl_sample(P + vec2( 0.125,  0.375), size, ax, ay, az) +
-                       tl_sample(P + vec2(-0.375,  0.125), size, ax, ay, az));
+    vec2 here = tl_local(P, ax, ay, az);
+    vec2 q = abs(here) - (0.5 * vec2(tl_cw, tl_ch) - tl_radius);
+    float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - tl_radius;   // px from the edge
+    vec4 col;
+    if (edge > -tl_band) {
+        col = 0.25 * (tl_at(tl_local(P + vec2(-0.125, -0.375), ax, ay, az), size) +
+                      tl_at(tl_local(P + vec2( 0.375, -0.125), ax, ay, az), size) +
+                      tl_at(tl_local(P + vec2( 0.125,  0.375), ax, ay, az), size) +
+                      tl_at(tl_local(P + vec2(-0.375,  0.125), ax, ay, az), size));
+    } else {
+        col = tl_at(here, size);
+    }
     cogl_color_out = col * cogl_color_in.a;
 `;
 
@@ -311,6 +329,7 @@ class TahoeNpTilt extends Clutter.OffscreenEffect {
         this.ax = 0;     // degrees
         this.ay = 0;
         this.lift = 0;   // logical px
+        this.card = [1, 1, 0, 8];   // the card's width, height, radius, edge band (logical px)
         tiltSnippet ??= (() => {
             const s = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, TILT_DECLARATIONS, null);
             s.set_replace(TILT_SHADER);
@@ -339,6 +358,11 @@ class TahoeNpTilt extends Clutter.OffscreenEffect {
         // the stage's perspective: 60 degrees across its height
         set('tl_eye', global.stage.height * k / 2 / Math.tan(30 * rad));
         set('tl_lift', this.lift * k);
+        const [cw, ch, radius, band] = this.card;
+        set('tl_cw', cw * k);
+        set('tl_ch', ch * k);
+        set('tl_radius', radius * k);
+        set('tl_band', band * k);
         super.vfunc_paint_target(node, paintContext);
     }
 });

@@ -52,8 +52,12 @@ const DROP_IN_MS = 200;           // the drop fading in as it starts to fall
 const FALL_MS = 620;              // the fall, accelerating (a drop under its own weight)
 const STRETCH_PER_SPEED = 0.0009; // stretch per px/s of fall (tahoe-motion's 0.0012, a little less)
 const MAX_STRETCH = 0.45;
-const SPREAD_W = {damping: 0.62, stiffness: 46};   // the width leads, overshooting a little
-const SPREAD_H = {damping: 0.72, stiffness: 34};   // the height follows, softer
+// the spread is elastic (user: inertia that deforms the drop, a slight overshoot, then the cover):
+// the width leads and overshoots, the height follows out of phase, both a little past the cover's
+// shape before they settle on it
+const SPREAD_W = {damping: 0.6, stiffness: 44};
+const SPREAD_H = {damping: 0.64, stiffness: 32};
+const OVERSHOOT_ROOM = 0.12;      // of the cover's size: room around it for the glass to overshoot into
 const ART_FADE_MS = 700;          // the cover fading in on the full-size glass
 const GATE = {damping: 1, stiffness: 110};          // the column and lyrics fading in, slowly
 const TILT_PAD = 24;              // px at 1440p of room around the cover for the leaning card
@@ -248,6 +252,7 @@ export class NowPlayingView {
         tilt.set_position(-room, -room);
         this._tiltFx = new Tilt();
         this._tiltFx.enabled = false;
+        this._tiltFx.card = [cw, ch, radius, 8];   // supersampled within 8 px of the edge only
         tilt.add_effect_with_name('tilt', this._tiltFx);
         cover.add_child(tilt);
         const card = new St.Widget({layout_manager: new Clutter.FixedLayout()});
@@ -418,10 +423,12 @@ export class NowPlayingView {
         const cw = this.parts.cover.width, ch = this.parts.cover.height;
         const d0 = Math.round(DROP * this._u);
         stack.opacity = 0;
-        // the glass is the cover's size from the start (Blur My Shell builds it once); a mask cuts
-        // the drop's shape out of it, wherever it is and however stretched
+        // the glass is the cover's size and some room around it from the start (Blur My Shell builds
+        // it once); a mask cuts the drop's shape out of it, wherever it is and however deformed
+        const room = Math.round(OVERSHOOT_ROOM * Math.max(cw, ch));
         const drop = this._glassCard(this._coverRadius);
-        drop.set_size(cw, ch);
+        drop.set_size(cw + 2 * room, ch + 2 * room);
+        drop.set_position(-room, -room);
         drop.clip_to_allocation = true;
         const mask = new PourMask();
         drop.add_effect_with_name('pour', mask);
@@ -429,16 +436,17 @@ export class NowPlayingView {
         this._tilt.insert_child_below(drop, stack);
         this._drop = drop;
         this.entering = true;
-        // the shape: w x h, its middle dy below the cover's middle; never past the cover
+        // the shape: w x h, its middle dy below the cover's middle (it may overshoot the cover into
+        // the room around it while it settles)
         const shape = (w, h, dy) => {
-            w = Math.min(cw, Math.max(1, w));
-            h = Math.min(ch, Math.max(1, h));
+            w = Math.min(cw + 2 * room, Math.max(1, w));
+            h = Math.min(ch + 2 * room, Math.max(1, h));
             // round while small, the cover's corners once it fills the cover
-            const p = Math.min(w / cw, h / ch);
+            const p = Math.min(1, w / cw, h / ch);
             const k = Math.min(1, Math.max(0, (p - 0.35) / 0.65));
             const r = Math.min(w, h) / 2 + (this._coverRadius - Math.min(w, h) / 2) * k * k * (3 - 2 * k);
             this._dropShape = {width: w, height: h, radius: r, dy};
-            mask.window = [(cw - w) / 2, (ch - h) / 2 + dy, w, h];
+            mask.window = [room + (cw - w) / 2, room + (ch - h) / 2 + dy, w, h];
             mask.radius = r;
             mask.queue_repaint();
             return [w, h];
@@ -456,8 +464,8 @@ export class NowPlayingView {
             if (this.parts.cover.hover && this._pointer)
                 this._tiltAt(...this._pointer);
         };
-        // full size: the cover fades in on the glass; the glass, exactly under it, goes once the
-        // cover is opaque (nothing to see change)
+        // settled on the cover's shape: the cover fades in on the glass; the glass, exactly under it,
+        // goes once the cover is opaque (nothing to see change)
         let full = false;
         const fill = () => {
             if (full || this._drop !== drop)
@@ -475,12 +483,19 @@ export class NowPlayingView {
         const spread = speed => {
             const m = this.motion;
             const each = () => {
-                if (full)   // the cover is fading in on the full glass: the shape stays put
+                if (full)   // the cover is fading in on the settled glass: the shape stays put
                     return;
                 [w, h] = shape(w, h, 0);
-                if (w >= cw - 0.5 && h >= ch - 0.5)
-                    fill();
             };
+            // the cover only once both have come to rest on its shape (the overshoot is over)
+            m.task(() => {
+                if (full || this._drop !== drop)
+                    return false;
+                if (m.value('drop-w') !== undefined || m.value('drop-h') !== undefined)
+                    return true;
+                fill();
+                return false;
+            });
             // landing: the width springs out with the fall's momentum, the height squashes first
             m.spring('drop-w', w, cw, SPREAD_W, v => {
                 w = v;
