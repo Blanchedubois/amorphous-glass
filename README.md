@@ -3,7 +3,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
-    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="Amorphous Glass: a tour of the desktop through widgets, menus, quick settings, windows, search, the calendar, music and Now Playing">
+    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="Amorphous Glass: a tour of the desktop through widgets, menus, quick settings, windows, search, the calendar, music, Now Playing and the lock screen">
   </picture>
 </p>
 
