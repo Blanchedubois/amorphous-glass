@@ -5,9 +5,9 @@
 // their column they blur more and more (a Gaussian-like disc of samples, its radius growing) and fade
 // to nothing, as Apple Music's.
 //
-// GlassEdge (user, 2026-10-21): while hovered, the cover is a thick Liquid Glass tile lit from above
-// the pointer: its face reflects the light softly, its rounded bevel catches a glint and falls into
-// shade (the thickness), with the widgets' rim light, edge shadow and 1 px edge (a flat reflection
+// GlassEdge (user, 2026-10-21): while hovered, the cover is a Liquid Glass card lit from above the
+// pointer: its face reflects the light softly, its thin rounded edge catches a glint and falls into
+// shade (a card's thickness, not a tile's), with the widgets' rim light, edge shadow and 1 px edge (a flat reflection
 // over the art alone made the cover look flat, user 2026-10-21).
 //
 // Sheen: the light on the cover while it tilts: a soft highlight that follows the pointer and a
@@ -138,11 +138,11 @@ const EDGE_SHADER = `
     float onBevel = smoothstep(0.02, 0.25, x);
     // the face: a soft, broad reflection; the bevel: a sharp glint
     float faceSpec = 0.22 * pow(max(dot(V, normalize(Lp + V)), 0.0), 18.0) * (1.0 - onBevel);
-    float bevelSpec = 0.85 * pow(max(dot(N, normalize(L + V)), 0.0), 40.0) * onBevel;
+    float bevelSpec = 0.70 * pow(max(dot(N, normalize(L + V)), 0.0), 40.0) * onBevel;
     // the bevel turned from the light is darker than the face, turned to it a little lighter
     float turn = dot(N, L) - dot(V, L);
-    float shadeBevel = 0.55 * max(-turn, 0.0) * onBevel;
-    float lightBevel = 0.25 * max(turn, 0.0) * onBevel;
+    float shadeBevel = 0.25 * max(-turn, 0.0) * onBevel;
+    float lightBevel = 0.15 * max(turn, 0.0) * onBevel;
 
     // the widgets' glass edge, its light on the side of the edge facing the light
     float facing = length(side) > 0.001 ? dot(n, normalize(side)) : 0.0;

@@ -462,7 +462,7 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   `pipeline_glassbar_dock` with its RoundedPipeline, built as the widgets' GlassCard builds them
   (`widgetglass.js`), over a copy of the view's backdrop; the tests check the pipeline id and that
   the CSS stand-in is gone. The cover tilts up to 3.5° toward the pointer on springs (8° was too dramatic, user 2026-10-21), lifts 10 px,
-  the cover becomes a thick Liquid Glass tile (user, 2026-10-21: no separate ring, no flat sheen; `GlassEdge`: a 16 px rounded bevel lit from the pointer's side, so the near edges glint and the far ones fall into shade, a soft reflection on the face under the pointer, and the widgets' rim light, edge shadow and 1 px edge), and all of it springs back
+  the cover becomes a Liquid Glass card (user, 2026-10-21: no separate ring, no flat sheen, card-thin not a thick embossed tile; `GlassEdge`: a 5 px rounded edge lit from the pointer's side, so the near edges glint and the far ones fall into shade, a soft reflection on the face under the pointer, and the widgets' rim light, edge shadow and 1 px edge), and all of it springs back
   when the pointer leaves. The lyrics fade out blurred at the top and bottom (user, 2026-10-21:
   `EdgeFade` in `effects.js`, 220 px bands, up to 14 px of blur). Tilt sweep at 60 Hz: p50 16.8 ms,
   p95 21.8 ms. Not done: a pixel comparison with a desktop widget (the two glasses bend different
