@@ -310,11 +310,11 @@ test('hotkey spam', async () => {
 
 // ---- Phase 2: the layout ----
 
-async function shot(name) {
+async function shot(name, area = [0, 0, global.stage.width, global.stage.height]) {
     const file = Gio.File.new_for_path(`${OUT}/${name}.png`);
     const stream = file.replace(null, false, Gio.FileCreateFlags.NONE, null);
     const shooter = new Shell.Screenshot();
-    await new Promise((resolve, reject) => shooter.screenshot_area(0, 0, global.stage.width, global.stage.height, stream,
+    await new Promise((resolve, reject) => shooter.screenshot_area(...area.map(Math.round), stream,
         (o, res) => {
             try {
                 o.screenshot_area_finish(res);
@@ -953,6 +953,95 @@ test('lyrics: the top and bottom fade out blurred', async () => {
     ov.close();
     await sleep(SETTLE);
     assertClean('after the lyrics edges');
+});
+
+// ---- Phase 6: the enter ----
+
+test('enter: the cover pours out of a circle of glass, then the art fades in', async () => {
+    fake ??= new FakePlayer();
+    fake.setTrack(0, 40);
+    await sleep(600);
+    ext().toggle();
+    const samples = [];
+    const paintId = global.stage.connect('after-paint', () => {
+        const p = ext().overlay?.view?.pour;
+        if (p)
+            samples.push(p);
+    });
+    try {
+        await sleep(1800);
+    } finally {
+        global.stage.disconnect(paintId);
+    }
+    const v = ext().overlay?.view;
+    expect(samples.length > 10, `only ${samples.length} frames of the pour`);
+    const first = samples.find(p => p.opacity > 0) ?? samples[0];
+    const cover = v.parts.cover.width;
+    expect(first.width < cover * 0.3 && Math.abs(first.radius - first.width / 2) < 2, `it did not start as a small circle: ${JSON.stringify(first)}`);
+    const widest = samples.reduce((m, p) => Math.max(m, p.width), 0);
+    expect(widest >= cover - 2, `it never opened to the cover's size (${widest} of ${cover})`);
+    // never past the cover: no rim of glass around the art as it fades in
+    expect(widest <= cover + 0.5, `the glass grew past the cover (${widest.toFixed(1)} of ${cover})`);
+    const open = samples.filter(p => p.width >= cover - 2);
+    expect(open.some(p => Math.abs(p.radius - v._coverRadius) < 1.5), `the corners never became the cover's: ${open.map(p => p.radius.toFixed(1)).slice(0, 5)}`);
+    expect(samples.some(p => p.art > 200 && p.opacity > 200), 'the art did not come in over the glass');
+    // one piece: the cover fades in only once the glass is full size
+    const early = samples.find(p => p.art > 0 && p.width < cover - 1);
+    expect(!early, `the cover started to fade in before the glass was full size: ${JSON.stringify(early)}`);
+    expect(!v.pour && v._coverBox.opacity === 255, `after the enter: pour ${JSON.stringify(v.pour)}, art ${v._coverBox.opacity}`);
+    log(`  pour: ${samples.length} frames, from ${first.width.toFixed(0)} px round to ${widest.toFixed(0)} px (cover ${cover})`);
+    ext().overlay.close();
+    await sleep(SETTLE);
+    assertClean('after the enter');
+});
+
+test('enter: no tilt while the cover pours in, then the tilt', async () => {
+    fake ??= new FakePlayer();
+    fake.setTrack(0, 40);
+    await sleep(600);
+    ext().toggle();
+    await sleep(60);
+    const v = ext().overlay.view;
+    // the pointer over the cover's top left while it pours in
+    const [x, y] = v.parts.cover.get_transformed_position();
+    const [w, h] = v.parts.cover.get_transformed_size();
+    await pointerTo(x + 0.2 * w, y + 0.2 * h);
+    await pointerTo(x + 0.22 * w, y + 0.21 * h);
+    await sleep(200);
+    expect(v.entering, 'the enter was already over (test timing)');
+    const during = v.tilt;
+    expect(Math.abs(during.x) < 0.01 && Math.abs(during.y) < 0.01 && during.edge < 0.01, `tilted during the enter: ${JSON.stringify(during)}`);
+    await sleep(1600);
+    expect(!v.entering, 'the enter did not finish');
+    const after = v.tilt;
+    expect(Math.abs(after.x) > 1 && Math.abs(after.y) > 1 && after.edge > 0.9, `no tilt after the enter: ${JSON.stringify(after)}`);
+    await pointerTo(global.stage.width - 200, global.stage.height / 2);
+    ext().overlay.close();
+    await sleep(SETTLE);
+    assertClean('after the tilt during the enter');
+});
+
+// NP_RECORD=1: the enter, a shot every frame it allows
+test('record: enter', async () => {
+    if (!GLib.getenv('NP_RECORD'))
+        return;
+    fake ??= new FakePlayer();
+    fake.setTrack(0, 40);
+    await sleep(600);
+    ext().toggle();
+    // the cover's area only (a small shot is fast enough to catch the pour)
+    const area = [300, 200, 760, 760];
+    const start = GLib.get_monotonic_time();
+    for (let i = 0; i < 40 && GLib.get_monotonic_time() - start < 1600000; i++) {
+        await shot(`enter-${String(i).padStart(2, '0')}`, area);
+        const v = ext().overlay?.view;
+        const d = v?._drop;
+        const box = d ? [...d.get_transformed_position(), ...d.get_transformed_size()].map(n => Math.round(n)) : null;
+        const clip = d?._glass?._copy?.has_clip ? d._glass._copy.get_clip().map(n => Math.round(n)) : null;
+        append('enter-times.txt', `${i} ${((GLib.get_monotonic_time() - start) / 1000).toFixed(0)} drop ${JSON.stringify(box)} clip ${JSON.stringify(clip)} glass ${d?._glass?.hasGlass} cover ${JSON.stringify(v ? [...v.parts.cover.get_transformed_position(), ...v.parts.cover.get_transformed_size()].map(n => Math.round(n)) : null)}`);
+    }
+    ext().overlay.close();
+    await sleep(SETTLE);
 });
 
 // NP_RECORD=1: shots every 100 ms through a track change and the swap (docs recordings)

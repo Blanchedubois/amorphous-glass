@@ -5,9 +5,10 @@
 // their column they blur more and more (a Gaussian-like disc of samples, its radius growing) and fade
 // to nothing, as Apple Music's.
 //
-// GlassEdge (user, 2026-10-21): while hovered, the cover is a Liquid Glass card lit from above the
-// pointer: its face reflects the light softly, its thin rounded edge catches a glint and falls into
-// shade (a card's thickness, not a tile's), with the widgets' rim light, edge shadow and 1 px edge (a flat reflection
+// GlassEdge (user, 2026-10-21): while hovered, the cover is art set in a Liquid Glass card lit from
+// above the pointer: its face reflects the light softly; at its thin rounded edge the art fades out
+// and the widgets' glass behind the cover shows through (clear glass, not shaded paint), with a
+// glint on the side facing the light, a fainter one opposite and a Fresnel lift (a card's thickness), with the widgets' rim light, edge shadow and 1 px edge (a flat reflection
 // over the art alone made the cover look flat, user 2026-10-21).
 //
 // Sheen: the light on the cover while it tilts: a soft highlight that follows the pointer and a
@@ -139,25 +140,24 @@ const EDGE_SHADER = `
     // the face: a soft, broad reflection; the bevel: a sharp glint
     float faceSpec = 0.22 * pow(max(dot(V, normalize(Lp + V)), 0.0), 18.0) * (1.0 - onBevel);
     float bevelSpec = 0.70 * pow(max(dot(N, normalize(L + V)), 0.0), 40.0) * onBevel;
-    // the bevel turned from the light is darker than the face, turned to it a little lighter
-    float turn = dot(N, L) - dot(V, L);
-    float shadeBevel = 0.25 * max(-turn, 0.0) * onBevel;
-    float lightBevel = 0.15 * max(turn, 0.0) * onBevel;
-
-    // the widgets' glass edge, its light on the side of the edge facing the light
+    // glass, not paint: light on both sides of the edge (bright where it faces the light, a
+    // fainter internal reflection opposite), a Fresnel lift toward the very edge, never a grey
+    // shade; the 1 px white edge of the widgets' glass
     float facing = length(side) > 0.001 ? dot(n, normalize(side)) : 0.0;
     float rimBand = 1.0 - smoothstep(0.0, 0.45 * ge_band, d);
-    float aoBand = 1.0 - smoothstep(0.0, 0.20 * ge_band, d);
     float hair = 1.0 - smoothstep(0.6, 1.4, d);
-    float rim = 0.55 * rimBand * max(facing, 0.0) + 0.16 * hair;
-    float ao = 0.30 * aoBand * max(-facing, 0.0);
+    float rim = 0.55 * rimBand * max(facing, 0.0) + 0.20 * rimBand * max(-facing, 0.0) + 0.16 * hair;
+    float fresnel = 0.18 * x * x * x;
 
     float k = ge_strength;
-    float shade = clamp((shadeBevel + ao) * k, 0.0, 0.85);
-    float light = clamp((faceSpec + bevelSpec + lightBevel + rim) * k, 0.0, 1.0);
-    rgb = rgb * (1.0 - shade);
-    rgb = rgb + (1.0 - rgb) * light;
-    cogl_color_out = vec4(rgb * a, a) * cogl_color_in.a;
+    float light = clamp((faceSpec + bevelSpec + rim + fresnel) * k, 0.0, 1.0);
+    // the art ends inside the edge: across the outer band it fades, and the glass behind the cover
+    // (the widgets' Liquid Glass) shows through, so the rim is clear glass with the art set in it
+    float art = mix(1.0, smoothstep(0.15 * ge_band, 0.95 * ge_band, d), k);
+    vec4 col = vec4(rgb * art, art);
+    // the glints over the art and the glass alike
+    col = vec4(col.rgb * (1.0 - light) + vec3(light), col.a + light * (1.0 - col.a));
+    cogl_color_out = col * a * cogl_color_in.a;
 `;
 
 let edgeSnippet = null;
@@ -198,6 +198,127 @@ class TahoeNpGlassEdge extends Clutter.OffscreenEffect {
         set('ge_strength', this.strength);
         set('ge_px', this.pointer[0]);
         set('ge_py', this.pointer[1]);
+        super.vfunc_paint_target(node, paintContext);
+    }
+});
+
+// ---- RoundMask: an actor cut to a rounded rectangle (exact, anti-aliased) ----
+
+const MASK_DECLARATIONS = `
+uniform float rm_w;
+uniform float rm_h;
+uniform float rm_radius;
+`;
+const MASK_SHADER = `
+    vec2 uv = cogl_tex_coord0_in.st;
+    vec2 p = uv * vec2(rm_w, rm_h);
+    vec2 q = abs(p - 0.5 * vec2(rm_w, rm_h)) - (0.5 * vec2(rm_w, rm_h) - rm_radius);
+    float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - rm_radius;
+    cogl_color_out = texture2D(cogl_sampler0, uv) * clamp(0.5 - dist, 0.0, 1.0) * cogl_color_in.a;
+`;
+
+let maskSnippet = null;
+
+export const RoundMask = GObject.registerClass(
+class TahoeNpRoundMask extends Clutter.OffscreenEffect {
+    // radius: logical px
+    _init(radius) {
+        super._init();
+        this.radius = radius;
+        maskSnippet ??= (() => {
+            const s = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, MASK_DECLARATIONS, null);
+            s.set_replace(MASK_SHADER);
+            return s;
+        })();
+    }
+
+    vfunc_paint_target(node, paintContext) {
+        const pipeline = this.get_pipeline();
+        if (!pipeline)
+            return;
+        if (!pipeline._tahoeNpMask) {
+            pipeline.add_snippet(maskSnippet);
+            pipeline._tahoeNpMask = true;
+        }
+        const actor = this.get_actor();
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
+        set('rm_w', Math.max(1, actor.width * scale));
+        set('rm_h', Math.max(1, actor.height * scale));
+        set('rm_radius', this.radius * scale);
+        super.vfunc_paint_target(node, paintContext);
+    }
+});
+
+// ---- PourMask: the enter's opening shape, cut from a full-size glass card ----
+// A rounded rectangle (x, y, width, height, radius px, inside the actor) that can change every frame
+// without touching the glass under it (Blur My Shell builds that once); along its moving edge a thin
+// rim light from the top left and a little shade opposite, so the opening shape reads as glass.
+
+const POUR_DECLARATIONS = `
+uniform float pm_w;
+uniform float pm_h;
+uniform float pm_x;
+uniform float pm_y;
+uniform float pm_ww;
+uniform float pm_wh;
+uniform float pm_radius;
+uniform float pm_rim;
+`;
+const POUR_SHADER = `
+    vec2 uv = cogl_tex_coord0_in.st;
+    vec2 p = uv * vec2(pm_w, pm_h);
+    vec2 c = vec2(pm_x, pm_y) + 0.5 * vec2(pm_ww, pm_wh);
+    vec2 q = abs(p - c) - (0.5 * vec2(pm_ww, pm_wh) - pm_radius);
+    float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pm_radius;
+    float inside = clamp(0.5 - dist, 0.0, 1.0);
+    vec4 col = texture2D(cogl_sampler0, uv);
+    // the rim: within 3 px of the edge, lit where the edge faces the top left
+    vec2 n = normalize(p - c + vec2(0.0001));
+    float band = 1.0 - smoothstep(0.0, 3.0, -dist);
+    float facing = dot(n, normalize(vec2(-1.0, -1.0)));
+    float light = pm_rim * band * (0.16 + 0.55 * max(facing, 0.0));
+    float shade = pm_rim * band * 0.30 * max(-facing, 0.0);
+    col.rgb = col.rgb * (1.0 - shade) + (col.a - col.rgb * (1.0 - shade)) * light;
+    cogl_color_out = col * inside * cogl_color_in.a;
+`;
+
+let pourSnippet = null;
+
+export const PourMask = GObject.registerClass(
+class TahoeNpPourMask extends Clutter.OffscreenEffect {
+    _init() {
+        super._init();
+        this.window = [0, 0, 1, 1];   // x, y, width, height (logical px, inside the actor)
+        this.radius = 0;
+        this.rim = 1;
+        pourSnippet ??= (() => {
+            const s = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, POUR_DECLARATIONS, null);
+            s.set_replace(POUR_SHADER);
+            return s;
+        })();
+    }
+
+    vfunc_paint_target(node, paintContext) {
+        const pipeline = this.get_pipeline();
+        if (!pipeline)
+            return;
+        if (!pipeline._tahoeNpPour) {
+            pipeline.add_snippet(pourSnippet);
+            pipeline._tahoeNpPour = true;
+        }
+        const actor = this.get_actor();
+        const k = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const set = (name, v) => pipeline.set_uniform_1f(pipeline.get_uniform_location(name), v);
+        const [x, y, w, h] = this.window;
+        set('pm_w', Math.max(1, actor.width * k));
+        set('pm_h', Math.max(1, actor.height * k));
+        set('pm_x', x * k);
+        set('pm_y', y * k);
+        set('pm_ww', w * k);
+        set('pm_wh', h * k);
+        set('pm_radius', this.radius * k);
+        set('pm_rim', this.rim);
         super.vfunc_paint_target(node, paintContext);
     }
 });

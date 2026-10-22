@@ -8,6 +8,7 @@
 // HOLD_MS, so the column does not jump on every track change. Found lyrics are kept across
 // openings (knownLyrics), and the song playing when the view opens is looked up at once.
 
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gvc from 'gi://Gvc';
 
@@ -18,10 +19,22 @@ import {coverPalette, inkColour, swirlPalette} from './shared/palette.js';
 
 const LOOKUP_DELAY = 1000;   // ms a track has to stay before its lyrics are looked up (the widget's)
 const HOLD_MS = 2500;        // the layout waits this long for a new track's lyrics
+const FIRST_HOLD_MS = 700;   // and at opening, before the view shows its content
 const VOLUME_STEP = 0.05;
 const SEEK_STEP = 10;        // s, Shift+arrows
 const RESTART_AFTER = 3;     // s: previous restarts the track past this, as Apple Music
 const DARK_INK_OVER = 0.62;  // the swirl's mean lightness over which the text turns dark
+
+// an MPRIS player on the session bus now (one quick local call, at opening)
+function anyPlayer() {
+    try {
+        const [names] = Gio.DBus.session.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', 'ListNames', null, null, Gio.DBusCallFlags.NONE, 500, null).deep_unpack();
+        return names.some(n => n.startsWith('org.mpris.MediaPlayer2.'));
+    } catch {
+        return false;
+    }
+}
 
 const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
@@ -43,6 +56,8 @@ export class PlayerController {
         this._view = view;
         this._guard = guard;
         this._onLayout = onLayout;
+        this._decided = false;
+        this._expectPlayer = anyPlayer();
         this._timers = new Set();
         this._player = acquirePlayer();
         this._onChange = () => this._guard(() => this._refresh());
@@ -136,12 +151,21 @@ export class PlayerController {
     // ---- lyrics ----
     _refreshLyrics(state) {
         const key = state?.key ?? null;
-        const first = this._lyricsKey === undefined;
+        // until the layout is first decided, the view is still opening: no delays, short holds
+        const first = !this._decided;
         if (key !== this._lyricsKey) {
             this._lyricsKey = key;
             this._lookupId = this._cancel(this._lookupId);
             this._holdId = this._cancel(this._holdId);
-            if (!state) {
+            if (!state && first && this._expectPlayer) {
+                // the players are found asynchronously: at opening "nothing" may only mean "not
+                // yet"; with players on the bus, wait a moment before showing the placeholder
+                this._holdId = this._later(FIRST_HOLD_MS, () => {
+                    this._holdId = 0;
+                    if (!this._player?.state)
+                        this._setLines(null);
+                });
+            } else if (!state) {
                 this._setLines(null);
             } else {
                 const known = knownLyrics.has(key) ? knownLyrics.get(key) : this._player.knownLyrics(key);
@@ -152,15 +176,13 @@ export class PlayerController {
                     // view has just opened); the lines go at once
                     this._view.setLyrics(null);
                     this._lines = null;
-                    if (first) {
-                        this._onLayout?.(0);
-                    } else {
-                        this._holdId = this._later(HOLD_MS, () => {
-                            this._holdId = 0;
-                            if (this._lyricsKey === key)
-                                this._onLayout?.(0);
-                        });
-                    }
+                    // at opening the content waits for the answer (a local .lrc is instant), at
+                    // most FIRST_HOLD_MS, so the cover pours out where it will stay
+                    this._holdId = this._later(first ? FIRST_HOLD_MS : HOLD_MS, () => {
+                        this._holdId = 0;
+                        if (this._lyricsKey === key)
+                            this._decide(0);
+                    });
                     // the song on screen when the view opens is looked up at once; later ones
                     // after LOOKUP_DELAY, so skipping through songs asks nothing
                     this._lookupId = this._later(first ? 0 : LOOKUP_DELAY, () => {
@@ -185,8 +207,13 @@ export class PlayerController {
         this._holdId = this._cancel(this._holdId);
         this._lines = lines;
         this._view.setLyrics(lines);
-        this._onLayout?.(lines ? 1 : 0);
+        this._decide(lines ? 1 : 0);
         this._follow();
+    }
+
+    _decide(blend) {
+        this._decided = true;
+        this._onLayout?.(blend);
     }
 
     get hasLyrics() {
