@@ -457,7 +457,16 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   - a change mid-swap, where the spring must retarget smoothly.
   Frame timing is within budget.
 
-### Phase 5: controls, the widgets' glass, and the 3D tilt
+### Phase 5: controls, the widgets' glass, and the 3D tilt (done: `docs/nowplaying/shots/phase5-tilt-glass.png`, 55/55 headless)
+- **Result.** The chevron, the empty cover's card and the hover outline are Blur My Shell's
+  `pipeline_glassbar_dock` with its RoundedPipeline, built as the widgets' GlassCard builds them
+  (`widgetglass.js`), over a copy of the view's backdrop; the tests check the pipeline id and that
+  the CSS stand-in is gone. The cover tilts up to 8° toward the pointer on springs, lifts 24 px,
+  a sheen (an SDF-cut shader) follows the pointer, the outline fades in, and all of it springs back
+  when the pointer leaves. The lyrics fade out blurred at the top and bottom (user, 2026-10-21:
+  `EdgeFade` in `effects.js`, 220 px bands, up to 14 px of blur). Tilt sweep at 60 Hz: p50 16.8 ms,
+  p95 21.8 ms. Not done: a pixel comparison with a desktop widget (the two glasses bend different
+  backdrops, so they cannot match pixel for pixel; the same pipeline and settings is the check).
 - **Controls.** SF Symbols as labels (the fallback SVGs when SF Pro is missing), the widget's hover
   circle and press squish, the cover's ink.
 - **Glass.** The chevron, and the card used by the enter and exit, on the widgets' `glass.js` in dark mode.
