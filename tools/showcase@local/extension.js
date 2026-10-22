@@ -53,7 +53,7 @@ function* walk(root) {
     }
 }
 
-// what: 'quick-settings', 'date', 'activities', 'status:<statusArea key>', 'dock:<app id>',
+// what: 'quick-settings', 'date', 'activities', 'status:<statusArea key>', 'dock:<app id>', 'show-apps',
 // 'qs-arrow:<n>' (the n-th quick settings toggle with a submenu), 'qs-toggle:<n>', 'menu' (the open
 // menu's box), 'widget:<n>' (the n-th desktop widget), 'app-grid:<app id>', 'folder:<n>', 'window:<app id>'
 function locate(what) {
@@ -80,6 +80,11 @@ function locate(what) {
     case 'folder': {
         const folders = [...walk(global.stage)].filter(a => a.constructor?.name === 'FolderIcon');
         return box(folders[Number(arg)] ?? null);
+    }
+    case 'show-apps': {
+        // the dock's app grid button (dash-to-dock's DockShowAppsIcon, else GNOME's own)
+        const icons = [...walk(global.stage)].filter(a => a.constructor?.name === 'DockShowAppsIcon' || a.has_style_class_name?.('show-apps'));
+        return box(icons.find(a => a.mapped) ?? null);
     }
     case 'qs-arrow':
     case 'qs-toggle': {
