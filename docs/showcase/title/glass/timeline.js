@@ -14,15 +14,16 @@ const DT = 1 / 240;
 
 /// the beats, in seconds
 export const SEQ = {
-    uiOut: [0.05, 0.55],   // bar, dock and widgets fade out: the bare wallpaper
-    drop: 0.45,            // the drop appears above the line and starts to fall
+    // the montage's last frame holds 0.3 s first: loop.sh's 0.5 s dissolve lands on it
+    uiOut: [0.3, 0.8],     // bar, dock and widgets fade out: the bare wallpaper
+    drop: 0.7,             // the drop appears above the line and starts to fall
     dropIn: 0.2,           // fading in as it starts (Now Playing: 0.11; longer, less abrupt)
     fall: 0.42,            // the fall, accelerating
-    morph: 1.10,           // the spread into a bar begins
-    rise: 1.26,            // the letters start to rise out of it, from the middle
-    fadeOut: [3.4, 4.0],   // the glass fades out
-    uiIn: [3.4, 4.0],      // bar, dock and widgets fade back in
-    end: 5.6,              // the plate, still, until the montage cuts in
+    morph: 1.35,           // the spread into a bar begins
+    rise: 1.51,            // the letters start to rise out of it, from the middle
+    fadeOut: [3.65, 4.25], // the glass fades out
+    uiIn: [3.65, 4.25],    // bar, dock and widgets fade back in
+    end: 4.9,              // the montage's first frame, still, until it cuts in
 };
 
 // Now Playing's drop (view.js): the stretch along the fall, the volume kept; the landing's springs,
