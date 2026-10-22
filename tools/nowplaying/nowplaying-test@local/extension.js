@@ -845,21 +845,114 @@ test('swap: a change mid-way turns back smoothly', async () => {
     // again before it has arrived
     fake.setTrack(1, 1);
     await sleep(200);
-    keys('Left');   // track 1: its lyrics are looked up (about 1 s), then the column moves
+    // the blend as painted: one sample per frame, at the frame's time
     const samples = [];
-    for (let i = 0; i < 200 && ov.view.blend < 0.05; i++)
-        samples.push(await sample(() => ov.view.blend, 16, 16).then(a => a[0] ?? ov.view.blend));
-    samples.push(...await sample(() => ov.view.blend, 150));
-    keys('Right');   // track 2 (known: no lyrics) before the column has arrived
-    samples.push(...await sample(() => ov.view.blend, 2400));
-    const peak = Math.max(...samples);
-    const jumps = samples.slice(1).map((v, i) => Math.abs(v - samples[i]));
+    const paintId = global.stage.connect('after-paint', () => samples.push([GLib.get_monotonic_time() / 1e6, ov.view.blend]));
+    try {
+        keys('Left');   // track 1: its lyrics are looked up (about 1 s), then the column moves
+        for (let i = 0; i < 200 && ov.view.blend < 0.05; i++)
+            await sleep(16);
+        await sleep(150);
+        keys('Right');   // track 2 (known: no lyrics) before the column has arrived
+        await sleep(2400);
+    } finally {
+        global.stage.disconnect(paintId);
+    }
+    const values = samples.map(([, v]) => v);
+    const peak = Math.max(...values);
+    // a jump is a step between two painted frames far bigger than the spring's (paint times are
+    // too irregular for a speed: two paints can come 6 ms apart)
+    const steps = values.slice(1).map((v, i) => Math.abs(v - values[i]));
+    const biggest = Math.max(...steps);
     expect(peak > 0.05 && peak < 0.95, `the column went to ${peak.toFixed(3)} (wanted part of the way)`);
-    expect(Math.max(...jumps) < 0.12, `a jump of ${Math.max(...jumps).toFixed(3)}`);
-    expect(samples.at(-1) === 0, `blend ended at ${samples.at(-1)}`);
+    expect(biggest < 0.15, `a jump of ${biggest.toFixed(3)} between two frames`);
+    expect(values.at(-1) === 0, `blend ended at ${values.at(-1)}`);
+    log(`  turn back: peak ${peak.toFixed(3)}, biggest step per frame ${biggest.toFixed(3)} over ${values.length} frames`);
     ov.close();
     await sleep(SETTLE);
     assertClean('after the turn back');
+});
+
+// ---- Phase 5: the tilt, the widgets' glass, the lyrics' edges ----
+
+async function pointerTo(x, y) {
+    ptr.notify_absolute_motion(t(), x, y);
+    await sleep(30);
+}
+
+// a point on the cover, 0..1 of its box
+function onCover(v, fx, fy) {
+    const [x, y] = v.parts.cover.get_transformed_position();
+    const [w, h] = v.parts.cover.get_transformed_size();
+    return [x + fx * w, y + fy * h];
+}
+
+test('tilt: the cover leans toward the pointer, then springs back', async () => {
+    const ov = await openOn(0);
+    const v = ov.view;
+    await pointerTo(...onCover(v, 0.2, 0.2));
+    await pointerTo(...onCover(v, 0.18, 0.22));
+    await sleep(700);
+    let tl = v.tilt;
+    log(`  tilt at top left: ${JSON.stringify(tl)}`);
+    expect(Math.abs(tl.x) > 3 && Math.abs(tl.y) > 3, `hardly tilted ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
+    expect(tl.x < 0 && tl.y > 0, `tilted the wrong way ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
+    expect(tl.outline === 255 && tl.sheen > 0.9 && tl.z > 10, `outline ${tl.outline}, sheen ${tl.sheen}, lift ${tl.z}`);
+    await shot('tilt-a');
+    // a sweep across the cover, timed
+    const timing = await frameTimes(async () => {
+        for (let i = 0; i <= 30; i++)
+            await pointerTo(...onCover(v, 0.18 + i * 0.022, 0.22 + i * 0.019));
+        await sleep(500);
+    });
+    tl = v.tilt;
+    expect(tl.x > 0 && tl.y < 0, `after the sweep to the bottom right: ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
+    log(`  tilt sweep: ${timing.frames} frames, p50 ${timing.p50.toFixed(1)} ms, p95 ${timing.p95.toFixed(1)} ms, max ${timing.max.toFixed(1)} ms`);
+    append('timing.jsonl', JSON.stringify({test: 'tilt', ...timing}));
+    await shot('tilt-b');
+    // leave: flat again, no outline, no sheen
+    await pointerTo(global.stage.width - 200, global.stage.height / 2);
+    await sleep(900);
+    tl = v.tilt;
+    expect(Math.abs(tl.x) < 0.05 && Math.abs(tl.y) < 0.05 && Math.abs(tl.z) < 0.5, `not flat after leaving: ${JSON.stringify(tl)}`);
+    expect(tl.outline === 0 && tl.sheen < 0.02, `outline ${tl.outline}, sheen ${tl.sheen} after leaving`);
+    expect(ext().overlay?.state === 'open', 'moving the pointer closed the view');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the tilt');
+});
+
+test('glass: the chevron and the empty cover are the widgets\' glass', async () => {
+    const ov = await openOn(2);   // no cover: the card shows
+    const v = ov.view;
+    await sleep(500);
+    const chevronGlass = v.chevron.child._glass;
+    const coverGlass = v._coverGlass._glass;
+    const bms = Main.extensionManager.lookup('blur-my-shell@aunetx');
+    expect(bms?.state === 1, `Blur My Shell is not running in the test shell (state ${bms?.state})`);
+    for (const [name, glass] of [['chevron', chevronGlass], ['cover card', coverGlass]]) {
+        expect(glass?.hasGlass, `${name}: no Blur My Shell glass`);
+        expect(glass._glass.pipeline.pipeline_id === 'pipeline_glassbar_dock', `${name}: pipeline ${glass._glass.pipeline.pipeline_id}`);
+        expect(glass._glass.pipeline.effects.length > 0, `${name}: the pipeline has no effects`);
+    }
+    // the CSS stand-in's tint is gone once the real glass is there
+    expect(!v.chevron.child.has_style_class_name('tahoe-np-glass'), 'the chevron still has the CSS stand-in');
+    const effects = v.chevron.child._glass._glass.pipeline.effects.map(e => e._bms_effect_type ?? e.constructor.name);
+    log(`  chevron glass effects: ${effects.join(', ')}`);
+    await shot('glass-nocover');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the glass');
+});
+
+test('lyrics: the top and bottom fade out blurred', async () => {
+    const ov = await openOn(0);
+    const fade = ov.view.parts.lyrics.get_effect('edge-fade');
+    expect(fade, 'no edge fade on the lyrics');
+    await shot('lyrics-edges');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the lyrics edges');
 });
 
 // NP_RECORD=1: shots every 100 ms through a track change and the swap (docs recordings)

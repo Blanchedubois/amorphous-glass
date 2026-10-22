@@ -26,6 +26,8 @@ import {geometry} from './layout.js';
 import {EXPRESSIVE} from './shared/spring.js';
 import {Motion} from './motion.js';
 import {Swirl} from './swirl.js';
+import {EdgeFade, Sheen} from './effects.js';
+import {WidgetGlass} from './widgetglass.js';
 import {setSymbol, symbolActor} from './symbols.js';
 
 const WALLPAPER_BLUR = 60;        // logical px at 1440p
@@ -35,6 +37,12 @@ const COVER_FADE_MS = 300;        // the old cover fading out over the new one
 const COVER_FROM = 0.97;          // the new cover grows from this
 const TEXT_MS = 300;              // a new title sliding in
 const TEXT_RISE = 8;              // px at 1440p
+const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at the top and bottom
+const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
+const OUTLINE = 12;               // px at 1440p: the glass outline around the hovered cover
+const OUTLINE_MS = 180;
+const TILT_MAX = 8;               // degrees each way
+const TILT_LIFT = 24;             // px toward the viewer while hovered
 const DISABLED = 0.4;             // a control the player does not offer
 
 const interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
@@ -67,6 +75,7 @@ export class NowPlayingView {
         this.controls = {};
 
         this.motion = new Motion(parent, guard);
+        this._glasses = [];
         this._buildBackdrop();
         const g = geometry(monitor, 1);
         this._u = g.u;
@@ -204,23 +213,50 @@ export class NowPlayingView {
         };
 
         // the cover: the art by itself (12 px corners, no shadow: St draws one as a square box behind
-        // the rounded art); with none, a Liquid Glass card
-        // with a note (the widgets' dark glass; Phase 5 puts the real glass under the CSS stand-in)
-        const cover = at(new St.Widget({layout_manager: new Clutter.BinLayout()}), b.cover, 'cover');
+        // the rounded art); with none, a card of the widgets' glass with a note. Hovered, it tilts
+        // toward the pointer with a sheen, the widgets' glass appearing around it as an outline.
+        // cover (takes the pointer, never moves) > tilt (turns) > outline, the art or card, sheen
+        const cover = at(new St.Widget({reactive: true, track_hover: true, layout_manager: new Clutter.FixedLayout()}), b.cover, 'cover');
         const radius = g.coverRadius;
-        this._coverGlass = new St.Widget({
-            style_class: 'tahoe-np-glass tahoe-np-cover-glass',
-            style: `border-radius: ${radius}px;`,
-            x_expand: true, y_expand: true,
-            layout_manager: new Clutter.BinLayout(),
-        });
-        const note = new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: Math.round(b.cover.height * 0.3), x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+        const [cw, ch] = [b.cover.width, b.cover.height];
+        const tilt = new St.Widget({layout_manager: new Clutter.FixedLayout(), pivot_point: new Graphene.Point({x: 0.5, y: 0.5})});
+        tilt.set_size(cw, ch);
+        cover.add_child(tilt);
+        this._tilt = tilt;
+
+        // the outline: a card of the widgets' glass OUTLINE px bigger all round (radius 12 + 12 = 24,
+        // the widgets' own), behind the cover, shown while hovered
+        const ring = Math.round(OUTLINE * this._u);
+        this._outline = this._glassCard(radius + ring);
+        this._outline.set_position(-ring, -ring);
+        this._outline.set_size(cw + 2 * ring, ch + 2 * ring);
+        this._outline.opacity = 0;
+        tilt.add_child(this._outline);
+
+        const stack = new St.Widget({layout_manager: new Clutter.BinLayout()});
+        stack.set_size(cw, ch);
+        tilt.add_child(stack);
+        this._coverGlass = this._glassCard(radius);
+        this._coverGlass.x_expand = this._coverGlass.y_expand = true;
+        const note = new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: Math.round(ch * 0.3), x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
         this._inkedStyle(note, 0.7);
         this._coverGlass.add_child(note);
-        cover.add_child(this._coverGlass);
+        stack.add_child(this._coverGlass);
         this._coverRadius = radius;
-        this._coverBox = cover;
+        this._coverBox = stack;
         this._coverArt = null;   // the art shown (an St.Widget), or null: the glass card
+
+        // the sheen, over the art (a shader cut to the cover's corners)
+        const sheen = new St.Widget({style: 'background-color: rgba(255, 255, 255, 0.004);', reactive: false});
+        sheen.set_size(cw, ch);
+        this._sheen = new Sheen(radius * St.ThemeContext.get_for_stage(global.stage).scale_factor);
+        sheen.add_effect_with_name('sheen', this._sheen);
+        sheen.opacity = 0;
+        tilt.add_child(sheen);
+        this._sheenActor = sheen;
+
+        cover.connect('motion-event', (_a, event) => this._guard(() => this._tiltTo(event)) ?? Clutter.EVENT_PROPAGATE);
+        cover.connect('leave-event', () => this._guard(() => this._untilt()) ?? Clutter.EVENT_PROPAGATE);
 
         const text = (string, extra, alpha) => {
             const l = new St.Label({text: string, style_class: 'tahoe-np-text'});
@@ -332,6 +368,77 @@ export class NowPlayingView {
 
     _setFill(track, fraction) {
         track._fill.set_size(Math.round(track._bar.width * Math.min(1, Math.max(0, fraction))), track._bar.height);
+    }
+
+    // a card of the widgets' glass (widgetglass.js), the CSS stand-in until Blur My Shell's is there
+    _glassCard(radius) {
+        const card = new St.Widget({
+            style_class: 'tahoe-np-glass',
+            style: `border-radius: ${radius === 'capsule' ? 9999 : radius}px;`,
+            layout_manager: new Clutter.BinLayout(),
+        });
+        const glass = new WidgetGlass(this.backdrop, radius);
+        glass.actor.x_expand = glass.actor.y_expand = true;
+        card.add_child(glass.actor);
+        glass.onReady = ok => {
+            if (ok && !glass.destroyed)
+                card.remove_style_class_name('tahoe-np-glass');   // the real glass has its own tint
+        };
+        this._glasses.push(glass);
+        card._glass = glass;
+        return card;
+    }
+
+    // ---- the tilt: the cover leans toward the pointer (TILT_MAX each way), lifts, a sheen follows
+    _tiltTo(event) {
+        const [ok, x, y] = this.parts.cover.transform_stage_point(...event.get_coords());
+        if (!ok)
+            return Clutter.EVENT_PROPAGATE;
+        const w = this.parts.cover.width, h = this.parts.cover.height;
+        const px = Math.min(1, Math.max(0, x / w)), py = Math.min(1, Math.max(0, y / h));
+        const m = this.motion, t = this._tilt;
+        const token = EXPRESSIVE.spatial.default;
+        // the side under the pointer goes down, the far side comes up
+        m.spring('tilt-x', t.rotation_angle_x, (py - 0.5) * 2 * TILT_MAX, token, v => (t.rotation_angle_x = v));
+        m.spring('tilt-y', t.rotation_angle_y, -(px - 0.5) * 2 * TILT_MAX, token, v => (t.rotation_angle_y = v));
+        m.spring('tilt-z', t.translation_z, TILT_LIFT * this._u, token, v => (t.translation_z = v));
+        m.spring('sheen', this._sheen.strength, 1, EXPRESSIVE.effects.default, v => {
+            this._sheen.strength = v;
+            this._sheenActor.opacity = Math.round(255 * Math.min(1, Math.max(0, v)));
+        });
+        this._sheen.x = px;
+        this._sheen.y = py;
+        this._sheen.band = (px + py) - 1;
+        this._sheen.queue_repaint();
+        if (!this._hovered) {
+            this._hovered = true;
+            this._outline.remove_all_transitions();
+            this._outline.ease({opacity: 255, duration: OUTLINE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        }
+        this.tiltTarget = [px, py];
+        return Clutter.EVENT_PROPAGATE;
+    }
+
+    _untilt() {
+        const m = this.motion, t = this._tilt;
+        const token = EXPRESSIVE.spatial.default;
+        m.spring('tilt-x', t.rotation_angle_x, 0, token, v => (t.rotation_angle_x = v));
+        m.spring('tilt-y', t.rotation_angle_y, 0, token, v => (t.rotation_angle_y = v));
+        m.spring('tilt-z', t.translation_z, 0, token, v => (t.translation_z = v));
+        m.spring('sheen', this._sheen.strength, 0, EXPRESSIVE.effects.default, v => {
+            this._sheen.strength = v;
+            this._sheenActor.opacity = Math.round(255 * Math.min(1, Math.max(0, v)));
+        });
+        this._hovered = false;
+        this._outline.remove_all_transitions();
+        this._outline.ease({opacity: 0, duration: OUTLINE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        this.tiltTarget = null;
+        return Clutter.EVENT_PROPAGATE;
+    }
+
+    get tilt() {
+        const t = this._tilt;
+        return {x: t.rotation_angle_x, y: t.rotation_angle_y, z: t.translation_z, outline: this._outline.opacity, sheen: this._sheen.strength};
     }
 
     // a floating control: the symbol, no plate; hover is the widget's soft circle (stylesheet)
@@ -481,6 +588,8 @@ export class NowPlayingView {
             anchor: (g.sungMiddle - b.y) / b.height,
         });
         box.add_child(this._lyrics.actor);
+        // no hard edge: toward the top and bottom the lines blur more and more and fade out
+        box.add_effect_with_name('edge-fade', new EdgeFade(Math.round(LYRIC_EDGE * g.u), Math.round(LYRIC_EDGE_BLUR * g.u)));
         this._lyrics.setLines(null, '');
         this.setInk(null);
     }
@@ -498,11 +607,14 @@ export class NowPlayingView {
     // ---- the chevron ----
     _buildChevron(g, onChevron) {
         const b = g.boxes.chevron;
+        // the widgets' glass as a capsule, the symbol over it
+        const face = this._glassCard('capsule');
+        face.add_child(new St.Bin({child: symbolActor('chevron.down', Math.round(26 * g.u), 'go-down-symbolic'), x_expand: true, y_expand: true}));
         const chevron = new St.Button({
-            style_class: 'tahoe-np-glass tahoe-np-chevron',
+            style_class: 'tahoe-np-chevron',
             accessible_name: 'Back to the desktop',
             can_focus: false,
-            child: symbolActor('chevron.down', Math.round(26 * g.u), 'go-down-symbolic'),
+            child: face,
         });
         chevron._tahoeNpControl = true;
         chevron.set_position(b.x, b.y);
@@ -523,6 +635,9 @@ export class NowPlayingView {
         // hidden by opacity only (an unallocated, invisible column warns while its lines ease)
         this.parts.lyrics.opacity = Math.round(255 * g.lyricsOpacity);
         this.geometry = g;
+        // the cover's glass follows the column's translation
+        for (const glass of this._glasses ?? [])
+            glass.place();
     }
 
     get blend() {
