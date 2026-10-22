@@ -96,6 +96,9 @@ item('A5', 'GTK3 windows rounded on all four corners',
      {'type': 'absent-text', 'glob': '~/.themes/MacTahoe-*/gtk-3.0/gtk*.css', 'text': 'border-radius: 24px 24px 0 0'},
      {'type': 'replace', 'old': 'border-radius: 24px 24px 0 0', 'new': 'border-radius: 24px'})
 item('A6', 'Tahoe login screen theme in the system gresource (when installed)', {'type': 'gdm-gresource'})
+item('A7', 'Login screen extension (system copy) matches this checkout (when installed)',
+     {'type': 'system-copy', 'path': '/usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe',
+      'repo': 'extensions/tahoe-gdm@cachyos-tahoe', 'fix': 'bash {ROOT}/scripts/gdm-theme.sh install'})
 
 # ---- B. GTK apps ------------------------------------------------------------------------------
 for m in MODES:
