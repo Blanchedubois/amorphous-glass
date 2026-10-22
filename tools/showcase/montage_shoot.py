@@ -536,6 +536,37 @@ def s_search_click():
         move(*HOME_XY, 600)
 
 
+def s_dock_search():
+    """the dock menu straight into the search, one take (user, 2026-10-22: "the right click on the files
+    app should transition directly to the app search for the calculator"): Files' glass menu, Escape,
+    the overview, the cursor up to the search bar, a click, "calc", the results, back to the desktop"""
+    with Clip('dock-search'):
+        x, y = center('dock:org.gnome.Nautilus')
+        move(x, y - 260, 500)
+        move(x, y, 700)
+        pause(500)                             # the glass name label
+        click(button=3)
+        pause(900)
+        move(x + 20, y - 150, 800)             # up over the menu's rows
+        pause(700)
+        press('Escape')                        # the menu shrinks back into the icon
+        settle(500)
+        press('Super_L')
+        settle(900)                            # the overview opens
+        move(1280, 78, 900)                    # up to the search bar
+        pause(300)
+        click()
+        settle(400)
+        type_('calc')
+        settle(1600)                           # the results pop up
+        press('Escape')
+        settle(300)
+        press('Escape')
+        settle(900)
+        move(*HOME_XY, 600)
+        settle(1200)                           # the home screen, still: where the title takes over
+
+
 def s_overview_search():
     with Clip('overview-search'):
         press('Super_L')
@@ -785,7 +816,8 @@ def gset_mode():
 # the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
 # of the desktop menu, window menu and volume shots
 SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
-         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click]
+         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click,
+         s_dock_search]
 # the README's rows: live blur, motion, spacing (the calendar), icons, widgets, modes
 FEATURE_SHOTS = [s_live_blur, s_files_window, s_menu_slide, s_quick_settings, s_desktop_widget, s_calendar,
                  s_icons, s_dock_menu, s_albums, s_modes]
