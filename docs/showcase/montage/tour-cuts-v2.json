@@ -20,13 +20,22 @@
       "where": "top right: the panel grows from its icon, the Wi-Fi submenu"
     },
     {
-      "name": "widget-to-menu",
+      "name": "desktop-widget",
       "source": "~/Videos/liquid-glass-showcase/extra4/widget-to-menu.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-extra/widget-to-menu.track.json",
       "in": 0.45,
+      "out": 5.95,
+      "zoom": 1.4,
+      "where": "right-click the wallpaper, Add Widget, the clock drops in, the cursor glides to it and rests, then leaves upward (cut on that motion; user, 2026-10-22)"
+    },
+    {
+      "name": "menu-slide",
+      "source": "~/Videos/liquid-glass-showcase/extra4/widget-to-menu.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/widget-to-menu.track.json",
+      "in": 6.55,
       "out": 12.3,
       "zoom": 1.4,
-      "where": "one take (user, 2026-10-22): right-click the wallpaper, Add Widget, the clock drops in; the cursor rises to the date, the calendar grows out of it and glides into quick settings"
+      "where": "the cursor arrives at the date and clicks: the calendar grows out of the clock and glides into quick settings"
     },
     {
       "name": "files-drag",
