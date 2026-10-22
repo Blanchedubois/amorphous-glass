@@ -5,7 +5,8 @@
 //
 // Lyrics decide the layout: synced lyrics found, two columns; none (or only unsynced ones), the
 // column centred. While a new track's lyrics are looked up the layout stays as it is, for at most
-// HOLD_MS, so the column does not jump on every track change.
+// HOLD_MS, so the column does not jump on every track change. Found lyrics are kept across
+// openings (knownLyrics), and the song playing when the view opens is looked up at once.
 
 import GLib from 'gi://GLib';
 import Gvc from 'gi://Gvc';
@@ -23,6 +24,18 @@ const RESTART_AFTER = 3;     // s: previous restarts the track past this, as App
 const DARK_INK_OVER = 0.62;  // the swirl's mean lightness over which the text turns dark
 
 const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+// the lyrics found per track, kept across openings (the shared player, and its cache, is released
+// when the view closes), so a known song opens straight into its layout
+const LYRICS_KEPT = 32;
+const knownLyrics = new Map();   // track key -> lines or null
+
+function keep(key, lines) {
+    knownLyrics.delete(key);
+    knownLyrics.set(key, lines);
+    while (knownLyrics.size > LYRICS_KEPT)
+        knownLyrics.delete(knownLyrics.keys().next().value);
+}
 
 export class PlayerController {
     // view: NowPlayingView; guard: the overlay's; onLayout(blend): the lyrics decided the layout
@@ -131,7 +144,7 @@ export class PlayerController {
             if (!state) {
                 this._setLines(null);
             } else {
-                const known = this._player.knownLyrics(key);
+                const known = knownLyrics.has(key) ? knownLyrics.get(key) : this._player.knownLyrics(key);
                 if (known !== undefined) {
                     this._setLines(known);
                 } else {
@@ -148,7 +161,9 @@ export class PlayerController {
                                 this._onLayout?.(0);
                         });
                     }
-                    this._lookupId = this._later(LOOKUP_DELAY, () => {
+                    // the song on screen when the view opens is looked up at once; later ones
+                    // after LOOKUP_DELAY, so skipping through songs asks nothing
+                    this._lookupId = this._later(first ? 0 : LOOKUP_DELAY, () => {
                         this._lookupId = 0;
                         const show = lines => this._guard(() => {
                             if (this._player && this._lyricsKey === key)
@@ -165,6 +180,8 @@ export class PlayerController {
     }
 
     _setLines(lines) {
+        if (this._lyricsKey)
+            keep(this._lyricsKey, lines);
         this._holdId = this._cancel(this._holdId);
         this._lines = lines;
         this._view.setLyrics(lines);

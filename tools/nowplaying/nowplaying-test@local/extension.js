@@ -624,6 +624,7 @@ test('player: controls and keys reach the player', async () => {
     const ov = await openView();
     await sleep(600);
     const v = ov.view;
+    expect(v.blend === 1 && v.motion.value('blend') === undefined, `the layout still moves after opening on a known song (blend ${v.blend})`);
     fake.calls = [];
     const clickOn = async actor => {
         const [x, y] = actor.get_transformed_position();
@@ -632,7 +633,8 @@ test('player: controls and keys reach the player', async () => {
         await sleep(300);
     };
     await clickOn(v.controls['play-pause']);
-    expect(fake.status === 'Paused', `status ${fake.status} after play-pause`);
+    const [bx, by] = v.controls['play-pause'].get_transformed_position();
+    expect(fake.status === 'Paused', `status ${fake.status} after play-pause (calls ${fake.calls}, button at ${bx},${by}, reactive ${v.controls['play-pause'].reactive}, blend ${v.blend}, overlay ${ext().overlay?.state})`);
     await sleep(200);
     expect(v.controls['play-pause'].child.text === String.fromCodePoint(0x100284), 'play button is not play.fill while paused');
     keys('space');
@@ -725,6 +727,153 @@ test('player: stay-closed setting', async () => {
         settings.set_string('when-nothing-plays', 'placeholder');
     }
     assertClean('after stay-closed');
+});
+
+// ---- Phase 4: the swirl and the transitions ----
+
+// stage frame intervals (ms) while fn runs
+async function frameTimes(fn) {
+    const stamps = [];
+    const id = global.stage.connect('after-paint', () => stamps.push(GLib.get_monotonic_time()));
+    try {
+        await fn();
+    } finally {
+        global.stage.disconnect(id);
+    }
+    const gaps = stamps.slice(1).map((t, i) => (t - stamps[i]) / 1000).sort((a, b) => a - b);
+    const pct = q => gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(q * gaps.length))] : 0;
+    return {frames: stamps.length, p50: pct(0.5), p95: pct(0.95), max: gaps.at(-1) ?? 0};
+}
+
+// samples fn() every `ms` for `total` ms
+async function sample(fn, total, ms = 16) {
+    const out = [];
+    const end = GLib.get_monotonic_time() + total * 1000;
+    while (GLib.get_monotonic_time() < end) {
+        out.push(fn());
+        await sleep(ms);
+    }
+    return out;
+}
+
+// open on track `index` and wait until its lyrics, colours and layout have settled
+async function openOn(index) {
+    fake ??= new FakePlayer();
+    fake.setTrack(index, 40);
+    await sleep(400);
+    const ov = await openView();
+    await sleep(2400);
+    return ov;
+}
+
+const near = (a, b, eps) => a.every((c, i) => c.every((v, j) => Math.abs(v - b[i][j]) < eps));
+
+test('swirl: shows with a cover and turns slowly', async () => {
+    const ov = await openOn(0);
+    const sw = ov.view.swirl;
+    expect(sw.amount === 1 && sw.effect.enabled, `amount ${sw.amount}, enabled ${sw.effect.enabled}`);
+    const t0 = sw.t;
+    await sleep(1000);
+    const turned = sw.t - t0;
+    expect(turned > 0.7 && turned < 1.3, `the field turned ${turned.toFixed(2)} in 1 s`);
+    expect(!ov.view.motion.running, 'the frame clock still runs with nothing but the swirl');
+    await shot('swirl-cover1');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the swirl');
+});
+
+test('swirl: a new cover cross-fades the colours', async () => {
+    const ov = await openOn(0);
+    const sw = ov.view.swirl;
+    const before = sw.colours.map(c => [...c]);
+    keys('Right');   // track 2, a blue cover
+    await sleep(800);
+    const mid = sw.colours.map(c => [...c]);
+    expect(!near(mid, before, 0.01), 'the colours had not started to change');
+    await sleep(1400);
+    const after = sw.colours.map(c => [...c]);
+    expect(!near(after, before, 0.05), 'the colours did not change');
+    expect(!near(mid, after, 0.01), 'the colours jumped instead of fading');
+    expect(sw.amount === 1, `amount ${sw.amount} between two covers`);
+    await shot('swirl-cover2');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the cross-fade');
+});
+
+test('swirl: no cover fades to the blurred wallpaper and stops', async () => {
+    const ov = await openOn(1);
+    keys('Right');   // track 3, no cover
+    await sleep(2000);
+    const sw = ov.view.swirl;
+    expect(sw.amount === 0 && !sw.effect.enabled, `amount ${sw.amount}, enabled ${sw.effect.enabled}`);
+    const t0 = sw.t;
+    await sleep(400);
+    expect(sw.t === t0, 'the swirl still turns with no cover');
+    expect(!ov.view.motion.running && !ov.view.motion._idleId, 'something still ticks with nothing to animate');
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the fade to the wallpaper');
+});
+
+test('swap: lyrics to none on a spring, smooth, then still', async () => {
+    const ov = await openOn(0);
+    expect(ov.view.blend === 1, `blend ${ov.view.blend} with lyrics`);
+    let samples;
+    const timing = await frameTimes(async () => {
+        keys('Right');   // track 2: no synced lyrics
+        samples = await sample(() => ov.view.blend, 2600);
+    });
+    const jumps = samples.slice(1).map((v, i) => Math.abs(v - samples[i]));
+    const biggest = Math.max(...jumps);
+    expect(samples.at(-1) === 0, `blend ended at ${samples.at(-1)}`);
+    expect(biggest < 0.12, `the column jumped ${biggest.toFixed(3)} in one sample`);
+    expect(Math.min(...samples) > -0.1, `overshoot ${Math.min(...samples).toFixed(3)}`);
+    expect(!ov.view.motion.running, 'the frame clock still runs after the swap');
+    log(`  swap: ${timing.frames} frames, p50 ${timing.p50.toFixed(1)} ms, p95 ${timing.p95.toFixed(1)} ms, max ${timing.max.toFixed(1)} ms; biggest step ${biggest.toFixed(3)}`);
+    append('timing.jsonl', JSON.stringify({test: 'swap', ...timing}));
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the swap');
+});
+
+test('swap: a change mid-way turns back smoothly', async () => {
+    const ov = await openOn(1);   // centred (no synced lyrics)
+    expect(ov.view.blend === 0, `blend ${ov.view.blend}`);
+    // previous: track 1, whose lyrics are known by now, so the column moves at once; then next
+    // again before it has arrived
+    fake.setTrack(1, 1);
+    await sleep(200);
+    keys('Left');   // track 1: its lyrics are looked up (about 1 s), then the column moves
+    const samples = [];
+    for (let i = 0; i < 200 && ov.view.blend < 0.05; i++)
+        samples.push(await sample(() => ov.view.blend, 16, 16).then(a => a[0] ?? ov.view.blend));
+    samples.push(...await sample(() => ov.view.blend, 150));
+    keys('Right');   // track 2 (known: no lyrics) before the column has arrived
+    samples.push(...await sample(() => ov.view.blend, 2400));
+    const peak = Math.max(...samples);
+    const jumps = samples.slice(1).map((v, i) => Math.abs(v - samples[i]));
+    expect(peak > 0.05 && peak < 0.95, `the column went to ${peak.toFixed(3)} (wanted part of the way)`);
+    expect(Math.max(...jumps) < 0.12, `a jump of ${Math.max(...jumps).toFixed(3)}`);
+    expect(samples.at(-1) === 0, `blend ended at ${samples.at(-1)}`);
+    ov.close();
+    await sleep(SETTLE);
+    assertClean('after the turn back');
+});
+
+// NP_RECORD=1: shots every 100 ms through a track change and the swap (docs recordings)
+test('record: track change and swap', async () => {
+    if (!GLib.getenv('NP_RECORD'))
+        return;
+    const ov = await openOn(0);
+    keys('Right');
+    for (let i = 0; i < 24; i++) {
+        await shot(`rec-${String(i).padStart(2, '0')}`);
+        await sleep(60);
+    }
+    ov.close();
+    await sleep(SETTLE);
 });
 
 async function run() {

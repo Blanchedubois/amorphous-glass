@@ -103,7 +103,7 @@ export function geometry(monitor, blend) {
         coverRadius: Math.round(S.coverRadius * k),
         lyricSize: Math.round(S.lyricSize),
         // the lyrics leave before the column has moved far, and come back after it
-        lyricsOpacity: Math.max(0, (blend - 0.5) / 0.5) ** 1.5,
+        lyricsOpacity: Math.min(1, Math.max(0, (blend - 0.5) / 0.5) ** 1.5),
         sungMiddle: Math.round(cover.y + cover.height / 2 + S.lyricBelowCover),
         // the group's middle: the screen's (two columns), or the column's (centred)
         groupMiddle: blend > 0.5 ? (columnX + lyricsLeft + S.lyrics) / 2 : columnX + S.column / 2,

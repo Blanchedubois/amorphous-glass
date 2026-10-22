@@ -199,7 +199,7 @@ capsule (112 × 52), and the cover's card (the enter and exit pour, and the hove
   tint's middle, the edge line, the rim band top left, the shadow band bottom right, the drop
   shadow) and compares them. Every region must be within 2/255 per channel. A side-by-side sheet
   zoomed to 400 % is committed with the numbers.
-- **Swirl motion.** The swirl behind moves slowly, so the chevron's backdrop copy is refreshed at
+- **Swirl motion (Phase 4).** The swirl behind moves slowly, so the chevron's backdrop copy is refreshed at
   the swirl's 25 fps only while the chevron is on screen. The card's glass exists only for the ~0.6 s
   of an animation.
 
@@ -435,7 +435,19 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   Screenshots match the layout. The lyrics line is in step with the position (±100 ms). Nothing
   reaches lrclib in the harness: the test shell has no network.
 
-### Phase 4: swirl and transitions
+### Phase 4: swirl and transitions (done: `docs/nowplaying/shots/phase4-*`, 52/52 headless)
+- **Result.** The swirl is `bgswirl.js` as an effect after the blur on the wallpaper layer (amount 0
+  is the blurred wallpaper, 1 the swirl); palettes cross-fade in Oklab over 1.2 s; the field turns
+  at about real-time speed and nothing ticks once it has faded out. The swap is one spring on the
+  blend (`motion.js`, the frame clock while it moves, 25 fps for the swirl alone); a change mid-way
+  turns back without a jump. Lyrics found are kept across openings, and the song on screen at
+  opening is looked up at once, so a known song opens straight into its layout.
+- **Measured.** The swap at 60 Hz: p50 17.0 ms, p95 40.8 ms; at 120 Hz: p50 8.4 ms, p95 40.1 ms
+  (about 5 % of frames stall around 40 ms). **For Phase 7:** find those stalls (suspects: the clock
+  panes' frost copy re-blurring the whole backdrop every frame the swirl moves, the per-line lyric
+  blurs); and shader programs grow with every opening ("Over 50 separate fragment shaders"):
+  `bgswirl.js` and the pane glass build a Cogl snippet per instance, so share one per module
+  (a change to the lock screen's and login screen's copies too).
 - **The swirl.** Full-screen `bgswirl.js` on the snapshot actor, at quarter resolution, with the
   Oklab palette cross-fade on track change.
 - **Transitions.** The cover and title cross-fade. The lyrics-to-centred swap moves on one spring.

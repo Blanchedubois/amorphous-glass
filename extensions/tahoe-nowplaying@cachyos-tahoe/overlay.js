@@ -110,10 +110,13 @@ export class Overlay {
             onControl: (name, value) => this._act(name, value),
             onChevron: () => this.close(),
         });
+        // the layout the lyrics decide: at once while the view is built, on a spring after
+        let built = false;
         this.player = new PlayerController(this.view, {
             guard: fn => this.guard(fn),
-            onLayout: blend => this.view?.setBlend(blend),   // Phase 4 puts this on a spring
+            onLayout: blend => built ? this.view?.animateBlend(blend) : this.view?.setBlend(blend),
         });
+        built = true;
 
         this._accelerators = this._settings.get_strv('toggle').map(parseAccelerator).filter(Boolean);
         this._connect(actor, 'key-press-event', (_a, event) => this._onKey(event));
