@@ -32,9 +32,9 @@ export const SPREAD_W = { damping: 0.62, stiffness: 420 };
 export const SPREAD_H = { damping: 0.66, stiffness: 320 };
 // the share of the landing speed that goes into the springs. Now Playing gives 0.9 and -0.35 of
 // a 72 px drop's speed; the title's drop is 5x bigger and falls 4x farther, so the shares are
-// scaled to keep the overshoot the same fraction of the drop (about 7 %)
-export const LAND_W = 0.9 * 0.2;
-export const LAND_H = -0.35 * 0.2;
+// scaled to keep the overshoot a small fraction of the drop (about 10 %: 0.2 read as timid)
+export const LAND_W = 0.9 * 0.3;
+export const LAND_H = -0.35 * 0.3;
 /// the morph's spring: the word fills in, with Material 3's default spatial feel
 export const MORPH = EXPRESSIVE.spatial.default;
 
