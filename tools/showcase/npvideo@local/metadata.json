@@ -1,0 +1,7 @@
+{
+  "uuid": "npvideo@local",
+  "name": "Now Playing video driver",
+  "description": "Dev only: films Tahoe Now Playing for the showcase in a throwaway headless shell (tools/showcase/screensaver-video.sh)",
+  "shell-version": ["51"],
+  "version": 1
+}
