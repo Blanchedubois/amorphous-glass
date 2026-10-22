@@ -1,6 +1,7 @@
 #version 300 es
-// Pass 2 of the glass title: the frost. The lock screen's clock shows the picture through a
-// Shell.BlurEffect of radius 18; here a separable Gaussian at half resolution, run twice (dir).
+// The glass title's Gaussian blur, separable, at half resolution, run twice (dir): the frost
+// behind the glass (pass 2; the lock screen's clock shows the picture through a Shell.BlurEffect)
+// and the glass layer's own blur as it comes in and goes out (pass 4). Premultiplied RGBA.
 precision highp float;
 
 uniform sampler2D src;
@@ -15,12 +16,12 @@ void main() {
     vec2 uv = gl_FragCoord.xy / size;
     vec2 step = dir / size;
     int radius = int(ceil(sigma * 3.0));
-    vec3 acc = vec3(0.0);
+    vec4 acc = vec4(0.0);
     float wsum = 0.0;
     for (int i = -radius; i <= radius; i++) {
         float w = exp(-0.5 * float(i * i) / (sigma * sigma));
-        acc += textureLod(src, uv + step * float(i), float(lod)).rgb * w;
+        acc += textureLod(src, uv + step * float(i), float(lod)) * w;
         wsum += w;
     }
-    fragColor = vec4(acc / wsum, 1.0);
+    fragColor = acc / wsum;
 }
