@@ -3,14 +3,14 @@
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
-    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="Amorphous Glass: a tour of the desktop through widgets, menus, quick settings, windows, search, the calendar, music and the lock screen">
+    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="Amorphous Glass: a tour of the desktop through widgets, menus, quick settings, windows, search, the calendar, music and Now Playing">
   </picture>
 </p>
 
 <p align="center"><b>macOS Tahoe's Liquid Glass look, rebuilt for GNOME 51 on Wayland.</b><br>
 Live, refracting glass on the bar, dock, menus, widgets and lock screen, moving on springs.</p>
 
-<p align="center"><a href="#install"><b>Install</b></a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Watch the tour (1080p)</a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/latest">Download</a> &nbsp;·&nbsp; <a href="#more">Docs</a></p>
+<p align="center"><a href="#install"><b>Install</b></a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-22/amorphous-glass.mp4">Watch the tour (1080p)</a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/latest">Download</a> &nbsp;·&nbsp; <a href="#more">Docs</a></p>
 
 ---
 
