@@ -44,20 +44,9 @@
       "source": "~/Videos/liquid-glass-showcase/extra4/files-to-folder.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-extra/files-to-folder.track.json",
       "in": 7.6,
-      "out": 10.3,
-      "zoom": 1.0,
-      "where": "the grid button clicked, the grid opens, the cursor goes up to Utilities"
-    },
-    {
-      "name": "utilities",
-      "source": "~/Videos/liquid-glass-showcase/extra4/files-to-folder.mp4",
-      "track": "~/Videos/liquid-glass-showcase/work-extra/files-to-folder.track.json",
-      "in": 10.3,
       "out": 11.9,
-      "zoom": 1.25,
-      "from_zoom": 1.0,
-      "push": 1.0,
-      "where": "the folder opens under the click as the camera eases in; it closes (cut before the recording goes black at 12.1)"
+      "zoom": 1.0,
+      "where": "the grid button clicked, the grid opens whole, the cursor goes up to Utilities, the folder opens under the click and closes (user, 2026-10-22: no zoom here; cut before the recording goes black at 12.1)"
     },
     {
       "name": "music",
