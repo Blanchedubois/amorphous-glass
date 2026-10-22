@@ -56,3 +56,11 @@ export function symbolActor(name, size, fallbackIcon) {
     }
     return new St.Icon({style_class: 'tahoe-np-symbol', icon_name: fallbackIcon, icon_size: Math.round(size * 1.1)});
 }
+
+// changes a symbolActor() to another symbol (play and pause), keeping its size
+export function setSymbol(actor, name, size, fallbackIcon) {
+    if (actor instanceof St.Label && symbolAvailable(name))
+        actor.text = String.fromCodePoint(SYMBOLS[name]);
+    else if (actor instanceof St.Icon)
+        actor.icon_name = fallbackIcon;
+}

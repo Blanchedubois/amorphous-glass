@@ -19,7 +19,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 "$H/check-shared.sh" >/dev/null
 mkdir -p "$out"; rm -f "$out"/*.png "$out"/results.jsonl "$out"/driver.log
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
-export GSETTINGS_BACKEND=keyfile NP_OUT=$out
+export GSETTINGS_BACKEND=keyfile NP_OUT=$out NP_FIXTURES=$H/fixtures
 ext=$XDG_DATA_HOME/gnome-shell/extensions
 mkdir -p "$ext" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
 cp -r "$H/nowplaying-test@local" "$extsrc" "$ext/"

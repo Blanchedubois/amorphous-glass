@@ -4,26 +4,21 @@
 
 .tahoe-np-overlay { background-color: #000000; }
 
-.tahoe-np-chevron {
-  border-radius: 9999px;
+/* the widgets' dark glass, CSS stand-in (Phase 5: the real glass under it): the chevron and
+   the cover's place when there is no art */
+.tahoe-np-glass {
   background-color: rgba(34, 34, 38, 0.42);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   color: #ffffff;
 }
+.tahoe-np-chevron { border-radius: 9999px; }
 .tahoe-np-chevron:hover { background-color: rgba(54, 54, 60, 0.52); }
 .tahoe-np-chevron:active { background-color: rgba(64, 64, 70, 0.58); }
 
 .tahoe-np-symbol { color: inherit; }
 
-/* Phase 2: the backdrop stand-in (Phase 4 puts the swirl over the blurred desktop here) */
-.tahoe-np-backdrop {
-  background-gradient-direction: vertical;
-  background-gradient-start: #8a3a52;
-  background-gradient-end: #1f5a68;
-}
-
-/* the cover's stand-in: the Music widget's empty art */
-.tahoe-np-cover { background-color: rgba(255, 255, 255, 0.12); }
+/* under the blurred wallpaper, in case a monitor has no background actor */
+.tahoe-np-wallpaper { background-color: #1c1c20; }
 
 /* the controls float, no plate; hover and press are the Music widget's (.tahoe-music-ink-white) */
 .tahoe-np-control { border-radius: 9999px; padding: 0; }

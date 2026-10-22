@@ -5,3 +5,11 @@
 tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
 # its glass: the SDF Liquid Glass pane the clock's glyph panes are drawn with
 tahoe-gdm@cachyos-tahoe/glass.js paneglass.js
+# the player: MPRIS (with shuffle, repeat, seek), the cover's colours, the Music widget's lyrics view
+tahoe-widgets@cachyos-tahoe/mpris.js mpris.js
+tahoe-widgets@cachyos-tahoe/palette.js palette.js
+tahoe-widgets@cachyos-tahoe/music.js music.js
+# music.js's own imports and icons (its SF-like SVGs are the symbols' fallback)
+tahoe-widgets@cachyos-tahoe/glass.js glass.js
+tahoe-widgets@cachyos-tahoe/swirl.js swirl.js
+tahoe-widgets@cachyos-tahoe/icons icons

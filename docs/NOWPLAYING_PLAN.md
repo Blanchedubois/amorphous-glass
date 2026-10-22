@@ -136,7 +136,7 @@ All sizes are logical px at 2560x1440. They scale with the monitor's height.
 
 ### The cover: by itself
 
-- **The cover.** 560 px, corners **12**, a soft two-layer drop shadow, no glass and no frame at rest.
+- **The cover.** 560 px, corners **12**, no shadow (St's `box-shadow` draws a square box behind rounded art; the user did not want it), no glass and no frame at rest.
 - **The glass card.** One card of the widgets' dark glass, 12 px larger than the cover all round,
   radius **24** (12 + 12, concentric, and the widgets' own `RADIUS`). It shows in three places:
   - **Enter:** a drop of it pours into the card; the cover fades in inside it, then the glass
@@ -258,7 +258,12 @@ capsule (112 × 52), and the cover's card (the enter and exit pour, and the hove
 - **Check.** Phase 2 renders it next to the lock screen's clock over the same picture; the two must
   match apart from size.
 
-### Nothing playing (proposal, see question 3)
+### No cover, and nothing playing (user, 2026-10-21)
+
+- **No cover** (a track without art, or nothing playing): the background is the **wallpaper,
+  blurred** (GNOME's own background actors, cloned, `Shell.BlurEffect`), not a neutral swirl; the
+  cover's place is a **Liquid Glass card** (the widgets' dark glass) with a note. With a cover, its
+  colours fade in over the blurred wallpaper (600 ms) and fade out again when it goes.
 
 - **From the hotkey:** the view opens with a placeholder. That is the neutral swirl, the clock, an
   empty glass card with a music-note glyph, and "Not Playing". The controls are disabled, and play
@@ -418,7 +423,7 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   - The group's centre within 1 px of the screen's centre.
   - The clock beside the lock screen's clock over the same picture.
 
-### Phase 3: player and lyrics wired to MPRIS
+### Phase 3: player and lyrics wired to MPRIS (done: `docs/nowplaying/shots/phase3-player.png`, 46/46 headless)
 - **`mpris.js`.** Volume, Shuffle, LoopStatus, `SetPosition` / `Seek`, CanSeek. Shared, so re-synced.
 - **The player.** Cover, title, artist, scrubbable progress, transport, shuffle and repeat (hidden
   when unsupported; the row stays centred). The volume slider is the system output (`Volume.getMixerControl()` default sink).

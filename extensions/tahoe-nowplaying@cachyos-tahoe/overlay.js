@@ -20,6 +20,7 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {Action, decide, parseAccelerator} from './keys.js';
+import {PlayerController} from './player.js';
 import {NowPlayingView} from './view.js';
 
 const ENTER_MS = 250;
@@ -36,7 +37,7 @@ export const modal = {
 
 export class Overlay {
     // settings: the extension's; onClosed: called once, when the overlay is gone;
-    // onAction: (action) => void, the player's keys and buttons (Phase 3 wires MPRIS)
+    // onAction: (action, value) => void, told of every player key and control (the tests listen)
     constructor({settings, onClosed, onAction}) {
         this._settings = settings;
         this._onClosed = onClosed;
@@ -106,8 +107,12 @@ export class Overlay {
         const monitor = Main.layoutManager.monitors[global.display.get_current_monitor()] ?? Main.layoutManager.primaryMonitor;
         this.view = new NowPlayingView(actor, monitor, {
             guard: fn => this.guard(fn),
-            onControl: name => this._onAction?.(name),
+            onControl: (name, value) => this._act(name, value),
             onChevron: () => this.close(),
+        });
+        this.player = new PlayerController(this.view, {
+            guard: fn => this.guard(fn),
+            onLayout: blend => this.view?.setBlend(blend),   // Phase 4 puts this on a spring
         });
 
         this._accelerators = this._settings.get_strv('toggle').map(parseAccelerator).filter(Boolean);
@@ -156,6 +161,12 @@ export class Overlay {
         return true;
     }
 
+    // a control or a player key: to the player, and to the extension's listener (the tests)
+    _act(action, value) {
+        this.player?.act(action, value);
+        this._onAction?.(action, value);
+    }
+
     get chevron() {
         return this.view?.chevron ?? null;
     }
@@ -174,7 +185,7 @@ export class Overlay {
         case Action.PASS:
             return Clutter.EVENT_PROPAGATE;
         default:
-            this._onAction?.(action);
+            this._act(action);
             return Clutter.EVENT_STOP;
         }
     }
@@ -283,6 +294,13 @@ export class Overlay {
         this.actor = null;
         const view = this.view;
         this.view = null;
+        const player = this.player;
+        this.player = null;
+        try {
+            player?.destroy();
+        } catch (e) {
+            console.error(`tahoe-nowplaying: player: ${e}`);
+        }
         try {
             view?.destroy();
         } catch (e) {
