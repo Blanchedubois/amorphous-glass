@@ -1,5 +1,5 @@
 {
-  "about": "Version 2: screensaver, lock screen, desktop, title: one passage. Screensaver: tools/showcase/screensaver-video.sh NPV_SPOTIFY=1 take, the user's Spotify playing \"Hey Ladies\" (Beastie Boys, Paul's Boutique).",
+  "about": "Version 2, final cut (user, 2026-10-22): the app grid through a blur with a push onto the Utilities folder; the dock menu straight into the search (no Settings clip); Now Playing (the user's Spotify playing \"Hey Ladies\", Beastie Boys; tools/showcase/screensaver-video.sh NPV_SPOTIFY=1), the lock screen recorded in the same minute, the desktop, the title.",
   "clips": [
     {
       "name": "home-to-widget",
@@ -46,10 +46,20 @@
     },
     {
       "name": "app-grid",
-      "in": 48.75,
-      "out": 52.95,
+      "in": 49.15,
+      "out": 50.6,
       "zoom": 1.0,
-      "where": "whole screen: the grid opens over the desktop, the cursor goes into Utilities, the folder opens and closes (user, 2026-10-22: the folder came out of nowhere)"
+      "blur_in": 24,
+      "where": "the app grid, already open, through a short blur (the recording dropped the overview animation to black at 48.95-49.15; user, 2026-10-22: the folder opening was abrupt)"
+    },
+    {
+      "name": "utilities",
+      "in": 50.6,
+      "out": 52.95,
+      "zoom": 1.25,
+      "from_zoom": 1.0,
+      "push": 1.1,
+      "where": "the camera eases onto the cursor as the Utilities folder opens; it closes and the overview closes"
     },
     {
       "name": "music",
@@ -63,16 +73,9 @@
       "source": "~/Videos/liquid-glass-showcase/extra1/dock-menu.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-extra/dock-menu.track.json",
       "in": 0.84,
-      "out": 3.7,
+      "out": 4.35,
       "zoom": 1.6,
-      "where": "bottom: an app in the dock, its name label, its menu"
-    },
-    {
-      "name": "settings-drag",
-      "in": 37.95,
-      "out": 41.6,
-      "zoom": 1.4,
-      "where": "middle: Settings dragged, then closed (its window shrinks away) as the camera pulls back",
+      "where": "bottom: Files in the dock, its name label, its menu; the menu closes and the camera pulls back as the cursor rises",
       "to_zoom": 1.0,
       "pull": 1.0
     },
@@ -83,50 +86,50 @@
       "in": 1.15,
       "out": 6.9,
       "zoom": 1.0,
-      "where": "whole screen: the overview opens, the cursor goes up and clicks the search bar, types, the results pop up, and it all closes back to the home screen, which the lock slides down over"
+      "where": "straight from the dock menu: the overview opens, the cursor clicks the search bar, types calc, the results pop up, and it closes back to the home screen"
     },
     {
       "name": "screensaver-enter",
-      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify1/screensaver.mp4",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify2/screensaver.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
       "in": 1.15,
-      "out": 4.3,
+      "out": 4.2,
       "zoom": 1.0,
       "blur_in": 30,
       "where": "whole screen: Now Playing opens over the desktop through a blur; a drop of glass falls and forms the cover"
     },
     {
       "name": "screensaver-tilt",
-      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify1/screensaver.mp4",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify2/screensaver.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
-      "in": 4.4,
-      "out": 12.4,
+      "in": 4.3,
+      "out": 12.3,
       "zoom": 1.7,
       "hold": [
         770,
         600
       ],
-      "where": "the cover, the camera still on it (user, 2026-10-22): the cursor tilts it, its rim glints"
+      "where": "the cover, the camera still on it: the cursor tilts it, its rim glints"
     },
     {
       "name": "screensaver-next",
-      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify1/screensaver.mp4",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/spotify2/screensaver.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
-      "in": 16.4,
-      "out": 21.0,
+      "in": 16.1,
+      "out": 20.85,
       "zoom": 1.0,
       "where": "whole screen: the lyrics, then Next: the next song on Paul's Boutique"
     },
     {
       "name": "lock",
-      "source": "~/Videos/liquid-glass-showcase/lock-heyladies/lock-video.mp4",
+      "source": "~/Videos/liquid-glass-showcase/lock-hl2/lock-video.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
-      "in": 4.6,
+      "in": 8.55,
       "out": 12.0,
       "zoom": 1.0,
       "blur_in": 30,
       "unpill": true,
-      "where": "the lock screen in music mode, Hey Ladies still playing; the prompt, the password, unlocked"
+      "where": "the lock screen through a blur, the same minute on its clock; the Now Playing card and the sign-in fade in at once, the password typed, unlocked (user, 2026-10-22: no pause before the card)"
     },
     {
       "name": "home",
@@ -136,7 +139,7 @@
       "out": 6.9,
       "zoom": 1.0,
       "blur_in": 30,
-      "where": "back to the desktop through a blur"
+      "where": "back to the desktop through a blur, then the title"
     }
   ]
 }
