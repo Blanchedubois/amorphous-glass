@@ -32,6 +32,9 @@
   "menubar": [
    "tahoe-menu-bar@cachyos-tahoe",
    "kiwimenu@kemma"
+  ],
+  "nowplaying": [
+   "tahoe-nowplaying@cachyos-tahoe"
   ]
  },
  "patched_extensions": [
@@ -185,6 +188,16 @@
    "feature": "Tahoe login screen theme in the system gresource (when installed)",
    "check": {
     "type": "gdm-gresource"
+   }
+  },
+  {
+   "id": "A7",
+   "feature": "Login screen extension (system copy) matches this checkout (when installed)",
+   "check": {
+    "type": "system-copy",
+    "path": "/usr/share/gnome-shell/extensions/tahoe-gdm@cachyos-tahoe",
+    "repo": "extensions/tahoe-gdm@cachyos-tahoe",
+    "fix": "bash {ROOT}/scripts/gdm-theme.sh install"
    }
   },
   {
@@ -3216,6 +3229,26 @@
    },
    "when": {
     "menubar": "on"
+   },
+   "guard": "tested"
+  },
+  {
+   "id": "F-nowplaying",
+   "feature": "tahoe-nowplaying@cachyos-tahoe installed (switched on)",
+   "check": {
+    "type": "tahoe-installed",
+    "uuid": "tahoe-nowplaying@cachyos-tahoe"
+   },
+   "fix": {
+    "type": "run",
+    "cmd": [
+     "tahoe-nowplaying.sh",
+     "on"
+    ],
+    "logout": true
+   },
+   "when": {
+    "nowplaying": "on"
    },
    "guard": "tested"
   },

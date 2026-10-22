@@ -20,6 +20,10 @@ CLIPS = {
     'albums': ([(V / f'features4/song-{i}.mp4', 0.6, 4.6, 'crop=1600:900:0:40') for i in (1, 2, 3, 4)], 1.5),
     'lock': ([(V / 'features-lock/lock-video.mp4', 0.8, 5.6, 'crop=2240:1260:60:20')], 3.5),
     'modes': ([(V / 'features4/modes.mp4', s, d, 'crop=2560:1440:0:0') for s, d in ((7.6, 5.4), (21.4, 4.6), (34.2, 2.8))], 2.2),
+    # Now Playing, from the title session's take (headless shell, merged eaff2da, placeholder lyrics)
+    'np-enter': ([(V / 'screensaver/screensaver-take2.mp4', 1.15, 3.25, 'crop=2560:1440:0:0')], 1.7),
+    'np-tilt': ([(V / 'screensaver/screensaver-take2.mp4', 5.1, 8.0, 'crop=1600:900:0:230')], 3.0),
+    'np-lyrics': ([(V / 'screensaver/screensaver-take2.mp4', 16.9, 4.9, 'crop=2560:1440:0:0')], 0.8),
 }
 
 

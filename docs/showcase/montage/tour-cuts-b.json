@@ -1,0 +1,127 @@
+{
+  "about": "Round 11 (user, 2026-10-21): a hard cut from the title on the identical home-screen frame; clips end once their motion has settled; Files shows only its drag and a pause; the search shown from the click on its bar, closing back to the home screen; the lock slides down over it and up off it (GNOME's own unlock motion). Version B: the screensaver replaces the lock screen. Screensaver: tools/showcase/screensaver-video.sh take (\"Hey Ladies\", Beastie Boys, Paul's Boutique cover; placeholder lyrics).",
+  "clips": [
+    {
+      "name": "home-to-widget",
+      "source": "~/Videos/liquid-glass-showcase/extra1/widget-drag.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/widget-drag.track.json",
+      "in": 0.2,
+      "out": 3.7,
+      "zoom": 1.6,
+      "where": "a hard cut from the title on the same home-screen frame; the camera pushes in onto the cursor; the clock set down beside Weather; ends once it has settled",
+      "from_zoom": 1.0,
+      "push": 1.1
+    },
+    {
+      "name": "quick-settings",
+      "in": 8.3,
+      "out": 11.05,
+      "zoom": 1.6,
+      "where": "top right: the panel grows from its icon, the Wi-Fi submenu"
+    },
+    {
+      "name": "desktop-widget",
+      "source": "~/Videos/liquid-glass-showcase/extra1/desktop-widget.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/desktop-widget.track.json",
+      "in": 0.45,
+      "out": 6.0,
+      "zoom": 1.5,
+      "where": "middle: right-click the wallpaper, Add Widget, a clock drops in"
+    },
+    {
+      "name": "menu-slide",
+      "in": 14.64,
+      "out": 18.85,
+      "zoom": 1.35,
+      "where": "top: the calendar, sliding across the status menus"
+    },
+    {
+      "name": "files-drag",
+      "in": 29.25,
+      "out": 32.65,
+      "zoom": 1.4,
+      "where": "middle: only the drag of the Files window, a pause once it is set down, the camera pulling back",
+      "to_zoom": 1.0,
+      "pull": 0.6
+    },
+    {
+      "name": "app-grid",
+      "in": 49.9,
+      "out": 52.4,
+      "zoom": 1.0,
+      "where": "whole screen: the app grid, a folder opens"
+    },
+    {
+      "name": "music",
+      "in": 54.86,
+      "out": 58.35,
+      "zoom": 1.6,
+      "where": "left: cover, controls, lyrics"
+    },
+    {
+      "name": "dock-menu",
+      "source": "~/Videos/liquid-glass-showcase/extra1/dock-menu.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/dock-menu.track.json",
+      "in": 0.84,
+      "out": 3.7,
+      "zoom": 1.6,
+      "where": "bottom: an app in the dock, its name label, its menu"
+    },
+    {
+      "name": "settings-drag",
+      "in": 37.95,
+      "out": 41.6,
+      "zoom": 1.4,
+      "where": "middle: Settings dragged, then closed (its window shrinks away) as the camera pulls back",
+      "to_zoom": 1.0,
+      "pull": 1.0
+    },
+    {
+      "name": "search",
+      "source": "~/Videos/liquid-glass-showcase/extra2/search-click.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/search-click.track.json",
+      "in": 1.15,
+      "out": 6.9,
+      "zoom": 1.0,
+      "where": "whole screen: the overview opens, the cursor goes up and clicks the search bar, types, the results pop up, and it all closes back to the home screen, which the lock slides down over"
+    },
+    {
+      "name": "screensaver-enter",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/screensaver-take2.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
+      "in": 1.15,
+      "out": 4.4,
+      "zoom": 1.0,
+      "blur_in": 30,
+      "where": "whole screen: Now Playing opens over the desktop through a blur; a drop of glass falls and spreads into the cover"
+    },
+    {
+      "name": "screensaver-tilt",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/screensaver-take2.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
+      "in": 5.15,
+      "out": 12.9,
+      "zoom": 1.6,
+      "where": "the cover, the cursor locked in the middle: it leans toward the cursor, lifts, its rim glints"
+    },
+    {
+      "name": "screensaver-next",
+      "source": "~/Videos/liquid-glass-showcase/screensaver/screensaver-take2.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-ss/screensaver.track.json",
+      "in": 16.95,
+      "out": 21.75,
+      "zoom": 1.0,
+      "where": "whole screen: Next, a song without lyrics, the layout re-centres"
+    },
+    {
+      "name": "home",
+      "source": "~/Videos/liquid-glass-showcase/extra2/search-click.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/search-click.track.json",
+      "in": 6.3,
+      "out": 6.9,
+      "zoom": 1.0,
+      "blur_in": 30,
+      "where": "back to the desktop through a blur"
+    }
+  ]
+}

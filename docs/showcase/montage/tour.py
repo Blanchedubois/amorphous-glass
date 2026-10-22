@@ -156,6 +156,17 @@ def main():
     finish(args, enc, last, out_size, tour_frames)
 
 
+def blur_mix(frm, to, x, out_size):
+    """one frame of the blur transition at x (0..1): each side blurred toward the midpoint"""
+    from PIL import ImageFilter
+    p = x * x * (3 - 2 * x)
+    r = 28 * out_size[0] / 1920
+    blur = lambda a, k: np.asarray(Image.fromarray(a).filter(ImageFilter.GaussianBlur(k))) if k > 0.4 else a
+    a = blur(frm, r * p).astype(np.float32)
+    b = blur(to, r * (1 - p)).astype(np.float32)
+    return (a * (1 - p) + b * p).round().astype(np.uint8)
+
+
 def render_cuts(args, pts, enc, out_size):
     """each clip of the cut list at its own zoom. Above 1 the cursor is locked to the exact centre of the
     frame (user, 2026-10-21: "I also like the mouse being centered"), the wallpaper continuing past the
@@ -166,7 +177,7 @@ def render_cuts(args, pts, enc, out_size):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import edit
     clips = json.loads(args.cuts.read_text())['clips']
-    dt, total, last = 1 / FPS, 0, None
+    dt, total, last, prev = 1 / FPS, 0, None, None
     size = probe(args.tour)
     W, H = size
     stage = edit.Stage(size, 1.0)        # padded for the widest view any clip uses
@@ -208,7 +219,13 @@ def render_cuts(args, pts, enc, out_size):
                 centres = [tuple(before + (here - before) * k / max(1, samples - 1)) for k in range(samples)]
                 stage.view = (W / z, W / z * OUT_H / OUT_W)
                 last = stage.shoot(stage.compose(im), centres, out_size)
-            enc.stdin.write(last.tobytes())
+            # "blur_in": N frames: from the previous clip's last frame, through a blur, into this one
+            # (the screensaver's entry and exit; the lock uses the same blend in finish())
+            if prev is not None and n < c.get('blur_in', 0):
+                enc.stdin.write(blur_mix(prev, last, (n + 1) / (c['blur_in'] + 1), out_size).tobytes())
+            else:
+                enc.stdin.write(last.tobytes())
+        prev = last
         total += count
         print(f'  {c["name"]}: {c["in"]:.2f}-{c["out"]:.2f} at {z_clip}', file=sys.stderr)
     return last, total
