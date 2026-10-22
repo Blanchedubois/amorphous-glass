@@ -9,7 +9,7 @@ imports the desktop's own spring.js from extensions/.
   render.py still 5.4 -o logo.png [--theme light]
   render.py webp title.mp4 -o title.webp    (the README loop, from a master)
   render.py clip -o title.mp4 [--webp title.webp] [--width 1920] [--fps 60] [--blur 6] [--theme light]
-             [--plate-in in.png --plate-out out.png]
+             [--plate-in in.png --plate-out out.png] [--scene glass]
 """
 
 import argparse
@@ -25,7 +25,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-PAGE = HERE.relative_to(ROOT).as_posix() + '/index.html'
+PAGES = {'capsule': 'index.html', 'glass': 'glass/index.html'}   # the first title, the glass title
+
+
+def page_of(args):
+    return HERE.relative_to(ROOT).as_posix() + '/' + PAGES[args.scene]
 CHROMIUM = shutil.which('chromium') or shutil.which('google-chrome-stable') or shutil.which('chrome')
 CHROMIUM_FLAGS = ['--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
                   '--hide-scrollbars', '--window-size=1920,1080', '--no-first-run']
@@ -61,7 +65,7 @@ def page_url(server, args, extra):
     for key, path in (('plateIn', args.plate_in), ('plateOut', args.plate_out)):
         if path:
             query[key] = '/' + Path(path).resolve().relative_to(ROOT).as_posix()
-    return f'http://127.0.0.1:{server.server_port}/{PAGE}?{urllib.parse.urlencode(query)}'
+    return f'http://127.0.0.1:{server.server_port}/{page_of(args)}?{urllib.parse.urlencode(query)}'
 
 
 def still(args):
@@ -71,9 +75,14 @@ def still(args):
         out = Path(args.output).resolve()
         # under load the screenshot can be taken before WebGL has drawn: a blank frame is a few KB
         for _ in range(4):
-            subprocess.run([CHROMIUM, *CHROMIUM_FLAGS, f'--user-data-dir={profile}/chromium',
-                            '--virtual-time-budget=20000', f'--screenshot={out}', url],
-                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log = ['--enable-logging=stderr', '--v=0'] if args.debug else []
+            run = subprocess.run([CHROMIUM, *CHROMIUM_FLAGS, *log, f'--user-data-dir={profile}/chromium',
+                                  '--virtual-time-budget=20000', f'--screenshot={out}', url],
+                                 check=True, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.PIPE if args.debug else subprocess.DEVNULL, text=True)
+            if args.debug:
+                # the page's console (shader errors, the timings it logs)
+                print('\n'.join(l.split('CONSOLE', 1)[1] for l in run.stderr.splitlines() if 'CONSOLE' in l), file=sys.stderr)
             if out.stat().st_size > 100_000:
                 break
         else:
@@ -151,6 +160,7 @@ def main():
     w.add_argument('--webp-method', type=int, default=4, help='libwebp effort, 0-6: 6 keeps dark gradients unblocked')
     for name in ('still', 'clip'):
         p = sub.add_parser(name)
+        p.add_argument('--scene', choices=tuple(PAGES), default='capsule', help='which title page')
         p.add_argument('--theme', choices=('dark', 'light'), default='dark')
         p.add_argument('--plate-in', help="the montage's last frame (inside the repository)")
         p.add_argument('--plate-out', help="the montage's first frame (inside the repository)")
@@ -159,6 +169,7 @@ def main():
         if name == 'still':
             p.add_argument('time', type=float)
             p.add_argument('-o', '--output', required=True)
+            p.add_argument('--debug', action='store_true', help="print the page's console")
         else:
             p.add_argument('-o', '--output', help='MP4')
             p.add_argument('--webp', help='looping animated WebP')
