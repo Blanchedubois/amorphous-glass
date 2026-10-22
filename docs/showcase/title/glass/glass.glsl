@@ -1,26 +1,17 @@
 #version 300 es
-// Pass 3 of the glass title: the liquid glass itself, the lock screen clock's material
+// Pass 3 of the glass title: the liquid glass word itself, as a layer (premultiplied colour and
+// coverage) that pass 4 blurs and lays over the scene. The lock screen clock's material
 // (extensions/tahoe-lockscreen@cachyos-tahoe/widgets/paneglass.js, variant B2 "clear blur" of
-// clockpanes.js) over one shape: a blend of the drop (an ellipse) and the word (its signed
-// distance field). The picture shows through frosted, a little lighter and more saturated, no
-// bend (the user: glass without refraction); the desktop widgets' edge: a rim light from the
-// top left and a 1 px hairline; and a soft drop shadow under it, as under every desktop glass.
+// clockpanes.js) on the word's signed distance field: the picture shows through frosted, a
+// little lighter and more saturated, bent a little toward the edge with a slight colour split
+// (the user: "glassier with slight refraction"); the desktop widgets' edge: a rim light from the
+// top left, an inner shade and a light line.
 precision highp float;
 
-uniform sampler2D scene;   // pass 1: what lies under the glass
-uniform sampler2D frost;   // pass 2: the same, frosted (half res)
+uniform sampler2D frost;   // pass 2: the scene, frosted (half res)
 uniform sampler2D sdf;     // the word's signed distance, px, < 0 inside (y down)
 uniform vec2 res;
-uniform vec4 blob;         // the drop: centre x, centre y, width, height (px, y down)
-uniform float morph;       // 0: the drop, 1: the word (where the front has passed)
-uniform float front;       // px from the middle: how far the letters have risen
-uniform float band;        // px: the width of the rise
-const float RISE_OVER = 0.05;   // how far the letters overshoot as they inflate (of REVEAL; 0.1 read as bold)
-const float REVEAL = 120.0;     // px: how far out of existence the letters are before the front
-const float MERGE = 40.0;       // px: how roundly the letters merge with the drop
 uniform float fade;        // the glass's presence
-uniform float shadow;      // a drop shadow's strength (0: liquid glass casts none, the user)
-uniform float gain;        // this moment's share of the frame (motion blur)
 
 out vec4 fragColor;
 
@@ -37,6 +28,11 @@ const float AO = 0.30;             // the inner shade inside the line
 const float AO_WIDTH = 0.20;
 uniform float hair;            // px: the line (2.5)
 uniform float hairAlpha;       // 0.40
+// the refraction (paneglass.js: the dome profile across the edge band, the backdrop pushed at
+// the edge; between the widgets' A2 "a touch of liquid" and A3)
+uniform float bend;            // px the backdrop is pushed at the very edge (6)
+const float EDGE = 14.0;           // px: the band the bend works over
+const float SPLIT = 0.06;          // colour split, as a fraction of the bend
 
 // the desktop's rim light (paneglass.js tahoe_lens_slope, from the Blur My Shell patch)
 float lensSlope(float t) {
@@ -46,60 +42,36 @@ float lensSlope(float t) {
     return pow(inner, 1.0 / n - 1.0) * pow(u, n - 1.0);
 }
 
-// the drop and the bar it spreads into: a capsule (a circle while it is round)
-float sdCapsule(vec2 p, vec2 half_) {
-    float r = min(half_.x, half_.y);
-    vec2 q = abs(p) - half_ + r;
-    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-}
-
-float smin(float a, float b, float k) {
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0 - h);
-}
-
-// the shape at `p` (px, y down): the drop, and the word inflating out of it behind a front that
-// travels from the middle to the ends. Ahead of the front the letters are pushed out of
-// existence (their distance raised by REVEAL px); as the front passes, each letter grows from
-// its spine to its full stroke, a little past it, and settles. Where the drop and the letters
-// meet they merge (a smooth union), so the letters come out of the drop, not beside it.
 float sd(vec2 p) {
-    float drop = sdCapsule(p - blob.xy, blob.zw * 0.5);
-    float word = texture(sdf, p / res).r;
-    float u = (front - abs(p.x - blob.x)) / band + 1.0;
-    float m = u < 1.0 ? (1.0 + RISE_OVER) * smoothstep(0.0, 1.0, u)
-                      : 1.0 + RISE_OVER * (1.0 - smoothstep(1.0, 2.0, u));
-    float letters = word + (1.0 - m * morph) * REVEAL;
-    return smin(drop, letters, MERGE);
+    return texture(sdf, p / res).r;
 }
 
 void main() {
     vec2 p = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y);
     vec2 fuv = gl_FragCoord.xy / res;
-    vec3 base = texture(scene, fuv).rgb;
 
     float d = sd(p);
     float cov = clamp(0.5 - d, 0.0, 1.0) * fade;
-
-    // the drop shadow under the glass, offset down, soft
-    float ds = sd(p - vec2(0.0, 14.0));
-    float drop = (1.0 - smoothstep(0.0, 44.0, ds)) * shadow * fade;
-    base *= 1.0 - drop;
-
     if (cov <= 0.0) {
-        fragColor = vec4(base * gain, gain);
+        fragColor = vec4(0.0);
         return;
     }
 
-    // the normal, pointing into the shape
+    // the normal, pointing into the shape (p space, y down)
     vec2 g = vec2(sd(p + vec2(1.0, 0.0)) - sd(p - vec2(1.0, 0.0)),
                   sd(p + vec2(0.0, 1.0)) - sd(p - vec2(0.0, 1.0)));
     float glen = length(g);
     vec2 n = glen > 0.0001 ? -g / glen : vec2(0.0);
     float inside = -d;
 
-    // the frosted backdrop, lighter, milkier, a touch more saturated
-    vec3 c = texture(frost, fuv).rgb;
+    // the bend: a dome profile, steep only at the edge, pushes the backdrop outward there
+    float x = clamp(1.0 - inside / EDGE, 0.0, 1.0);
+    float dome = 1.0 - sqrt(max(1.0 - x * x, 0.0));
+    vec2 off = vec2(-n.x, n.y) * dome * bend / res;   // into the frost's space (y up)
+    vec3 c = vec3(texture(frost, fuv + off * (1.0 + SPLIT)).r,
+                  texture(frost, fuv + off).g,
+                  texture(frost, fuv + off * (1.0 - SPLIT)).b);
+    // lighter, milkier, a touch more saturated
     c += brightness;
     float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
     c = mix(vec3(luma), c, SATURATION);
@@ -121,5 +93,5 @@ void main() {
     c = mix(c, vec3(1.0), hl * hairAlpha);
     c = clamp(c, 0.0, 1.0);
 
-    fragColor = vec4(mix(base, c, cov) * gain, gain);
+    fragColor = vec4(c * cov, cov);
 }

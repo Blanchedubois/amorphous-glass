@@ -1,12 +1,11 @@
-// The glass title: "amorphous glass" as liquid glass, formed from a drop that falls in and spreads
-// out, over the wallpaper. Three WebGL2 passes (scene.glsl, blur.glsl, glass.glsl) driven by
+// The glass title: "amorphous glass" as liquid glass over the wallpaper, sharpening in out of a
+// blur and softening out again. WebGL2 passes: the scene (scene.glsl), its frost (blur.glsl),
+// the glass layer (glass.glsl), the layer's blur (blur.glsl again) and the composite, driven by
 // timeline.js. The same page modes and query parameters as the first title (../main.js):
 //
 //   theme=dark|light        the wallpaper and the stand-in plates
 //   plateIn=URL, plateOut=URL   the montage's last frame (the clip starts on it) and first frame
-//   shadow=0, bright=0.14, milk=0.16, hair=2.5, hairAlpha=0.4   the material's dials
-//   spreadW=D,S spreadH=D,S morph=D,S   other springs (timeline.js)
-//   morphAt=SECONDS         when the blend into the word begins (SEQ.morph; 99: never)
+//   bright=0.14, milk=0.16, hair=2.5, hairAlpha=0.4, bend=6   the material's dials
 //   t=SECONDS               draw one frame and stop
 //   render=1&fps=N&blur=M&from=S&to=S   render.py: every frame POSTed to /frame/<n>, then /done; M moments
 //                           per frame across half its time (motion blur)
@@ -15,22 +14,15 @@ import { SEQ, timeline } from './timeline.js';
 import { signedDistance } from './sdf.js';
 
 const Q = new URLSearchParams(location.search);
-if (Q.has('morphAt'))
-    SEQ.rise = parseFloat(Q.get('morphAt'));
 const THEME = Q.get('theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-const SHADOW = parseFloat(Q.get('shadow') ?? '0');
-// the material's dials (glass.glsl): the light, the line
+// the material's dials (glass.glsl): the light, the line, the bend
 const LOOK = {
     brightness: parseFloat(Q.get('bright') ?? '0.14'),
     milk: parseFloat(Q.get('milk') ?? '0.16'),
     hair: parseFloat(Q.get('hair') ?? '2.5'),
     hairAlpha: parseFloat(Q.get('hairAlpha') ?? '0.40'),
+    bend: parseFloat(Q.get('bend') ?? '6'),
 };
-const spring = key => {
-    const [damping, stiffness] = (Q.get(key) ?? '').split(',').map(Number);
-    return stiffness > 0 ? { damping, stiffness } : undefined;
-};
-const SPRINGS = { spreadW: spring('spreadW'), spreadH: spring('spreadH'), morph: spring('morph') };
 const W = 1920;
 const H = 1080;
 
@@ -154,6 +146,9 @@ const tex = {
     scene: texture(null),
     frostA: texture(null, { w: W / 2, h: H / 2, mip: false }),
     frostB: texture(null, { w: W / 2, h: H / 2, mip: false }),
+    layer: texture(null),
+    layerA: texture(null, { w: W / 2, h: H / 2, mip: false }),
+    layerB: texture(null, { w: W / 2, h: H / 2, mip: false }),
 };
 function framebuffer(t) {
     const f = gl.createFramebuffer();
@@ -161,7 +156,7 @@ function framebuffer(t) {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
     return f;
 }
-const fbo = { scene: framebuffer(tex.scene), frostA: framebuffer(tex.frostA), frostB: framebuffer(tex.frostB) };
+const fbo = Object.fromEntries(['scene', 'frostA', 'frostB', 'layer', 'layerA', 'layerB'].map(k => [k, framebuffer(tex[k])]));
 
 // motion blur: the moments of a frame are added up in a float texture, then shown with a little
 // dither (the wallpaper's soft gradients band at 8 bits once encoded)
@@ -182,6 +177,19 @@ void main() {
     vec3 c = texelFetch(accum, ivec2(gl_FragCoord.xy), 0).rgb;
     fragColor = vec4(c + (hash(gl_FragCoord.xy) - 0.5) / 255.0, 1.0);
 }`)}`);
+// the composite: the glass layer (sharp, or its blur) over the scene
+const composite = await program(`data:text/plain,${encodeURIComponent(`#version 300 es
+precision highp float;
+uniform sampler2D scene;
+uniform sampler2D layer;
+uniform vec2 res;
+uniform float gain;
+out vec4 fragColor;
+void main() {
+    vec2 uv = gl_FragCoord.xy / res;
+    vec4 g = texture(layer, uv);
+    fragColor = vec4((texture(scene, uv).rgb * (1.0 - g.a) + g.rgb) * gain, gain);
+}`)}`);
 gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);
@@ -193,13 +201,13 @@ function bind(prog, name, unit, t) {
     gl.uniform1i(prog.u[name], unit);
 }
 
-// the frost: the lock clock's Shell.BlurEffect radius 18, as a Gaussian of sigma 18 px at full
-// resolution, run at half
-const FROST_SIGMA = 18 / 2;
+// the frost: the lock clock's Shell.BlurEffect radius 18, as a Gaussian at full resolution run
+// at half; a little less here (12) so the bend at the edge has detail to show
+const FROST_SIGMA = 12 / 2;
 
 /// draws the moment `t`, into the canvas or (`gain` < 1) added into the accumulation texture
 function drawMoment(t, gain) {
-    const s = timeline(t, WORD, SPRINGS);
+    const s = timeline(t);
 
     gl.disable(gl.BLEND);
     gl.viewport(0, 0, W, H);
@@ -214,40 +222,58 @@ function drawMoment(t, gain) {
     gl.bindTexture(gl.TEXTURE_2D, tex.scene);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    gl.viewport(0, 0, W / 2, H / 2);
-    gl.useProgram(blur.p);
-    gl.uniform1f(blur.u.sigma, FROST_SIGMA);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.frostA);
-    bind(blur, 'src', 0, tex.scene);
-    gl.uniform1i(blur.u.lod, 1);
-    gl.uniform2f(blur.u.dir, 1, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.frostB);
-    bind(blur, 'src', 0, tex.frostA);
-    gl.uniform1i(blur.u.lod, 0);
-    gl.uniform2f(blur.u.dir, 0, 1);
+    // a separable Gaussian of `src` (read at mip level 1, half res) into B, through A
+    const blurInto = (src, A, B, sigma) => {
+        gl.viewport(0, 0, W / 2, H / 2);
+        gl.useProgram(blur.p);
+        gl.uniform1f(blur.u.sigma, sigma);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, A);
+        bind(blur, 'src', 0, src);
+        gl.uniform1i(blur.u.lod, 1);
+        gl.uniform2f(blur.u.dir, 1, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, B);
+        bind(blur, 'src', 0, A === fbo.frostA ? tex.frostA : tex.layerA);
+        gl.uniform1i(blur.u.lod, 0);
+        gl.uniform2f(blur.u.dir, 0, 1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.viewport(0, 0, W, H);
+    };
+    blurInto(tex.scene, fbo.frostA, fbo.frostB, FROST_SIGMA);
+
+    // the glass layer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.layer);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(glass.p);
+    bind(glass, 'frost', 0, tex.frostB);
+    bind(glass, 'sdf', 1, tex.sdf);
+    gl.uniform2f(glass.u.res, W, H);
+    gl.uniform1f(glass.u.fade, s.fade);
+    for (const [k, v] of Object.entries(LOOK))
+        gl.uniform1f(glass.u[k], v);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    gl.viewport(0, 0, W, H);
+    // its blur, as it comes in and goes out
+    let layer = tex.layer;
+    if (s.blur > 0.4) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, tex.layer);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        blurInto(tex.layer, fbo.layerA, fbo.layerB, s.blur / 2);
+        layer = tex.layerB;
+    }
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, gain < 1 ? accumFbo : null);
     if (gain < 1) {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);
     }
-    gl.useProgram(glass.p);
-    gl.uniform1f(glass.u.gain, gain);
-    bind(glass, 'scene', 0, tex.scene);
-    bind(glass, 'frost', 1, tex.frostB);
-    bind(glass, 'sdf', 2, tex.sdf);
-    gl.uniform2f(glass.u.res, W, H);
-    gl.uniform4f(glass.u.blob, s.cx, s.cy, s.w, s.h);
-    gl.uniform1f(glass.u.morph, s.morph);
-    gl.uniform1f(glass.u.front, s.front);
-    gl.uniform1f(glass.u.band, s.band);
-    gl.uniform1f(glass.u.fade, s.fade);
-    gl.uniform1f(glass.u.shadow, SHADOW);
-    for (const [k, v] of Object.entries(LOOK))
-        gl.uniform1f(glass.u[k], v);
+    gl.useProgram(composite.p);
+    bind(composite, 'scene', 0, tex.scene);
+    bind(composite, 'layer', 1, layer);
+    gl.uniform2f(composite.u.res, W, H);
+    gl.uniform1f(composite.u.gain, gain);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
