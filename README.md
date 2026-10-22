@@ -70,6 +70,40 @@ One command switches the shell, GTK and libadwaita apps and every tint: `bash sc
 
 </td></tr></table>
 
+## Now Playing
+
+Press <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> for a full-screen view of what is playing: the lock screen's glass clock,
+the cover and player, live synced lyrics, all over a slow swirl of the album's colours. <kbd>Esc</kbd>, the same keys, the
+chevron at the bottom or a click outside the controls close it.
+
+<table><tr><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-enter-still.webp"><img src="docs/showcase/media/feature-np-enter.webp" width="100%" alt="Super+Shift+M: the desktop blurs into the album colours and the cover pours in under the glass clock"></picture></td><td>
+
+#### It pours in
+
+The album's colours swirl in behind the glass clock, and the cover forms from a drop of glass.
+
+</td></tr></table>
+
+<table><tr><td>
+
+#### The cover follows the cursor
+
+Move over the cover and it leans towards the pointer in 3D and lifts, its clear glass rim catching the light.
+
+</td><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-tilt-still.webp"><img src="docs/showcase/media/feature-np-tilt.webp" width="100%" alt="The cursor moving over the album cover: it tilts towards the cursor in 3D, with a glass rim and a reflection"></picture></td></tr></table>
+
+<table><tr><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-lyrics-still.webp"><img src="docs/showcase/media/feature-np-lyrics.webp" width="100%" alt="The Now Playing view with live lyrics beside the player, and a song without lyrics: the cover and player alone"></picture></td><td>
+
+#### With or without lyrics
+
+Synced lyrics (a `.lrc` beside the file, or lrclib.net) scroll beside the player and blur as they move away. A song without lyrics leaves the cover and the controls alone in the middle.
+
+</td></tr></table>
+
+<kbd>Space</kbd> plays or pauses, <kbd>←</kbd>/<kbd>→</kbd> skip, <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> seek 10 s and <kbd>↑</kbd>/<kbd>↓</kbd>
+change the volume. It shows on the monitor under the pointer. Turn it on with `bash scripts/tahoe-nowplaying.sh on` (then
+log out and back in); `off` switches it off and `status` says where it stands.
+
 ## Install
 
 For Arch-based distributions (CachyOS, Arch, EndeavourOS) on GNOME 51 with Wayland. Everything goes into your home folder.
@@ -78,7 +112,8 @@ For Arch-based distributions (CachyOS, Arch, EndeavourOS) on GNOME 51 with Wayla
 git clone https://github.com/Blanchedubois/amorphous-glass ~/amorphous-glass && cd ~/amorphous-glass && ./install.sh
 ```
 
-Then **log out and back in**: GNOME loads new extensions only at login.
+Then **log out and back in**: GNOME loads new extensions only at login. The [Now Playing](#now-playing) view is a
+separate switch for now: `bash scripts/tahoe-nowplaying.sh on`.
 
 | Before | Remove it |
 |---|---|
@@ -126,6 +161,7 @@ Switch any piece off and on later:
 - `bash scripts/tahoe-widgets.sh off`
 - `bash scripts/tahoe-motion.sh off`
 - `bash scripts/tahoe-lockscreen.sh off`
+- `bash scripts/tahoe-nowplaying.sh off`
 - `bash scripts/glass-bar.sh menus off`, `dock off`, `apps off`, `mode light`
 
 </details>
@@ -306,7 +342,7 @@ Details, the switches and the drift test results: `docs/REPAIR.md`.
 | `scripts/glass-bar.sh` | Apply, rebuild and switch every glass surface and mode |
 | `scripts/tahoe-repair.sh`, `scripts/tahoe_repair.py`, `scripts/repair_manifest.py` | The repair and its manifest (`docs/REPAIR.md`) |
 | `scripts/tahoe-*.sh` | The on/off switches of each Tahoe extension |
-| `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
+| `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-nowplaying` (the Now Playing view), `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
 | `tokens/`, `docs/STANDARD.md` | The glass standard: radius, gap, tint and edge per surface |
 | `docs/` | Plans, measurements and workshop notes for every part |
 | `docs/showcase/` | The video at the top and the design images |
@@ -348,7 +384,7 @@ Amorphous Glass stands on other people's work. Thank you.
 
 **In the clips**
 
-- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
+- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify; the Now Playing clips show *Hey Ladies* and *Shake Your Rump* from *Paul's Boutique* by the Beastie Boys, with placeholder lyrics. The album artwork and the lyrics belong to their artists, writers and labels.
 
 **Inspirations**
 
