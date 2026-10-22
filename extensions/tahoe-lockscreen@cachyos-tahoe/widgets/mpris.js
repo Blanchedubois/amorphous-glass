@@ -14,7 +14,7 @@ const PATH = '/org/mpris/MediaPlayer2';
 const IFACE = 'org.mpris.MediaPlayer2.Player';
 const ROOT = 'org.mpris.MediaPlayer2';   // the player itself: DesktopEntry, Identity, Raise
 const CACHE = GLib.build_filenamev([GLib.get_user_cache_dir(), 'tahoe-widgets', 'art']);
-const USER_AGENT = 'tahoe-widgets (https://github.com/Blanchedubois/liquid-glass)';
+const USER_AGENT = 'tahoe-widgets (https://github.com/Blanchedubois/amorphous-glass)';
 
 let session = null;
 function soup() {

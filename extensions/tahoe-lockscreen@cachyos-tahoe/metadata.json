@@ -4,6 +4,6 @@
   "description": "macOS Tahoe style lock screen for GNOME Shell. Active only while the screen is locked; styles GNOME's own unlock dialog and never replaces its authentication.",
   "shell-version": ["51"],
   "session-modes": ["unlock-dialog"],
-  "url": "https://github.com/Blanchedubois/liquid-glass",
+  "url": "https://github.com/Blanchedubois/amorphous-glass",
   "version": 1
 }
