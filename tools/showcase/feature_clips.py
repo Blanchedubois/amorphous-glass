@@ -11,21 +11,11 @@ from PIL import Image
 V = Path.home() / 'Videos/liquid-glass-showcase'
 W, H, FPS = 960, 540, 20
 
-# box blur over private notifications: (x, y, w, h) in source pixels, [t0, t1] seconds
-NOTIF = (950, 56, 390, 240)
-
-
-def blur(box, t0, t1):
-    x, y, w, h = box
-    return (f"split[a][b];[b]crop={w}:{h}:{x}:{y},boxblur=24:3[bl];"
-            f"[a][bl]overlay={x}:{y}:enable='between(t,{t0},{t1})'")
-
-
 # name: list of (source, start, duration, filter before scale), still time (s into the result)
 CLIPS = {
-    'live-blur': ([(V / 'features1/live-blur.mp4', 0.3, 10.4, blur(NOTIF, 3.35, 7.25) + ',crop=1920:1080:0:0')], 5.8),
+    'live-blur': ([(V / 'features5/live-blur.mp4', 0.3, 10.4, 'crop=1920:1080:0:0')], 5.8),
     'motion': ([(V / 'features1/quick-settings.mp4', 0.4, 6.6, 'crop=1280:720:1280:0')], 3.6),
-    'spacing': ([(V / 'features1/calendar.mp4', 0.9, 4.4, blur(NOTIF, 0.75, 3.7) + ',crop=1280:720:640:0')], 2.6),
+    'spacing': ([(V / 'features5/calendar.mp4', 0.9, 4.4, 'crop=1280:720:640:0')], 2.6),
     'icons': ([(V / 'features3/icons.mp4', 0.6, 6.6, 'crop=960:540:1600:0')], 3.2),
     'albums': ([(V / f'features4/song-{i}.mp4', 0.6, 4.6, 'crop=1600:900:0:40') for i in (1, 2, 3, 4)], 1.5),
     'lock': ([(V / 'features-lock/lock-video.mp4', 0.8, 5.6, 'crop=2240:1260:60:20')], 3.5),
