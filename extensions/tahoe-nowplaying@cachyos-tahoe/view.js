@@ -26,7 +26,7 @@ import {geometry} from './layout.js';
 import {EXPRESSIVE} from './shared/spring.js';
 import {Motion} from './motion.js';
 import {Swirl} from './swirl.js';
-import {EdgeFade, GlassEdge, Sheen} from './effects.js';
+import {EdgeFade, GlassEdge} from './effects.js';
 import {WidgetGlass} from './widgetglass.js';
 import {setSymbol, symbolActor} from './symbols.js';
 
@@ -41,7 +41,6 @@ const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at th
 const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
 const EDGE_BAND = 16;             // px at 1440p: the hovered cover's glass bevel
 const EDGE_BEND = 6;              // px the art bends at the very edge
-const LIGHT_SWING = 0.45;         // how far the light on the edge moves with the tilt
 const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
 const TILT_LIFT = 10;             // px toward the viewer while hovered
 const DISABLED = 0.4;             // a control the player does not offer
@@ -215,9 +214,10 @@ export class NowPlayingView {
 
         // the cover: the art by itself (12 px corners, no shadow: St draws one as a square box behind
         // the rounded art); with none, a card of the widgets' glass with a note. Hovered, it tilts
-        // toward the pointer with a sheen, and its own edge turns to Liquid Glass, as a thick glass
-        // tile (no separate ring; user, 2026-10-21).
-        // cover (takes the pointer, never moves) > tilt (turns) > the art or card (glass edge), sheen
+        // toward the pointer and turns into a thick Liquid Glass tile lit from above the pointer: a soft
+        // reflection on its face, a glint and shade on its bevel (effects.js GlassEdge; no ring, no
+        // flat sheen; user, 2026-10-21).
+        // cover (takes the pointer, never moves) > tilt (turns) > the art or card (glass edge)
         const cover = at(new St.Widget({reactive: true, track_hover: true, layout_manager: new Clutter.FixedLayout()}), b.cover, 'cover');
         const radius = g.coverRadius;
         const [cw, ch] = [b.cover.width, b.cover.height];
@@ -243,14 +243,6 @@ export class NowPlayingView {
         this._coverBox = stack;
         this._coverArt = null;   // the art shown (an St.Widget), or null: the glass card
 
-        // the sheen, over the art (a shader cut to the cover's corners)
-        const sheen = new St.Widget({style: 'background-color: rgba(255, 255, 255, 0.004);', reactive: false});
-        sheen.set_size(cw, ch);
-        this._sheen = new Sheen(radius * St.ThemeContext.get_for_stage(global.stage).scale_factor);
-        sheen.add_effect_with_name('sheen', this._sheen);
-        sheen.opacity = 0;
-        tilt.add_child(sheen);
-        this._sheenActor = sheen;
 
         cover.connect('motion-event', (_a, event) => this._guard(() => this._tiltTo(event)) ?? Clutter.EVENT_PROPAGATE);
         cover.connect('leave-event', () => this._guard(() => this._untilt()) ?? Clutter.EVENT_PROPAGATE);
@@ -399,14 +391,9 @@ export class NowPlayingView {
         m.spring('tilt-x', t.rotation_angle_x, (py - 0.5) * 2 * TILT_MAX, token, v => this._lean('x', v));
         m.spring('tilt-y', t.rotation_angle_y, -(px - 0.5) * 2 * TILT_MAX, token, v => this._lean('y', v));
         m.spring('tilt-z', t.translation_z, TILT_LIFT * this._u, token, v => (t.translation_z = v));
-        m.spring('sheen', this._sheen.strength, 1, EXPRESSIVE.effects.default, v => {
-            this._sheen.strength = v;
-            this._sheenActor.opacity = Math.round(255 * Math.min(1, Math.max(0, v)));
-        });
-        this._sheen.x = px;
-        this._sheen.y = py;
-        this._sheen.band = (px + py) - 1;
-        this._sheen.queue_repaint();
+        // the light sits above the pointer
+        this._edge.pointer = [px, py];
+        this._edge.queue_repaint();
         this._hovered = true;
         this._edgeTo(this._coverArt ? 1 : 0);
         this.tiltTarget = [px, py];
@@ -419,28 +406,18 @@ export class NowPlayingView {
         m.spring('tilt-x', t.rotation_angle_x, 0, token, v => this._lean('x', v));
         m.spring('tilt-y', t.rotation_angle_y, 0, token, v => this._lean('y', v));
         m.spring('tilt-z', t.translation_z, 0, token, v => (t.translation_z = v));
-        m.spring('sheen', this._sheen.strength, 0, EXPRESSIVE.effects.default, v => {
-            this._sheen.strength = v;
-            this._sheenActor.opacity = Math.round(255 * Math.min(1, Math.max(0, v)));
-        });
         this._hovered = false;
         this._edgeTo(0);
         this.tiltTarget = null;
         return Clutter.EVENT_PROPAGATE;
     }
 
-    // one axis of the lean; the light on the glass edge swings with it
+    // one axis of the lean
     _lean(axis, v) {
-        const t = this._tilt;
         if (axis === 'x')
-            t.rotation_angle_x = v;
+            this._tilt.rotation_angle_x = v;
         else
-            t.rotation_angle_y = v;
-        const lx = -1 - LIGHT_SWING * t.rotation_angle_y / TILT_MAX;
-        const ly = -1 + LIGHT_SWING * t.rotation_angle_x / TILT_MAX;
-        const len = Math.hypot(lx, ly) || 1;
-        this._edge.light = [lx / len, ly / len];
-        this._edge.queue_repaint();
+            this._tilt.rotation_angle_y = v;
     }
 
     // the cover's glass edge in (1) or out (0)
@@ -453,7 +430,7 @@ export class NowPlayingView {
 
     get tilt() {
         const t = this._tilt;
-        return {x: t.rotation_angle_x, y: t.rotation_angle_y, z: t.translation_z, edge: this._edge.strength, sheen: this._sheen.strength};
+        return {x: t.rotation_angle_x, y: t.rotation_angle_y, z: t.translation_z, edge: this._edge.strength, sheen: this._edge.strength, light: this._edge.pointer};
     }
 
     // a floating control: the symbol, no plate; hover is the widget's soft circle (stylesheet)
