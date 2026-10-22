@@ -92,11 +92,11 @@ Move over the cover and it leans towards the pointer in 3D and lifts, its clear 
 
 </td><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-tilt-still.webp"><img src="docs/showcase/media/feature-np-tilt.webp" width="100%" alt="The cursor moving over the album cover: it tilts towards the cursor in 3D, with a glass rim and a reflection"></picture></td></tr></table>
 
-<table><tr><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-lyrics-still.webp"><img src="docs/showcase/media/feature-np-lyrics.webp" width="100%" alt="The Now Playing view with live lyrics beside the player, and a song without lyrics: the cover and player alone"></picture></td><td>
+<table><tr><td width="58%"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/feature-np-lyrics-still.webp"><img src="docs/showcase/media/feature-np-lyrics.webp" width="100%" alt="The Now Playing view with live lyrics beside the player; Next, and the new song's lyrics come in"></picture></td><td>
 
-#### With or without lyrics
+#### Live lyrics
 
-Synced lyrics (a `.lrc` beside the file, or lrclib.net) scroll beside the player and blur as they move away. A song without lyrics leaves the cover and the controls alone in the middle.
+Synced lyrics (a `.lrc` beside the file, or lrclib.net) scroll beside the player and blur as they move away. Skip to the next song and its lyrics take over.
 
 </td></tr></table>
 
@@ -119,7 +119,7 @@ separate switch for now: `bash scripts/tahoe-nowplaying.sh on`.
 |---|---|
 | `./install.sh --check` lists what is missing and the `pacman` line to fix it. It changes nothing. | `./install.sh --uninstall` puts back the settings from before and removes what it added. |
 
-Prefer a download? Every [release](https://github.com/Blanchedubois/amorphous-glass/releases/latest) has the source as a `.tar.gz`: unpack it and run `./install.sh` inside.
+Prefer a download? Get [Amorphous Glass 1.0](https://github.com/Blanchedubois/amorphous-glass/releases/latest) and take the source `.tar.gz` under **Assets**: unpack it and run `./install.sh` inside.
 
 <a id="more"></a>
 ## More
@@ -384,7 +384,7 @@ Amorphous Glass stands on other people's work. Thank you.
 
 **In the clips**
 
-- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify; the Now Playing clips show *Hey Ladies* and *Shake Your Rump* from *Paul's Boutique* by the Beastie Boys, with placeholder lyrics. The album artwork and the lyrics belong to their artists, writers and labels.
+- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify; the Now Playing clips show *Hey Ladies* and *5-Piece Chicken Dinner* from *Paul's Boutique* by the Beastie Boys, also in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
 
 **Inspirations**
 
