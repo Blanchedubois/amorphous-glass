@@ -427,6 +427,17 @@ class Repair:
                 return INFO, 'the login screen base (.pre-gdm-tahoe) predates this GNOME major; rebuild it with MacTahoe first'
         return OK, ''
 
+    def c_system_copy(self, c):
+        """a root-installed copy of a repo folder (the login screen extension): reported, never fixed here"""
+        if not os.path.exists(GDM_KEYS):
+            return SKIP, 'the Tahoe login screen is not installed'
+        path, repo = c['path'], os.path.join(ROOT, c['repo'])
+        if not os.path.isdir(path):
+            return ACTION, f'{path} is missing: run {expand(c["fix"])} (sudo)'
+        if os.path.isdir(repo) and self.tree_hash(repo) != self.tree_hash(path):
+            return ACTION, f'the installed login screen differs from this checkout: run {expand(c["fix"])} (sudo); it shows at the next logout'
+        return OK, ''
+
     def c_version_validation(self, c):
         s, _ = self.settings.get('org.gnome.shell')
         have = s[0].get_boolean('disable-extension-version-validation')

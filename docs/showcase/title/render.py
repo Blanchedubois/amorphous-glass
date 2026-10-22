@@ -125,7 +125,7 @@ def encode_webp(paths, fps, args):
             height = round(im.height * args.webp_width / im.width / 2) * 2
             images.append(im.resize((args.webp_width, height), Image.LANCZOS))
     images[0].save(args.webp, save_all=True, append_images=images[1:], loop=0,
-                   duration=round(1000 * step / fps), quality=args.webp_quality, method=4,
+                   duration=round(1000 * step / fps), quality=args.webp_quality, method=getattr(args, 'webp_method', 4),
                    kmin=args.webp_kmax - 1, kmax=args.webp_kmax, allow_mixed=False)
     print(args.webp, os.path.getsize(args.webp))
 
@@ -148,6 +148,7 @@ def main():
     w.add_argument('--webp-fps', type=int, default=30)
     w.add_argument('--webp-quality', type=int, default=75)
     w.add_argument('--webp-kmax', type=int, default=10, help='frames between keyframes')
+    w.add_argument('--webp-method', type=int, default=4, help='libwebp effort, 0-6: 6 keeps dark gradients unblocked')
     for name in ('still', 'clip'):
         p = sub.add_parser(name)
         p.add_argument('--theme', choices=('dark', 'light'), default='dark')
