@@ -1,40 +1,55 @@
 {
-  "about": "Round 7 (user, 2026-10-21: choppier; cut in with the mouse already moving and out before it slows; no flicker on the lock; neighbours always different). Each clip enters on a glide already at speed (moves start at full speed: ease-out) and leaves just as the next glide sets off; the order alternates the place on screen and the kind of thing (where).",
+  "about": "Round 10 (user, 2026-10-21): the clock set down on the grid beside Weather (no drag back); the desktop's right-click Add Widget and a dock app's menu added (extra1 takes); quick settings shown once; push-in from the title, pull-outs before whole-screen clips. Neighbours alternate place and kind.",
   "clips": [
     {
-      "name": "home",
-      "in": 0.9,
-      "out": 1.9,
-      "zoom": 1.0,
-      "where": "whole screen"
-    },
-    {
-      "name": "widget-drag",
-      "in": 3.45,
-      "out": 5.65,
+      "name": "home-to-widget",
+      "source": "~/Videos/liquid-glass-showcase/extra1/widget-drag.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/widget-drag.track.json",
+      "in": 0.2,
+      "out": 3.82,
       "zoom": 1.6,
-      "where": "left: the clock pulled out across the wallpaper"
+      "where": "the title hands over on the home screen, whole; the camera pushes in onto the cursor; the clock is set down beside Weather, on the grid",
+      "from_zoom": 1.0,
+      "push": 1.1
     },
     {
       "name": "quick-settings",
       "in": 8.3,
       "out": 11.05,
       "zoom": 1.6,
-      "where": "top right: the panel grows from its icon, Wi-Fi submenu"
+      "where": "top right: the panel grows from its icon, the Wi-Fi submenu"
+    },
+    {
+      "name": "desktop-widget",
+      "source": "~/Videos/liquid-glass-showcase/extra1/desktop-widget.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/desktop-widget.track.json",
+      "in": 0.45,
+      "out": 6.0,
+      "zoom": 1.5,
+      "where": "middle: right-click the wallpaper, Add Widget, a clock drops in at the bottom left"
+    },
+    {
+      "name": "menu-slide",
+      "in": 14.64,
+      "out": 18.85,
+      "zoom": 1.35,
+      "where": "top: the calendar, sliding across the status menus"
     },
     {
       "name": "files-drag",
       "in": 28.2,
-      "out": 31.2,
+      "out": 31.7,
       "zoom": 1.4,
-      "where": "middle: the Files window grabbed and dragged"
+      "where": "middle: the Files window dragged; the camera pulls back to the whole screen",
+      "to_zoom": 1.0,
+      "pull": 0.9
     },
     {
       "name": "overview-search",
-      "in": 44.25,
+      "in": 43.76,
       "out": 45.92,
       "zoom": 1.0,
-      "where": "whole screen: search"
+      "where": "whole screen: the overview opens, search"
     },
     {
       "name": "music",
@@ -44,25 +59,29 @@
       "where": "left: cover, controls, lyrics"
     },
     {
-      "name": "menu-slide",
-      "in": 14.64,
-      "out": 20.3,
-      "zoom": 1.35,
-      "where": "top: the calendar slides into quick settings"
+      "name": "dock-menu",
+      "source": "~/Videos/liquid-glass-showcase/extra1/dock-menu.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/dock-menu.track.json",
+      "in": 0.84,
+      "out": 3.7,
+      "zoom": 1.6,
+      "where": "bottom: an app in the dock, its name label, its menu"
     },
     {
       "name": "settings-drag",
       "in": 37.95,
-      "out": 39.8,
+      "out": 40.2,
       "zoom": 1.4,
-      "where": "middle: Settings dragged"
+      "where": "middle: Settings dragged; the camera pulls back to the whole screen",
+      "to_zoom": 1.0,
+      "pull": 0.8
     },
     {
       "name": "app-grid",
-      "in": 50.35,
+      "in": 49.9,
       "out": 54.15,
       "zoom": 1.0,
-      "where": "whole screen: a folder opens, then it all collapses back to the home screen, into the lock"
+      "where": "whole screen: a folder opens, then it all collapses to the home screen, into the lock"
     }
   ]
 }

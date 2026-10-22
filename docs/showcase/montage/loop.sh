@@ -25,7 +25,7 @@ ffmpeg -loglevel error -y -i "$title" -i "$montage" -i "$title" -filter_complex 
 # user, 2026-10-21: "the starting clip should be the title card": the loop is seamless, so the file is
 # rotated to begin on the word, already on screen (ROTATE s into the title), and the home screen
 # it opened on plays at the end instead
-ROTATE=${ROTATE:-1.25}
+ROTATE=${ROTATE:-0.95}
 if [ "$ROTATE" != 0 ]; then
   tmp="${out%.mp4}.unrotated.mp4"
   mv "$out" "$tmp"
