@@ -360,24 +360,56 @@ async function runVideo() {
     const started = await call('Screencast', new GLib.Variant('(sa{sv})', [file, opts]), new GLib.VariantType('(bs)'));
     const t0 = GLib.get_monotonic_time();
     const mark = label => write({label: 'video-mark', mark: label, t: (GLib.get_monotonic_time() - t0) / 1e6});
-    await sleep(1500);
+    // the fake player registers a little after the shell starts: wait for it, so Now Playing is on
+    // the lock screen from the first frame
+    for (let i = 0; i < 40 && !Gio.DBus.session.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+        'org.freedesktop.DBus', 'ListNames', null, null, Gio.DBusCallFlags.NONE, -1, null)
+        .deepUnpack()[0].some(n => n.startsWith('org.mpris.MediaPlayer2.')); i++)
+        await sleep(250);
+    await sleep(2500);
     mark('lock');
     Main.screenShield.lock(true);            // animated, as Super+L
-    await sleep(700);
-    Main.screenShield._wakeUpScreen();       // as at a desk: no blanking after the lock
-    await sleep(5300);                        // the clock, the widgets, the music swirl
+    // keep it awake, as a person at the desk would: small pointer nudges (a key would open the prompt)
+    const seat = (global.stage.get_context?.()?.get_backend?.() ?? global.backend).get_default_seat();
+    const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+    let nudge = 0;
+    const awake = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+        pointer.notify_relative_motion(GLib.get_monotonic_time(), (nudge++ % 2) ? 1 : -1, 0);
+        return GLib.SOURCE_CONTINUE;
+    });
+    await sleep(5500);                        // the clock, the widgets, Now Playing over the music swirl
     mark('wake');
     Main.screenShield._wakeUpScreen();
-    await sleep(1200);
+    await sleep(500);
+    GLib.source_remove(awake);
     const dialog = Main.screenShield._dialog;
+    // as a person would: the dialog has the keyboard, a key opens the prompt page
+    let inside = false;
+    for (let a = global.stage.key_focus; a; a = a.get_parent()) if (a === dialog) inside = true;
+    if (!inside)
+        dialog.grab_key_focus();
+    await typeKeys('x');
+    await sleep(700);
     const prompt = dialog?._authPrompt;
-    if (prompt && !prompt._entryArea.visible)
+    if (prompt && !prompt._entryArea.visible) {
         prompt.setQuestion('Enter Password');
+        await sleep(400);
+    }
+    if (prompt?._entry) {
+        prompt._entry.text = '';
+        prompt._entry.grab_key_focus();
+    }
     mark('type');
     for (const ch of 'showcase') {           // dots only: nothing reaches GDM or PAM in this shell
         await typeKeys(ch);
-        await sleep(140);
+        await sleep(110);
     }
+    write({label: 'video-entry', visible: !!prompt?._entryArea?.visible, typed: prompt?._entry?.text?.length ?? -1});
+    await sleep(600);
+    // the demo sign-in: this throwaway shell has no real authentication (the system-bus filter keeps
+    // GDM out), so it is unlocked directly, with GNOME's own unlock animation
+    mark('unlock');
+    Main.screenShield.deactivate(true);
     await sleep(2500);
     mark('stop');
     const stopped = await call('StopScreencast', null, new GLib.VariantType('(b)'));
