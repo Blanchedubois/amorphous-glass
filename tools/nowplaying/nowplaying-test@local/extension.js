@@ -980,16 +980,17 @@ test('enter: the cover pours out of a circle of glass, then the art fades in', a
     expect(first.width < cover * 0.3 && Math.abs(first.radius - first.width / 2) < 2, `it did not start as a small circle: ${JSON.stringify(first)}`);
     const widest = samples.reduce((m, p) => Math.max(m, p.width), 0);
     expect(widest >= cover - 2, `it never opened to the cover's size (${widest} of ${cover})`);
-    // never past the cover: no rim of glass around the art as it fades in
-    expect(widest <= cover + 0.5, `the glass grew past the cover (${widest.toFixed(1)} of ${cover})`);
+    // elastic: it overshoots the cover a little, then settles on it
+    expect(widest > cover + 2 && widest < cover * 1.25, `no slight overshoot past the cover (${widest.toFixed(1)} of ${cover})`);
     const open = samples.filter(p => p.width >= cover - 2);
     expect(open.some(p => Math.abs(p.radius - v._coverRadius) < 1.5), `the corners never became the cover's: ${open.map(p => p.radius.toFixed(1)).slice(0, 5)}`);
     expect(samples.some(p => p.art > 200 && p.opacity > 200), 'the art did not come in over the glass');
-    // one piece: the cover fades in only once the glass is full size
-    const early = samples.find(p => p.art > 0 && p.width < cover - 1);
-    expect(!early, `the cover started to fade in before the glass was full size: ${JSON.stringify(early)}`);
+    // one piece: the cover fades in only once the glass has settled exactly on its shape (no rim)
+    const early = samples.find(p => p.art > 0 && (Math.abs(p.width - cover) > 1 || Math.abs(p.height - v.parts.cover.height) > 1));
+    expect(!early, `the cover started to fade in before the glass had settled on its shape: ${JSON.stringify(early)}`);
     expect(!v.pour && v._coverBox.opacity === 255, `after the enter: pour ${JSON.stringify(v.pour)}, art ${v._coverBox.opacity}`);
-    log(`  pour: ${samples.length} frames, from ${first.width.toFixed(0)} px round to ${widest.toFixed(0)} px (cover ${cover})`);
+    const tallest = samples.reduce((m, p) => Math.max(m, p.height), 0);
+    log(`  pour: ${samples.length} frames, from ${first.width.toFixed(0)} px round, overshooting to ${widest.toFixed(0)} x ${tallest.toFixed(0)} px (cover ${cover})`);
     ext().overlay.close();
     await sleep(SETTLE);
     assertClean('after the enter');
