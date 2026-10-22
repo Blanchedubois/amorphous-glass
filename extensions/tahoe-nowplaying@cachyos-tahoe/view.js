@@ -41,25 +41,28 @@ const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at th
 const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
 const EDGE_BAND = 6;              // px at 1440p: the hovered cover's clear glass rim (a card: 16 read as a thick embossed tile)
 const EDGE_BEND = 2;              // px the art bends at the very edge
-// the enter (user, 2026-10-21; slow on purpose, it is cosmetic): a drop of the widgets' glass falls
+// the enter (user, 2026-10-21; about a second: 2.5 s was far too slow): a drop of the widgets' glass falls
 // to the cover's middle, stretching as it speeds up (its volume kept), lands, and spreads into the
 // cover's shape, its width leading its height (a squash, a liquid wobble); once it is full size the
 // cover fades in on it, as one piece
 const DROP = 72;                  // px at 1440p: the drop's diameter
 const DROP_FROM = 0.30;           // of the cover's height above its middle: where the drop appears
-const DROP_DELAY = 220;           // ms after the layout is decided (the view is fading in)
-const DROP_IN_MS = 200;           // the drop fading in as it starts to fall
-const FALL_MS = 620;              // the fall, accelerating (a drop under its own weight)
-const STRETCH_PER_SPEED = 0.0009; // stretch per px/s of fall (tahoe-motion's 0.0012, a little less)
+const DROP_DELAY = 60;            // ms after the layout is decided (the view is fading in)
+const DROP_IN_MS = 110;           // the drop fading in as it starts to fall
+const FALL_MS = 260;              // the fall, accelerating (a drop under its own weight)
+const STRETCH_PER_SPEED = 0.00045; // stretch per px/s of fall (the fall is twice as fast as before)
 const MAX_STRETCH = 0.45;
 // the spread is elastic (user: inertia that deforms the drop, a slight overshoot, then the cover):
 // the width leads and overshoots, the height follows out of phase, both a little past the cover's
 // shape before they settle on it
-const SPREAD_W = {damping: 0.6, stiffness: 44};
-const SPREAD_H = {damping: 0.64, stiffness: 32};
+const SPREAD_W = {damping: 0.62, stiffness: 420};
+const SPREAD_H = {damping: 0.66, stiffness: 320};
+const SETTLED_PX = 3;             // the spread counts as settled this close to the cover's shape
+const SETTLED_SPEED = 160;        // and this slow (px/s); the cover fading in over it hides the snap
 const OVERSHOOT_ROOM = 0.12;      // of the cover's size: room around it for the glass to overshoot into
-const ART_FADE_MS = 700;          // the cover fading in on the full-size glass
-const GATE = {damping: 1, stiffness: 110};          // the column and lyrics fading in, slowly
+const ART_FADE_MS = 340;          // the cover fading in on the full-size glass, through a blur
+const ART_BLUR = 24;              // px at 1440p of Gaussian blur it starts from, sharpening as it fades in
+const GATE = {damping: 1, stiffness: 300};          // the column and lyrics fading in
 const TILT_PAD = 24;              // px at 1440p of room around the cover for the leaning card
 const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
 const TILT_LIFT = 10;             // px toward the viewer while hovered
@@ -473,9 +476,24 @@ export class NowPlayingView {
             full = true;
             shape(cw, ch, 0);
             mask.rim = 0;   // the glass's own edge from here
-            stack.ease({
-                opacity: 255, duration: ART_FADE_MS, mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
-                onStopped: () => this._guard(finish),
+            // the cover comes in soft and sharpens as it fades in (a Gaussian blur, user 2026-10-22)
+            const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+            const blur = new Shell.BlurEffect({mode: Shell.BlurMode.ACTOR, radius: Math.round(ART_BLUR * this._u * scale), brightness: 1});
+            stack.add_effect_with_name('enter-blur', blur);
+            let at = 0;
+            this.motion.task(dt => {
+                if (this._drop !== drop)
+                    return false;
+                at = Math.min(1, at + dt / (ART_FADE_MS / 1000));
+                const e = 1 - (1 - at) * (1 - at) * (1 - at);   // ease out: soft quickly gone
+                stack.opacity = Math.round(255 * Math.min(1, at * 1.25));
+                blur.radius = Math.round(ART_BLUR * this._u * scale * (1 - e));
+                if (at < 1)
+                    return true;
+                stack.remove_effect(blur);
+                stack.opacity = 255;
+                finish();
+                return false;
             });
         };
         // the spread: width and height on their own springs, from the landed drop's shape
@@ -487,12 +505,19 @@ export class NowPlayingView {
                     return;
                 [w, h] = shape(w, h, 0);
             };
-            // the cover only once both have come to rest on its shape (the overshoot is over)
+            // the cover only once both have come to rest on its shape (the overshoot is over): within
+            // SETTLED_PX of it and nearly still, the rest of the wobble is snapped (it cannot be seen)
+            const near = name => {
+                const st = m.state(name);
+                return !st || (Math.abs(st.value - st.target) < SETTLED_PX && Math.abs(st.velocity) < SETTLED_SPEED);
+            };
             m.task(() => {
                 if (full || this._drop !== drop)
                     return false;
-                if (m.value('drop-w') !== undefined || m.value('drop-h') !== undefined)
+                if (!near('drop-w') || !near('drop-h'))
                     return true;
+                m.stop('drop-w');
+                m.stop('drop-h');
                 fill();
                 return false;
             });
@@ -538,7 +563,7 @@ export class NowPlayingView {
     get pour() {
         const d = this._drop;
         const sh = this._dropShape;
-        return d && sh ? {width: sh.width, height: sh.height, radius: sh.radius, opacity: d.opacity, art: this._coverBox.opacity} : null;
+        return d && sh ? {width: sh.width, height: sh.height, radius: sh.radius, dy: sh.dy, opacity: d.opacity, art: this._coverBox.opacity} : null;
     }
 
     // a card of the widgets' glass (widgetglass.js), the CSS stand-in until Blur My Shell's is there
