@@ -14,6 +14,7 @@ track.py sees in the frames (its confident matches, where the cursor moves), ove
 10 ms steps.
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,9 +26,12 @@ FPS = 60
 GOOD = 30.0
 
 
-def ease(t):
-    """the driver's glide (tools/showcase@local _glide)"""
-    return 2 * t * t if t < 0.5 else 1 - (-2 * t + 2) ** 2 / 2
+def ease(t, curve=None):
+    """a glide's curve: moves are ease-out quart (montage_shoot.py steps them), drags the driver's own
+    ease in-out (shoots before 2026-10-21 evening: TAHOE_POINTER_EASE=inout for moves too)"""
+    if curve == 'inout' or os.environ.get('TAHOE_POINTER_EASE') == 'inout':
+        return 2 * t * t if t < 0.5 else 1 - (-2 * t + 2) ** 2 / 2
+    return 1 - (1 - t) ** 4
 
 
 def segments(entries):
@@ -40,14 +44,14 @@ def segments(entries):
         t = e['t'] - t0
         if 'move' in e:
             x0, y0, x1, y1, ms = e['move']
-            glides.append((t, t + ms / 1000, x0, y0, x1, y1))
+            glides.append((t, t + ms / 1000, x0, y0, x1, y1, None))
         elif 'drag' in e:
             x0, y0, x1, y1, ms = e['drag']
             start = t + 0.15                    # the driver presses, waits, then glides
-            glides.append((start, start + ms / 1000, x0, y0, x1, y1))
+            glides.append((start, start + ms / 1000, x0, y0, x1, y1, 'inout'))
         elif 'click' in e:
             x, y, _ = e['click']
-            glides.append((t, t, x, y, x, y))
+            glides.append((t, t, x, y, x, y, None))
     return pos, glides
 
 
@@ -55,13 +59,13 @@ def path(pos, glides, times):
     out = np.empty((len(times), 2))
     for i, t in enumerate(times):
         x, y = pos
-        for a, b, x0, y0, x1, y1 in glides:
+        for a, b, x0, y0, x1, y1, curve in glides:
             if t < a:
                 break
             if t >= b:
                 x, y = x1, y1
             else:
-                e = ease((t - a) / (b - a))
+                e = ease((t - a) / (b - a), curve)
                 x, y = x0 + (x1 - x0) * e, y0 + (y1 - y0) * e
         out[i] = (x, y)
     return out

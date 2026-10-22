@@ -360,15 +360,22 @@ async function runVideo() {
     const started = await call('Screencast', new GLib.Variant('(sa{sv})', [file, opts]), new GLib.VariantType('(bs)'));
     const t0 = GLib.get_monotonic_time();
     const mark = label => write({label: 'video-mark', mark: label, t: (GLib.get_monotonic_time() - t0) / 1e6});
-    await sleep(1500);
+    await sleep(1200);
     mark('lock');
     Main.screenShield.lock(true);            // animated, as Super+L
-    await sleep(700);
-    Main.screenShield._wakeUpScreen();       // as at a desk: no blanking after the lock
-    await sleep(5300);                        // the clock, the widgets, the music swirl
+    // keep it awake, as a person at the desk would: small pointer nudges (a key would open the prompt)
+    const seat = (global.stage.get_context?.()?.get_backend?.() ?? global.backend).get_default_seat();
+    const pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+    let nudge = 0;
+    const awake = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+        pointer.notify_relative_motion(GLib.get_monotonic_time(), (nudge++ % 2) ? 1 : -1, 0);
+        return GLib.SOURCE_CONTINUE;
+    });
+    await sleep(5500);                        // the clock, the widgets, Now Playing over the music swirl
     mark('wake');
     Main.screenShield._wakeUpScreen();
-    await sleep(1200);
+    await sleep(900);
+    GLib.source_remove(awake);
     const dialog = Main.screenShield._dialog;
     const prompt = dialog?._authPrompt;
     if (prompt && !prompt._entryArea.visible)
@@ -376,8 +383,13 @@ async function runVideo() {
     mark('type');
     for (const ch of 'showcase') {           // dots only: nothing reaches GDM or PAM in this shell
         await typeKeys(ch);
-        await sleep(140);
+        await sleep(90);
     }
+    await sleep(500);
+    // the demo sign-in: this throwaway shell has no real authentication (the system-bus filter keeps
+    // GDM out), so it is unlocked directly, with GNOME's own unlock animation
+    mark('unlock');
+    Main.screenShield.deactivate(true);
     await sleep(2500);
     mark('stop');
     const stopped = await call('StopScreencast', null, new GLib.VariantType('(b)'));
