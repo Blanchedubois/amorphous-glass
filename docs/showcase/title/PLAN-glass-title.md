@@ -40,25 +40,26 @@ exact damped oscillator), with the tokens the desktop already uses. No new easin
 | Beat | Source of the feel | Numbers |
 |---|---|---|
 | The fall | the Now Playing cover's drop (`tahoe-nowplaying@cachyos-tahoe/view.js`, 2bd1046): accelerating under its weight, `y = -fall · (1 - t²)`, stretched along its speed with the volume kept (`w = d / sqrt(1 + s)`, `h = d · sqrt(1 + s)`, s = speed · 0.00045, max 0.45), fading in as it starts (110 ms) | the circle appears above the word's line and falls to it; FALL 0.42 s (the Now Playing's 0.26 s, scaled to a fall about 1.6x longer in px) |
-| The landing | the Now Playing's spread: width on `{damping 0.62, stiffness 420}` with velocity +0.9 × the landing speed, height on `{0.66, 320}` with -0.35 × it: the width leads and overshoots, the height squashes first, both settle out of phase | the title's drop is 4x bigger and falls 4x farther than the cover's, so the springs get 0.3 of those shares (0.2 read as timid): about 10 % overshoot |
-| The spread | the landed drop (a capsule) is pulled out into a bar the word's length and about an x-height tall, width and height on the first title's "follow" spring `{0.55, 90}` (../timeline.js FOLLOW: softer than the OS tokens, which settle too fast to read across a 1500 px word; under-damped, so the bar overshoots its length and swings back), the landing's velocity kept | the bar is formed about 0.25 s after it sets off |
-| The rise | the letters rise out of the bar from the middle to the ends: a front travels outward on `{0.55, 30}` (the same damping, a third of the stiffness: about half a second across the word), and behind it, over a 300 px band, the field blends from the capsule's SDF into the word's: `sd = mix(sd_bar, sd_word, m(p))` | a straight blend over the whole word at once (the first try) popped the word in a tenth of a second and looked like a mess; the front makes it a rise |
+| The landing | the Now Playing's spread: width on `{damping 0.62, stiffness 420}` with velocity +0.9 × the landing speed, height on `{0.66, 320}` with -0.35 × it: the width leads and overshoots, the height squashes first, both settle out of phase | the title's drop is 4x bigger and falls 4x farther than the cover's, so the springs get 0.6 of those shares (0.2 read as timid, 0.3 still "too sharp and abrupt": the user, phase 3); and the drop does not stop dead on the line: its centre dips past it on `{0.5, 120}` with 0.12 of the fall's speed and rebounds |
+| The spread | the landed drop (a capsule) is pulled out into a bar the word's length on `{0.45, 60}` (softer than the OS tokens, which settle too fast to read across a 1500 px word, and than the first title's follow spring, 0.55/90, which the user found too sharp; under-damped, so the bar overshoots its length and swings back), the landing's velocity kept; its height chases its area over its width (the volume kept, 1.8x the drop's: it thins as it overshoots and thickens as it swings back) | the bar is formed about 0.3 s after it sets off |
+| The rise | the letters rise out of the bar from the middle to the ends: a front travels outward on `{0.45, 25}` (about half a second across the word), and behind it, over a 420 px band, the field blends from the capsule's SDF into the word's: `sd = mix(sd_bar, sd_word, m(p))`, where `m` rises to 1.18 and settles to 1 over a second band, so the letters overshoot their size (the blend past 1 extrapolates: taller, fatter) and settle | a straight blend over the whole word at once (the first try) popped the word in a tenth of a second and looked like a mess; the front makes it a rise |
 | Volume | the circle's area equals the word's ink area, measured from the text canvas at load (the diameter is not a guess), so what drops is what the letters are made of; the spread is the same area pulled wide | |
 | Hold | still | ~1.1 s |
 | The fade | the glass's coverage and the shadow fade out (0.55 s, `smooth`); the plate's bar, dock and widgets fade back in over the same beat (as the old title's `uiIn`) | ends on the montage's first frame |
 
-Timeline (about 5.6 s; to be tuned in phase 5):
+Timeline, as rendered in phase 5 (4.9 s; the first numbers were 0.25 s earlier and held the end
+plate 1.6 s):
 
 | Time (s) | |
 |---|---|
-| 0.00 | the montage's last frame (`plateIn`), whole: loop.sh's dissolve lands here |
-| 0.05 – 0.55 | bar, dock and widgets fade out: the bare wallpaper (no camera zoom: the montage's camera is locked, REWRITE.md "Joins") |
-| 0.45 | the circle appears above the line and starts to fall |
-| 0.87 | it lands; the elastic landing |
-| 1.10 – 1.7 | the spread into a bar (1.10), the rise of the letters (from 1.22) |
-| 1.7 – 3.4 | hold |
-| 3.4 – 4.0 | the glass fades; bar, dock and widgets fade back in |
-| 4.0 – 5.6 | the montage's first frame (`plateOut`), whole: the hard cut into the montage. (Trimmed in phase 5 so the clip is about 5–6 s with the plate held at least 0.5 s at each end.) |
+| 0.00 – 0.3 | the montage's last frame (`plateIn`), whole and still: loop.sh's 0.5 s dissolve lands here |
+| 0.3 – 0.8 | bar, dock and widgets fade out: the bare wallpaper (no camera zoom: the montage's camera is locked, REWRITE.md "Joins") |
+| 0.7 | the circle fades in above the frame (0.2 s) and falls |
+| 1.12 | it lands: squashes, dips below the line and rebounds |
+| 1.35 – 1.9 | the spread into a bar (1.35), the rise of the letters (from 1.51) |
+| 1.9 – 3.65 | hold |
+| 3.65 – 4.25 | the glass fades; bar, dock and widgets fade back in |
+| 4.25 – 4.9 | the montage's first frame (`plateOut`), whole: the hard cut into the montage |
 
 Every frame is computed from t = 0 (the springs are stepped at 240 Hz from the start), as in
 `timeline.js`, so a still equals a frame of the video, and render.py's motion blur (6 moments per
@@ -94,8 +95,8 @@ sheet); SwiftShader render time (3 passes, 6 moments: ~10 min per clip, run in t
 | 1 | The look: the static glass word at the hold frame, dark theme, over the bare wallpaper; the lock clock's B2 material | one 1920x1080 still, plus a 2-up (with / without the drop shadow) |
 | 2 | The drop: the circle's fall and elastic landing (no morph yet: it holds as the landed ellipse) | a contact sheet of the landing (every 2 frames around it) and a short MP4 |
 | 3 | The morph: ellipse → word, the width spring carrying into the letters | contact sheet + MP4 of 0.4 – 2.6 s |
-| 4 | The joins: plate in, UI out / in, the fade; first and last frames checked against the plates pixel for pixel | contact sheet of both ends + the whole clip MP4 |
-| 5 | Timing polish, the montage's final plates from the amorphous-title session, the final render | `docs/showcase/title/renders/title-glass.mp4` (1920x1080, 60 fps, silent, ~5–6 s); its path to the amorphous-title session for loop.sh |
+| 4 | The joins: plate in, UI out / in, the fade; first and last frames checked against the plates pixel for pixel | done: the first frame differs from the montage's last by 1.5 levels per channel on average, the last from the montage's first by 1.4 (encoding noise); the plates are version 2 (widget-drag.mp4 at 0.20 s, search-click.mp4 at 6.90 s, scaled from 1440p), `renders/plate-{in,out}-v2.png` |
+| 5 | Timing polish, the montage's final plates from the amorphous-title session, the final render | `docs/showcase/title/renders/title-glass.mp4` (1920x1080, 60 fps, silent, 4.9 s); its path to the amorphous-title session for loop.sh |
 
 Commits on this worktree's branch; renders stay out of git (`renders/` is ignored); no README or
 hero changes here.
