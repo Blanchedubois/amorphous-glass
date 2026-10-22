@@ -897,7 +897,7 @@ test('tilt: the cover leans toward the pointer, then springs back', async () => 
     log(`  tilt at top left: ${JSON.stringify(tl)}`);
     expect(Math.abs(tl.x) > 1.2 && Math.abs(tl.y) > 1.2 && Math.abs(tl.x) <= 3.5 && Math.abs(tl.y) <= 3.5, `tilt out of range ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
     expect(tl.x < 0 && tl.y > 0, `tilted the wrong way ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
-    expect(tl.outline === 255 && tl.sheen > 0.9 && tl.z > 5, `outline ${tl.outline}, sheen ${tl.sheen}, lift ${tl.z}`);
+    expect(tl.edge > 0.9 && tl.sheen > 0.9 && tl.z > 5, `glass edge ${tl.edge}, sheen ${tl.sheen}, lift ${tl.z}`);
     await shot('tilt-a');
     // a sweep across the cover, timed
     const timing = await frameTimes(async () => {
@@ -915,7 +915,7 @@ test('tilt: the cover leans toward the pointer, then springs back', async () => 
     await sleep(900);
     tl = v.tilt;
     expect(Math.abs(tl.x) < 0.05 && Math.abs(tl.y) < 0.05 && Math.abs(tl.z) < 0.5, `not flat after leaving: ${JSON.stringify(tl)}`);
-    expect(tl.outline === 0 && tl.sheen < 0.02, `outline ${tl.outline}, sheen ${tl.sheen} after leaving`);
+    expect(tl.edge < 0.02 && tl.sheen < 0.02, `glass edge ${tl.edge}, sheen ${tl.sheen} after leaving`);
     expect(ext().overlay?.state === 'open', 'moving the pointer closed the view');
     ov.close();
     await sleep(SETTLE);
