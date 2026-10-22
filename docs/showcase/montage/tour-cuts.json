@@ -70,11 +70,11 @@
     {
       "name": "settings-drag",
       "in": 37.95,
-      "out": 40.2,
+      "out": 41.6,
       "zoom": 1.4,
-      "where": "middle: Settings dragged; the camera pulls back",
+      "where": "middle: Settings dragged, then closed (its window shrinks away) as the camera pulls back",
       "to_zoom": 1.0,
-      "pull": 0.8
+      "pull": 1.0
     },
     {
       "name": "search",

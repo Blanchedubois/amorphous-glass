@@ -233,26 +233,26 @@ def finish(args, enc, last, out_size, tour_frames):
         # the lock screen, full screen, a dissolve in and out (it ends where it began: the home screen)
         lock = [np.asarray(unpill(im, args.lock_mask).resize(out_size, Image.LANCZOS))
                 for im in frames(args.lock, args.lock_in, args.lock_out - args.lock_in)]
-        # the lock slides down over the home screen and, after the sign-in, up off it (GNOME's own
-        # unlock motion), eased, over the lock recording's own moving frames
-        D = 36
-        H = out_size[1]
-        def slide(under, over, offset):
-            f = under.copy()
-            y = int(round(offset))
-            if y < 0:
-                f[:H + y] = over[-y:]
-            else:
-                f[y:] = over[:H - y]
-            return f
+        # user, 2026-10-21: "the transition between the lock screen and the main OS should be a blur":
+        # the home screen blurs away as the lock comes into focus over it, and back after the
+        # sign-in (both blurred at the midpoint, so the swap never shows a hard edge)
+        from PIL import ImageFilter
+        D = 30
+        MAXR = 28 * out_size[0] / 1920
+        def blurred(a, r):
+            return np.asarray(Image.fromarray(a).filter(ImageFilter.GaussianBlur(r))) if r > 0.4 else a
+        ease = lambda x: x * x * (3 - 2 * x)
+        def mix(frm, to, i):
+            p = ease((i + 1) / (D + 1))
+            a = blurred(frm, MAXR * p).astype(np.float32)
+            b = blurred(to, MAXR * (1 - p)).astype(np.float32)
+            return (a * (1 - p) + b * p).round().astype(np.uint8)
         for i in range(D):
-            p = 1 - (1 - (i + 1) / D) ** 3            # ease-out: it drops in and settles
-            enc.stdin.write(slide(last, lock[i], -(1 - p) * H).tobytes())
+            enc.stdin.write(mix(last, lock[i], i).tobytes())
         for f in lock[D:len(lock) - D]:
             enc.stdin.write(f.tobytes())
         for i in range(D):
-            p = ((i + 1) / D) ** 3                    # ease-in: it lifts away, faster and faster
-            enc.stdin.write(slide(last, lock[len(lock) - D + i], -p * H).tobytes())
+            enc.stdin.write(mix(lock[len(lock) - D + i], last, i).tobytes())
         for _ in range(30):
             enc.stdin.write(last.tobytes())
     enc.stdin.close()
