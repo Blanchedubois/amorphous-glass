@@ -120,6 +120,8 @@ def main():
     ap.add_argument('--lock')
     ap.add_argument('--lock-in', type=float, default=1.0)
     ap.add_argument('--lock-out', type=float, default=9.6)
+    ap.add_argument('--lock-mask', type=lambda v: [int(x) for x in v.split(',')], default=[2450, 160, 115, 46],
+                    help='x,y,w,h painted out of every lock frame (the stray top bar glass)')
     ap.add_argument('--start', type=float, default=0.0, help='where in the tour to begin (s)')
     ap.add_argument('--cuts', type=Path, help='a cut list (tour-cuts.json): clips of the take, each at one zoom')
     ap.add_argument('--draft', action='store_true')
@@ -155,43 +157,81 @@ def main():
 
 
 def render_cuts(args, pts, enc, out_size):
-    """each clip of the cut list at its own fixed zoom. Above 1 the cursor is locked to the exact centre
-    of the frame (user, 2026-10-21: "I also like the mouse being centered"), the wallpaper continuing
-    past the screen's edge (edit.py's Stage), with motion blur along the camera's path; at 1 the clip
-    is the whole screen"""
+    """each clip of the cut list at its own zoom. Above 1 the cursor is locked to the exact centre of the
+    frame (user, 2026-10-21: "I also like the mouse being centered"), the wallpaper continuing past the
+    screen's edge, with motion blur along the camera's path. A clip may open with a push-in ("from_zoom",
+    over "push" s: from the whole screen onto the cursor) or close with a pull-out ("to_zoom", over
+    "pull" s): transitions inside the clip, eased, the camera's centre gliding between the screen's
+    middle and the cursor with the zoom"""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import edit
     clips = json.loads(args.cuts.read_text())['clips']
     dt, total, last = 1 / FPS, 0, None
     size = probe(args.tour)
+    W, H = size
+    stage = edit.Stage(size, 1.0)        # padded for the widest view any clip uses
+    ease = lambda x: x * x * (3 - 2 * x)
+    tracks = {}
     for c in clips:
-        z = c['zoom']
-        stage = edit.Stage(size, z) if z > 1 else None
+        z_clip = c['zoom']
         count = round((c['out'] - c['in']) * FPS)
+        # a clip may come from another recording ("source", with its own "track"): the takes added later
+        source = Path(c['source']).expanduser() if 'source' in c else Path(args.tour)
+        if 'track' in c:
+            key = str(Path(c['track']).expanduser())
+            if key not in tracks:
+                tracks[key] = np.array([[p[0], p[1]] for p in json.loads(Path(key).read_text())['points']], dtype=float)
+            cpts = tracks[key]
+        else:
+            cpts = pts
         n = 0
-        for n, im in enumerate(frames(args.tour, c['in'], c['out'] - c['in'] + 0.1)):
+        for n, im in enumerate(frames(source, c['in'], c['out'] - c['in'] + 0.1)):
             if n >= count:
                 break
+            t_in, t_out = n * dt, (count - 1 - n) * dt
+            z = z_clip
+            if 'from_zoom' in c and t_in < c.get('push', 0.8):
+                z = c['from_zoom'] + (z_clip - c['from_zoom']) * ease(t_in / c.get('push', 0.8))
+            if 'to_zoom' in c and t_out < c.get('pull', 0.8):
+                z = c['to_zoom'] + (z_clip - c['to_zoom']) * ease(t_out / c.get('pull', 0.8))
             t = c['in'] + n * dt
-            if stage is None:
+            if z <= 1.0001 and z_clip <= 1.0001:
                 last = np.asarray(im.resize(out_size, Image.LANCZOS))
             else:
-                here = edit.position(pts, t)
-                before = edit.position(pts, t - edit.SHUTTER * dt)
+                # how much the camera is on the cursor: 0 at the whole screen, 1 at the clip's zoom
+                w = 1.0 if z_clip <= 1 else min(1.0, max(0.0, (z - 1) / (z_clip - 1)))
+                mid = np.array([W / 2, H / 2])
+                here = mid + w * (edit.position(cpts, t) - mid)
+                before = mid + w * (edit.position(cpts, t - edit.SHUTTER * dt) - mid)
                 moved = float(np.hypot(*(here - before)))
                 samples = 1 if args.draft or moved < 0.75 or moved > edit.JUMP else int(min(edit.MAX_SAMPLES, max(3, moved / 4)))
                 centres = [tuple(before + (here - before) * k / max(1, samples - 1)) for k in range(samples)]
+                stage.view = (W / z, W / z * OUT_H / OUT_W)
                 last = stage.shoot(stage.compose(im), centres, out_size)
             enc.stdin.write(last.tobytes())
         total += count
-        print(f'  {c["name"]}: {c["in"]:.2f}-{c["out"]:.2f} at {z}', file=sys.stderr)
+        print(f'  {c["name"]}: {c["in"]:.2f}-{c["out"]:.2f} at {z_clip}', file=sys.stderr)
     return last, total
+
+
+def unpill(im, box):
+    """paint out a box of the lock recording (the throwaway shell's top bar glass, a stray pill at the
+    top right): each column is filled with a straight blend from the row above the box to the row
+    below it, which on the lock screen's soft background is invisible"""
+    if not box:
+        return im
+    x, y, w, h = box
+    a = np.asarray(im).astype(np.float32).copy()
+    top, bottom = a[y - 1, x:x + w], a[y + h, x:x + w]
+    t = np.linspace(0, 1, h + 2)[1:-1, None, None]
+    a[y:y + h, x:x + w] = top[None] * (1 - t) + bottom[None] * t
+    return Image.fromarray(a.round().astype(np.uint8))
 
 
 def finish(args, enc, last, out_size, tour_frames):
     if args.lock:
         # the lock screen, full screen, a dissolve in and out (it ends where it began: the home screen)
-        lock = [np.asarray(im.resize(out_size, Image.LANCZOS))
+        lock = [np.asarray(unpill(im, args.lock_mask).resize(out_size, Image.LANCZOS))
                 for im in frames(args.lock, args.lock_in, args.lock_out - args.lock_in)]
         # smoother (user): the crossfades overlap GNOME's own lock and unlock animations, eased, so the
         # widgets fade out while the lock comes down and back in while it lifts (the lock recording's

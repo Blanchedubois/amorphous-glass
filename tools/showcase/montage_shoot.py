@@ -344,15 +344,31 @@ def s_home_end():
 
 
 def s_widget_drag():
+    """the analog clock picked up from its column and set down beside the Weather widget: top edges
+    lined up, the standard 16 px gap between them, on the 8 px grid (user, 2026-10-21: "line up with
+    the spacing beside another widget to follow a grid"). It stays there (no drag back); the layout
+    is restored after the shoot"""
     x, y, w, h = widget_box(170, 170)          # the analog clock
+    wx, wy, ww, wh = widget_at(392, 250)       # Weather: Week, by its place in the shoot layout
+    tx, ty = wx + ww + 16 + w // 2, wy + h // 2
     with Clip('widget-drag'):
         move(x + w // 2, y + h // 2, 900)
         pause(300)
-        drag(1240, 620, 1500)
-        pause(900)
-        drag(x + w // 2, y + h // 2, 1400)
-        pause(600)
+        drag(tx, ty, 1500)
+        pause(1200)                            # it settles into its place
+        log(clock_box=list(locate_widget_near(tx, ty)))
         move(*HOME_XY, 900)
+
+
+def locate_widget_near(x, y):
+    for i in range(20):
+        try:
+            b = locate(f'widget:{i}')
+        except LookupError:
+            break
+        if b[0] <= x <= b[0] + b[2] and b[1] <= y <= b[1] + b[3]:
+            return b
+    return (-1, -1, -1, -1)
 
 
 def qs_arrow():
@@ -445,6 +461,56 @@ def s_menu_slide():
             move(*HOME_XY, 600)
     finally:
         TEMPO = tempo
+
+
+def widget_boxes():
+    out = []
+    for i in range(20):
+        try:
+            out.append(tuple(locate(f'widget:{i}')))
+        except LookupError:
+            break
+    return out
+
+
+def s_desktop_widget():
+    """right-click the wallpaper anywhere: the glass menu; Add Widget expands under its own row; pick
+    Analog Clock and the cursor glides to where it appears (user, 2026-10-21). The layout is restored
+    after the shoot, so the new widget goes away again"""
+    before = set(widget_boxes())
+    with Clip('desktop-widget'):
+        move(1700, 640, 700)
+        click(button=3)
+        pause(900)                             # the menu grows out of the click
+        move(POS[0] + 70, POS[1] + 22, 500)    # Add Widget, the menu's first row
+        click()
+        pause(800)                             # the submenu expands under it
+        move(POS[0] + 10, POS[1] + 34, 500)    # its first entry: Analog Clock
+        pause(300)
+        click()
+        settle(900)
+        new = [b for b in widget_boxes() if b not in before]
+        if new:
+            x, y, w, h = new[0]
+            move(x + w // 2, y + h // 2, 900)  # to the clock that just appeared
+            pause(1200)
+        log(new_widget=list(new[0]) if new else None)
+        move(*HOME_XY, 700)
+
+
+def s_dock_menu():
+    """right-click an app in the dock: its glass menu grows out of the icon; glide over its rows"""
+    with Clip('dock-menu'):
+        x, y = center('dock:org.gnome.Nautilus')
+        move(x, y - 260, 500)
+        move(x, y, 700)
+        pause(500)                             # the glass name label
+        click(button=3)
+        pause(900)
+        move(x + 20, y - 150, 800)             # up over the menu's rows
+        pause(900)
+        close_all()
+        move(*HOME_XY, 700)
 
 
 def s_overview_search():
@@ -562,7 +628,7 @@ def s_settings_window():
 # the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
 # of the desktop menu, window menu and volume shots
 SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
-         s_overview_search, s_app_grid, s_music, s_home_end]
+         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu]
 
 
 def main():
