@@ -16,10 +16,10 @@ const DT = 1 / 240;
 export const SEQ = {
     uiOut: [0.05, 0.55],   // bar, dock and widgets fade out: the bare wallpaper
     drop: 0.45,            // the drop appears above the line and starts to fall
-    dropIn: 0.11,          // fading in as it starts (Now Playing: DROP_IN_MS)
+    dropIn: 0.2,           // fading in as it starts (Now Playing: 0.11; longer, less abrupt)
     fall: 0.42,            // the fall, accelerating
     morph: 1.10,           // the spread into a bar begins
-    rise: 1.22,            // the letters start to rise out of it, from the middle
+    rise: 1.26,            // the letters start to rise out of it, from the middle
     fadeOut: [3.4, 4.0],   // the glass fades out
     uiIn: [3.4, 4.0],      // bar, dock and widgets fade back in
     end: 5.6,              // the plate, still, until the montage cuts in
@@ -34,17 +34,21 @@ export const SPREAD_H = { damping: 0.66, stiffness: 320 };
 // the share of the landing speed that goes into the springs. Now Playing gives 0.9 and -0.35 of
 // a 72 px drop's speed; the title's drop is 5x bigger and falls 4x farther, so the shares are
 // scaled to keep the overshoot a small fraction of the drop (about 10 %: 0.2 read as timid)
-export const LAND_W = 0.9 * 0.3;
-export const LAND_H = -0.35 * 0.3;
+export const LAND_W = 0.9 * 0.6;
+export const LAND_H = -0.35 * 0.6;
+/// the landing itself: the drop does not stop dead on the line, it dips past it and rebounds
+/// (inertia; the user, phase 3: "more elasticity and springiness", "too sharp and abrupt")
+export const LAND_Y = { damping: 0.5, stiffness: 120 };
+export const LAND_Y_SHARE = 0.12;
 /// the spread and the rise: the first title's "follow" spring (../timeline.js FOLLOW), softer
 /// than the OS tokens, which settle in a fraction of a second, too fast to read across a 1500 px
 /// word; under-damped, so the bar overshoots its length and swings back (inertia)
-export const SPREAD = { damping: 0.55, stiffness: 90 };
+export const SPREAD = { damping: 0.45, stiffness: 60 };
 /// the rise: the same damping, a third of the stiffness: the front crosses the word in about
 /// half a second (at 90 the word was whole 0.2 s after the bar, too quick to read as rising)
-export const MORPH = { damping: 0.55, stiffness: 30 };
-const BAR_H = 110;        // px: the bar's height (about the x-height; the letters rise above it)
-const BAND = 300;         // px: how wide the rise is at any moment
+export const MORPH = { damping: 0.45, stiffness: 25 };
+const BAR_VOLUME = 1.8;   // the bar's area over the drop's (a little is gained as it thins out)
+const BAND = 420;         // px: how wide the rise is at any moment
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
 export const smooth = (a, b, x) => {
@@ -82,9 +86,12 @@ export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, spre
     const st = Math.min(MAX_STRETCH, speed * STRETCH_PER_SPEED);
     const w = new Spring(word.d / Math.sqrt(1 + st), spreadW, { velocity: speed * LAND_W });
     const h = new Spring(word.d * Math.sqrt(1 + st), spreadH, { velocity: speed * LAND_H });
+    const y = new Spring(word.cy, LAND_Y, { velocity: speed * LAND_Y_SHARE });
     const m = new Spring(0, morph);
     w.retarget(word.d, word.d);
     h.retarget(word.d, word.d);
+    y.retarget(word.cy, word.d);
+    const barArea = BAR_VOLUME * Math.PI * word.d * word.d / 4;
     const tl = SEQ.drop + SEQ.fall;
     let spreading = false, rising = false;
     for (let k = 0; tl + k * DT < t; k++) {
@@ -93,18 +100,22 @@ export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, spre
             // the spread: the same body pulled out into a bar the word's length, the velocity kept
             spreading = true;
             w.setToken(spread);
-            h.setToken(spread);
             w.retarget(word.w + 60, word.w);
-            h.retarget(BAR_H, word.d);
         }
+        // the bar keeps its volume: the height chases the area over the width (thinner as the
+        // bar overshoots its length, thicker as it swings back)
+        if (spreading)
+            h.retarget(barArea / Math.max(w.value, 1), word.d);
         if (!rising && now >= SEQ.rise) {
             rising = true;
             m.retarget(1, 1);
         }
         w.step(DT);
         h.step(DT);
+        y.step(DT);
         m.step(DT);
     }
+    s.cy = y.value;
     s.w = Math.max(10, w.value);
     s.h = Math.max(10, h.value);
     s.morph = 1;

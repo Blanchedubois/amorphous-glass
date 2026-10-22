@@ -15,6 +15,7 @@ uniform vec4 blob;         // the drop: centre x, centre y, width, height (px, y
 uniform float morph;       // 0: the drop, 1: the word (where the front has passed)
 uniform float front;       // px from the middle: how far the letters have risen
 uniform float band;        // px: the width of the rise
+const float RISE_OVER = 0.18;   // how far the letters overshoot as they rise
 uniform float fade;        // the glass's presence
 uniform float shadow;      // a drop shadow's strength (0: liquid glass casts none, the user)
 uniform float gain;        // this moment's share of the frame (motion blur)
@@ -55,8 +56,12 @@ float sdCapsule(vec2 p, vec2 half_) {
 float sd(vec2 p) {
     float drop = sdCapsule(p - blob.xy, blob.zw * 0.5);
     float word = texture(sdf, p / res).r;
-    float m = smoothstep(0.0, 1.0, (front - abs(p.x - blob.x)) / band + 1.0) * morph;
-    return mix(drop, word, m);
+    // behind the front each point rises over a band, overshoots (the letters a little taller
+    // and fatter than they end up: the blend past 1 extrapolates) and settles over another
+    float u = (front - abs(p.x - blob.x)) / band + 1.0;
+    float m = u < 1.0 ? (1.0 + RISE_OVER) * smoothstep(0.0, 1.0, u)
+                      : 1.0 + RISE_OVER * (1.0 - smoothstep(1.0, 2.0, u));
+    return mix(drop, word, m * morph);
 }
 
 void main() {
