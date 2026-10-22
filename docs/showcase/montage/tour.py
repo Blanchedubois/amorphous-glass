@@ -233,19 +233,26 @@ def finish(args, enc, last, out_size, tour_frames):
         # the lock screen, full screen, a dissolve in and out (it ends where it began: the home screen)
         lock = [np.asarray(unpill(im, args.lock_mask).resize(out_size, Image.LANCZOS))
                 for im in frames(args.lock, args.lock_in, args.lock_out - args.lock_in)]
-        # smoother (user): the crossfades overlap GNOME's own lock and unlock animations, eased, so the
-        # widgets fade out while the lock comes down and back in while it lifts (the lock recording's
-        # own desktop is the same wallpaper without them)
-        D = 30
-        ease = lambda x: x * x * (3 - 2 * x)
+        # the lock slides down over the home screen and, after the sign-in, up off it (GNOME's own
+        # unlock motion), eased, over the lock recording's own moving frames
+        D = 36
+        H = out_size[1]
+        def slide(under, over, offset):
+            f = under.copy()
+            y = int(round(offset))
+            if y < 0:
+                f[:H + y] = over[-y:]
+            else:
+                f[y:] = over[:H - y]
+            return f
         for i in range(D):
-            a = ease((i + 1) / (D + 1))
-            enc.stdin.write((last * (1 - a) + lock[i] * a).astype(np.uint8).tobytes())
+            p = 1 - (1 - (i + 1) / D) ** 3            # ease-out: it drops in and settles
+            enc.stdin.write(slide(last, lock[i], -(1 - p) * H).tobytes())
         for f in lock[D:len(lock) - D]:
             enc.stdin.write(f.tobytes())
         for i in range(D):
-            a = ease((i + 1) / (D + 1))
-            enc.stdin.write((lock[len(lock) - D + i] * (1 - a) + last * a).astype(np.uint8).tobytes())
+            p = ((i + 1) / D) ** 3                    # ease-in: it lifts away, faster and faster
+            enc.stdin.write(slide(last, lock[len(lock) - D + i], -p * H).tobytes())
         for _ in range(30):
             enc.stdin.write(last.tobytes())
     enc.stdin.close()

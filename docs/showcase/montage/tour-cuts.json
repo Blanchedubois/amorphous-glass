@@ -1,14 +1,14 @@
 {
-  "about": "Round 10 (user, 2026-10-21): the clock set down on the grid beside Weather (no drag back); the desktop's right-click Add Widget and a dock app's menu added (extra1 takes); quick settings shown once; push-in from the title, pull-outs before whole-screen clips. Neighbours alternate place and kind.",
+  "about": "Round 11 (user, 2026-10-21): a hard cut from the title on the identical home-screen frame; clips end once their motion has settled; Files shows only its drag and a pause; the search shown from the click on its bar, closing back to the home screen; the lock slides down over it and up off it (GNOME's own unlock motion).",
   "clips": [
     {
       "name": "home-to-widget",
       "source": "~/Videos/liquid-glass-showcase/extra1/widget-drag.mp4",
       "track": "~/Videos/liquid-glass-showcase/work-extra/widget-drag.track.json",
       "in": 0.2,
-      "out": 3.82,
+      "out": 3.7,
       "zoom": 1.6,
-      "where": "the title hands over on the home screen, whole; the camera pushes in onto the cursor; the clock is set down beside Weather, on the grid",
+      "where": "a hard cut from the title on the same home-screen frame; the camera pushes in onto the cursor; the clock set down beside Weather; ends once it has settled",
       "from_zoom": 1.0,
       "push": 1.1
     },
@@ -26,7 +26,7 @@
       "in": 0.45,
       "out": 6.0,
       "zoom": 1.5,
-      "where": "middle: right-click the wallpaper, Add Widget, a clock drops in at the bottom left"
+      "where": "middle: right-click the wallpaper, Add Widget, a clock drops in"
     },
     {
       "name": "menu-slide",
@@ -37,19 +37,19 @@
     },
     {
       "name": "files-drag",
-      "in": 28.2,
-      "out": 31.7,
+      "in": 29.25,
+      "out": 32.65,
       "zoom": 1.4,
-      "where": "middle: the Files window dragged; the camera pulls back to the whole screen",
+      "where": "middle: only the drag of the Files window, a pause once it is set down, the camera pulling back",
       "to_zoom": 1.0,
-      "pull": 0.9
+      "pull": 0.6
     },
     {
-      "name": "overview-search",
-      "in": 43.76,
-      "out": 45.92,
+      "name": "app-grid",
+      "in": 49.9,
+      "out": 52.4,
       "zoom": 1.0,
-      "where": "whole screen: the overview opens, search"
+      "where": "whole screen: the app grid, a folder opens"
     },
     {
       "name": "music",
@@ -72,16 +72,18 @@
       "in": 37.95,
       "out": 40.2,
       "zoom": 1.4,
-      "where": "middle: Settings dragged; the camera pulls back to the whole screen",
+      "where": "middle: Settings dragged; the camera pulls back",
       "to_zoom": 1.0,
       "pull": 0.8
     },
     {
-      "name": "app-grid",
-      "in": 49.9,
-      "out": 54.15,
+      "name": "search",
+      "source": "~/Videos/liquid-glass-showcase/extra2/search-click.mp4",
+      "track": "~/Videos/liquid-glass-showcase/work-extra/search-click.track.json",
+      "in": 1.15,
+      "out": 6.9,
       "zoom": 1.0,
-      "where": "whole screen: a folder opens, then it all collapses to the home screen, into the lock"
+      "where": "whole screen: the overview opens, the cursor goes up and clicks the search bar, types, the results pop up, and it all closes back to the home screen, which the lock slides down over"
     }
   ]
 }

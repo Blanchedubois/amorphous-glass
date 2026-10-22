@@ -513,6 +513,27 @@ def s_dock_menu():
         move(*HOME_XY, 700)
 
 
+def s_search_click():
+    """the overview opens, the cursor glides up to its search bar and clicks it, then types: the
+    results pop up on raised glass (user, 2026-10-21: show the cursor going up and clicking it)"""
+    with Clip('search-click'):
+        move(1280, 700, 500)
+        pause(400)
+        press('Super_L')
+        settle(900)                            # the overview opens
+        move(1280, 78, 900)                    # up to the search bar
+        pause(300)
+        click()
+        settle(400)
+        type_('calc')
+        settle(1600)                           # the results pop up
+        press('Escape')
+        settle(300)
+        press('Escape')
+        settle(900)
+        move(*HOME_XY, 600)
+
+
 def s_overview_search():
     with Clip('overview-search'):
         press('Super_L')
@@ -628,7 +649,7 @@ def s_settings_window():
 # the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
 # of the desktop menu, window menu and volume shots
 SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
-         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu]
+         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click]
 
 
 def main():
