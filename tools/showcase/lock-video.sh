@@ -10,6 +10,8 @@
 # The shell sees the system bus only through tools/gdm/sysbus.sh, so nothing it does reaches the
 # real GDM or PAM; run.sh also refuses to start after a recent PAM failure (faillock).
 #
+# TAHOE_LOCK_PLAYER= (empty): no music, so the lock shows the wallpaper rather than music mode's swirl.
+#
 # Output: OUTDIR/lock-video.mp4 and the driver's log (marks: lock, wake, type, stop; seconds from the
 # recording's start).
 set -eu
@@ -28,7 +30,7 @@ print(f"art={shlex.quote(cover)}; export TAHOE_LOCK_TITLE={shlex.quote(s['title'
 PY
 )"
 fi
-TAHOE_TEST_PIPEWIRE=1 TAHOE_TEST_TIMEOUT=${TAHOE_TEST_TIMEOUT:-90} TAHOE_LOCK_MONITOR=2560x1440@60 TAHOE_LOCK_PLAYER=1 \
+TAHOE_TEST_PIPEWIRE=1 TAHOE_TEST_TIMEOUT=${TAHOE_TEST_TIMEOUT:-90} TAHOE_LOCK_MONITOR=2560x1440@60 TAHOE_LOCK_PLAYER=${TAHOE_LOCK_PLAYER-1} \
   TAHOE_LOCK_ART="$art" TAHOE_LOCK_GATE=video TAHOE_LOCK_TAG=video \
   TAHOE_TEST_EXT_DIRS="${TAHOE_TEST_EXT_DIRS:-$R/extensions/tahoe-lockscreen@cachyos-tahoe}" \
   "$R/tools/lockscreen/run.sh" "$out" "$mode"

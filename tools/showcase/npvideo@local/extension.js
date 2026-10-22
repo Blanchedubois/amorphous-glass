@@ -6,6 +6,9 @@
 // Next (a song without lyrics: the layout re-centres), and Escape closes it. Marks go to
 // $NPV_OUT/marks.jsonl in seconds from the recording's start.
 //   NPV_TITLE, NPV_ARTIST, NPV_ALBUM, NPV_COVER (a file), NPV_TITLE2 (the second song, no lyrics)
+//   NPV_REAL_BUS (the user's own session bus) with NPV_TRACK, NPV_TRACK2 (spotify:track:...) and
+//   NPV_START (seconds in): the user's real Spotify plays instead (user, 2026-10-22: "use spotify"); this
+//   shell's player only mirrors it, so Now Playing shows Spotify's own cover, names and lrclib lyrics
 
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
@@ -57,6 +60,74 @@ const MPRIS_XML = `<node>
   <property name="CanGoPrevious" type="b" access="read"/>
   <property name="CanSeek" type="b" access="read"/>
 </interface></node>`;
+
+// the user's real Spotify, seen from this throwaway shell: what it plays is mirrored on this shell's
+// bus (the shell's own D-Bus session cannot see the user's), and Next opens NPV_TRACK2 there
+class SpotifyMirror {
+    constructor(addr) {
+        this.real = Gio.DBusConnection.new_for_address_sync(addr,
+            Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, null, null);
+        this.ids = [];
+        for (const iface of Gio.DBusNodeInfo.new_for_xml(MPRIS_XML).interfaces) {
+            this.ids.push(Gio.DBus.session.register_object('/org/mpris/MediaPlayer2', iface,
+                (c, s, p, i, method, params, inv) => { this.method(method); inv.return_value(null); },
+                (c, s, p, i, name) => this.props()[name] ?? null, null));
+        }
+    }
+
+    callReal(iface, method, params, type = null) {
+        return this.real.call_sync('org.mpris.MediaPlayer2.spotify', '/org/mpris/MediaPlayer2', iface, method,
+            params, type, Gio.DBusCallFlags.NONE, 3000, null);
+    }
+
+    get(name) {
+        return this.callReal('org.freedesktop.DBus.Properties', 'Get',
+            new GLib.Variant('(ss)', ['org.mpris.MediaPlayer2.Player', name]),
+            new GLib.VariantType('(v)')).get_child_value(0).get_variant();
+    }
+
+    async open(uri, seconds) {
+        this.callReal('org.mpris.MediaPlayer2.Player', 'OpenUri', new GLib.Variant('(s)', [uri]));
+        for (let i = 0; i < 40; i++) {
+            await sleep(150);
+            const id = this.get('Metadata').lookup_value('mpris:trackid', null)?.unpack() ?? '';
+            if (id.endsWith(uri.split(':').pop()))
+                break;
+        }
+        if (seconds) {
+            const id = this.get('Metadata').lookup_value('mpris:trackid', null).unpack();
+            this.callReal('org.mpris.MediaPlayer2.Player', 'SetPosition', new GLib.Variant('(ox)', [id, seconds * 1e6]));
+        }
+        this.metadata = this.get('Metadata');
+    }
+
+    async start() {
+        await this.open(env('NPV_TRACK', ''), +env('NPV_START', '0'));
+        Gio.DBus.session.own_name('org.mpris.MediaPlayer2.spotify', Gio.BusNameOwnerFlags.NONE, null, null);
+    }
+
+    props() {
+        return {
+            Identity: new GLib.Variant('s', 'Spotify'),
+            DesktopEntry: new GLib.Variant('s', 'spotify'),
+            CanRaise: new GLib.Variant('b', false),
+            PlaybackStatus: new GLib.Variant('s', 'Playing'),
+            Metadata: this.metadata,
+            Position: this.get('Position'),
+            CanGoNext: new GLib.Variant('b', true),
+            CanGoPrevious: new GLib.Variant('b', true),
+            CanSeek: new GLib.Variant('b', true),
+        };
+    }
+
+    method(name) {
+        if (name !== 'Next')
+            return;
+        this.open(env('NPV_TRACK2', ''), 0).then(() => Gio.DBus.session.emit_signal(null, '/org/mpris/MediaPlayer2',
+            'org.freedesktop.DBus.Properties', 'PropertiesChanged', new GLib.Variant('(sa{sv}as)',
+                ['org.mpris.MediaPlayer2.Player', {Metadata: this.metadata}, []])));
+    }
+}
 
 class Player {
     constructor() {
@@ -157,7 +228,15 @@ export default class NpVideo extends Extension {
             return [x + w / 2, y + h / 2, w, h];
         };
 
-        new Player();
+        const real = GLib.getenv('NPV_REAL_BUS');
+        if (real) {
+            const mirror = new SpotifyMirror(real);
+            await mirror.start();
+            const r = mirror.metadata.recursiveUnpack();
+            write({label: 'track', title: r['xesam:title'], album: r['xesam:album'], art: r['mpris:artUrl']});
+        } else {
+            new Player();
+        }
         await sleep(1500);
 
         const bus = Gio.DBus.session;
@@ -181,6 +260,7 @@ export default class NpVideo extends Extension {
 
         const view = np().overlay.view;
         const [cx, cy, cw, ch] = centreOf(view.parts.cover);
+        write({label: 'cover-box', x: cx, y: cy, w: cw, h: ch});
         mark('cover');
         await glide(cx - cw * 0.05, cy + ch * 0.1, 1100);     // onto the cover: it leans toward the cursor
         await sleep(700);

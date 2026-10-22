@@ -18,6 +18,9 @@ export XDG_RUNTIME_DIR=$(mktemp -d "/tmp/npv.XXXX")
 chmod 700 "$XDG_RUNTIME_DIR"
 export XDG_CONFIG_HOME=$root/config XDG_CACHE_HOME=$root/cache XDG_DATA_HOME=$root/data XDG_STATE_HOME=$root/state
 export GSETTINGS_BACKEND=keyfile NPV_OUT=$out
+# NPV_SPOTIFY=1 (with NPV_TRACK, NPV_TRACK2, NPV_START): the user's own Spotify plays, mirrored into the
+# throwaway shell from the user's session bus (only Spotify's MPRIS is called there)
+[ -n "${NPV_SPOTIFY:-}" ] && export NPV_REAL_BUS=$DBUS_SESSION_BUS_ADDRESS
 ext=$XDG_DATA_HOME/gnome-shell/extensions
 mkdir -p "$ext" "$XDG_CONFIG_HOME/glib-2.0/settings" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
 cp -r "$H/npvideo@local" "$R/extensions/tahoe-nowplaying@cachyos-tahoe" "$ext/"
