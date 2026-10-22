@@ -206,9 +206,9 @@ capsule (112 × 52), and the cover's card (the enter and exit pour, and the hove
 ### The 3D tilt on the cover
 
 - **Geometry.**
-  - The cover, with its glass outline behind it, gets `rotation_angle_x/y` about its centre, at most **8°**
-    per axis toward the pointer.
-  - It also gets `translation_z` +20 px and a drop shadow that moves away from the pointer.
+  - The cover, with its glass outline behind it, gets `rotation_angle_x/y` about its centre, at most **3.5°**
+    per axis toward the pointer (8° at first; the user found it too dramatic).
+  - It also gets `translation_z` +10 px and a drop shadow that moves away from the pointer.
   - The stage's own perspective gives the depth.
 - **Motion.** Two `Spring`s (`EXPRESSIVE.spatial.default`) drive the angles on the frame clock,
   only while the pointer is over the cover or the springs have not settled. On leave they retarget
@@ -461,7 +461,7 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
 - **Result.** The chevron, the empty cover's card and the hover outline are Blur My Shell's
   `pipeline_glassbar_dock` with its RoundedPipeline, built as the widgets' GlassCard builds them
   (`widgetglass.js`), over a copy of the view's backdrop; the tests check the pipeline id and that
-  the CSS stand-in is gone. The cover tilts up to 8° toward the pointer on springs, lifts 24 px,
+  the CSS stand-in is gone. The cover tilts up to 3.5° toward the pointer on springs (8° was too dramatic, user 2026-10-21), lifts 10 px,
   a sheen (an SDF-cut shader) follows the pointer, the outline fades in, and all of it springs back
   when the pointer leaves. The lyrics fade out blurred at the top and bottom (user, 2026-10-21:
   `EdgeFade` in `effects.js`, 220 px bands, up to 14 px of blur). Tilt sweep at 60 Hz: p50 16.8 ms,

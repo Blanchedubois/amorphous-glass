@@ -895,9 +895,9 @@ test('tilt: the cover leans toward the pointer, then springs back', async () => 
     await sleep(700);
     let tl = v.tilt;
     log(`  tilt at top left: ${JSON.stringify(tl)}`);
-    expect(Math.abs(tl.x) > 3 && Math.abs(tl.y) > 3, `hardly tilted ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
+    expect(Math.abs(tl.x) > 1.2 && Math.abs(tl.y) > 1.2 && Math.abs(tl.x) <= 3.5 && Math.abs(tl.y) <= 3.5, `tilt out of range ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
     expect(tl.x < 0 && tl.y > 0, `tilted the wrong way ${tl.x.toFixed(2)}, ${tl.y.toFixed(2)}`);
-    expect(tl.outline === 255 && tl.sheen > 0.9 && tl.z > 10, `outline ${tl.outline}, sheen ${tl.sheen}, lift ${tl.z}`);
+    expect(tl.outline === 255 && tl.sheen > 0.9 && tl.z > 5, `outline ${tl.outline}, sheen ${tl.sheen}, lift ${tl.z}`);
     await shot('tilt-a');
     // a sweep across the cover, timed
     const timing = await frameTimes(async () => {

@@ -41,8 +41,8 @@ const LYRIC_EDGE = 220;           // px at 1440p: the lyrics' blurred fade at th
 const LYRIC_EDGE_BLUR = 14;       // px of blur at the very edge
 const OUTLINE = 12;               // px at 1440p: the glass outline around the hovered cover
 const OUTLINE_MS = 180;
-const TILT_MAX = 8;               // degrees each way
-const TILT_LIFT = 24;             // px toward the viewer while hovered
+const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
+const TILT_LIFT = 10;             // px toward the viewer while hovered
 const DISABLED = 0.4;             // a control the player does not offer
 
 const interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
