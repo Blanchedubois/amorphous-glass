@@ -24,7 +24,8 @@ is recorded in a throwaway shell by tools/showcase/lock-video.sh.
   TAHOE_SHOWCASE_PLAYER=spotify   no fake player: the user's own Spotify plays on, so the widgets show
               the real song, cover and synced lyrics (the Lyrics widget fetches them from lrclib.net
               itself, user's choice 2026-10-21); it is moved to TAHOE_SHOWCASE_SEEK seconds (default
-              60) so the track does not end mid-shoot
+              60) so the track does not end mid-shoot; TAHOE_SHOWCASE_TRACK=spotify:track:... opens
+              that song first (the player may have moved on to another)
 """
 import json, os, shutil, signal, subprocess, sys, time
 
@@ -35,6 +36,9 @@ from gi.repository import Gio, GLib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARGS = [a for a in sys.argv[1:] if not a.startswith('-')]
 DRY = '--dry-run' in sys.argv
+# user, 2026-10-21: "take the entire clip of moving around the OS ... all in one take", the camera
+# zooming in and following the mouse where needed (docs/showcase/montage/tour.py)
+ONE_TAKE = '--one-take' in sys.argv
 OUT = os.path.abspath(ARGS[0]) if ARGS else sys.exit(__doc__)
 LAYOUT = os.path.expanduser('~/.config/tahoe-glass/widgets.json')
 WIDGETS_UUID = 'tahoe-widgets@cachyos-tahoe'
@@ -70,9 +74,9 @@ def log(**kv):
     LOG.flush()
 
 
-# the shoot's tempo (user, 2026-10-21: "sharper cuts and motion"): glides, drags and ordinary pauses
+# the shoot's tempo (user, 2026-10-21: "sharper cuts and motion", then "faster ... choppier and faster"): glides, drags and ordinary pauses
 # at this fraction of their written length; waits for an app to open (settle) are not scaled
-TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.7'))
+TEMPO = float(os.environ.get('TAHOE_SHOWCASE_TEMPO', '0.75'))
 
 
 def pause(ms):
@@ -85,10 +89,20 @@ def settle(ms):
 
 
 def move(x, y, ms=700):
-    """an eased glide (the driver's ease in-out), at least 0.6 s for a long way: the camera follows"""
+    """a glide that starts at full speed and settles into place (ease-out quart), steered from here
+    in 8 ms steps (the installed driver's own glide eases in, which read as the whole frame speeding
+    up under the locked camera; GNOME keeps the old driver code until the user logs out)"""
     x, y, ms = int(x), int(y), max(300, int(ms * TEMPO))
-    log(move=[POS[0], POS[1], x, y, ms])
-    call('Move', (x, y, ms), '(iiu)')
+    x0, y0 = POS
+    log(move=[x0, y0, x, y, ms])
+    start = time.monotonic()
+    while True:
+        t = min(1.0, (time.monotonic() - start) * 1000 / ms)
+        e = 1 - (1 - t) ** 4
+        call('Move', (round(x0 + (x - x0) * e), round(y0 + (y - y0) * e), 0), '(iiu)')
+        if t >= 1:
+            break
+        time.sleep(0.008)
     POS[:] = [x, y]
 
 
@@ -141,8 +155,13 @@ class Clip:
 
     def __init__(self, name):
         self.name = name
+        # one take (--one-take): only the 'tour' clip records; each shot inside it is a marked segment
+        self.segment = ONE_TAKE and name != 'tour'
 
     def __enter__(self):
+        if self.segment:
+            log(segment=self.name, cursor=list(POS))
+            return self
         opts = {'framerate': GLib.Variant('i', 60), 'draw-cursor': GLib.Variant('b', True)}
         t0 = time.time()
         ok, self.file = call('Screencast', (os.path.join(OUT, self.name), opts), '(sa{sv})', '(bs)',
@@ -153,6 +172,9 @@ class Clip:
         return self
 
     def __exit__(self, *exc):
+        if self.segment:
+            log(segment_end=self.name)
+            return False
         pause(400)
         call('StopScreencast', dest='org.gnome.Shell.Screencast', path='/org/gnome/Shell/Screencast',
              iface='org.gnome.Shell.Screencast', out='(b)')
@@ -183,9 +205,14 @@ def status(name):
 
 def seek_real(name, seconds):
     """the user's player playing its current track, at `seconds` in (so it does not end mid-shoot)"""
+    uri = os.environ.get('TAHOE_SHOWCASE_TRACK')   # e.g. spotify:track:...: the song the user chose
+    if uri:
+        BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player', 'OpenUri',
+                      GLib.Variant('(s)', (uri,)), None, Gio.DBusCallFlags.NONE, 5000, None)
+        settle(2500)
     if status(name) != 'Playing':
-        player(name, 'Play')                  # its current track: the one the user chose
-        pause(800)
+        player(name, 'Play')
+        settle(800)
     meta = BUS.call_sync(name, '/org/mpris/MediaPlayer2', 'org.freedesktop.DBus.Properties', 'Get',
                          GLib.Variant('(ss)', ('org.mpris.MediaPlayer2.Player', 'Metadata')), None,
                          Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
@@ -280,7 +307,7 @@ def restore():
         steps.append(lambda: shutil.copy2(LAYOUT + '.before-showcase', LAYOUT))
         steps.append(reload_widgets)
     if STATE.get('driver'):
-        steps.append(lambda: subprocess.run(['gnome-extensions', 'disable', 'showcase@local'], check=True))
+        steps.append(lambda: subprocess.run(['gnome-extensions', 'disable', DRIVER], check=True))
     if STATE.get('driver_copied'):
         steps.append(lambda: shutil.rmtree(STATE['driver_copied']))
     for step in steps:
@@ -317,15 +344,31 @@ def s_home_end():
 
 
 def s_widget_drag():
+    """the analog clock picked up from its column and set down beside the Weather widget: top edges
+    lined up, the standard 16 px gap between them, on the 8 px grid (user, 2026-10-21: "line up with
+    the spacing beside another widget to follow a grid"). It stays there (no drag back); the layout
+    is restored after the shoot"""
     x, y, w, h = widget_box(170, 170)          # the analog clock
+    wx, wy, ww, wh = widget_at(392, 250)       # Weather: Week, by its place in the shoot layout
+    tx, ty = wx + ww + 16 + w // 2, wy + h // 2
     with Clip('widget-drag'):
         move(x + w // 2, y + h // 2, 900)
         pause(300)
-        drag(1240, 620, 1500)
-        pause(900)
-        drag(x + w // 2, y + h // 2, 1400)
-        pause(600)
+        drag(tx, ty, 1500)
+        pause(1200)                            # it settles into its place
+        log(clock_box=list(locate_widget_near(tx, ty)))
         move(*HOME_XY, 900)
+
+
+def locate_widget_near(x, y):
+    for i in range(20):
+        try:
+            b = locate(f'widget:{i}')
+        except LookupError:
+            break
+        if b[0] <= x <= b[0] + b[2] and b[1] <= y <= b[1] + b[3]:
+            return b
+    return (-1, -1, -1, -1)
 
 
 def qs_arrow():
@@ -373,6 +416,9 @@ def s_files_window():
         pause(500)
         drag(POS[0] - 700, POS[1] + 120, 1500)
         pause(800)
+        press('Control_L', 'w')
+        settle(700)
+        move(*HOME_XY, 700)
 
 
 def s_window_menu():
@@ -389,6 +435,103 @@ def s_window_menu():
         press('Control_L', 'w')
         pause(900)
         move(*HOME_XY, 900)
+
+
+def s_menu_slide():
+    """the top bar's menus: the calendar opens, then a slow glide right hands it over to quick settings
+    (one glass surface morphing), and back. Slower than the rest of the shoot (user, 2026-10-21: "too
+    fast where you cant see the animations"): the tempo does not apply here"""
+    global TEMPO
+    tempo, TEMPO = TEMPO, 1.0
+    try:
+        with Clip('menu-slide'):
+            dx, dy = center('date')
+            qx, qy = center('quick-settings')
+            move(dx, dy + 300, 500)
+            move(dx, dy, 500)
+            click()
+            pause(1300)                        # the calendar grows out of the clock
+            move(qx - 300, qy, 1600)           # across the status icons: each hand-over shows
+            pause(700)
+            move(qx, qy, 900)
+            pause(1500)                        # quick settings, settled
+            move(dx, dy, 1800)                 # back: quick settings morphs into the calendar
+            pause(1300)
+            close_all()
+            move(*HOME_XY, 600)
+    finally:
+        TEMPO = tempo
+
+
+def widget_boxes():
+    out = []
+    for i in range(20):
+        try:
+            out.append(tuple(locate(f'widget:{i}')))
+        except LookupError:
+            break
+    return out
+
+
+def s_desktop_widget():
+    """right-click the wallpaper anywhere: the glass menu; Add Widget expands under its own row; pick
+    Analog Clock and the cursor glides to where it appears (user, 2026-10-21). The layout is restored
+    after the shoot, so the new widget goes away again"""
+    before = set(widget_boxes())
+    with Clip('desktop-widget'):
+        move(1700, 640, 700)
+        click(button=3)
+        pause(900)                             # the menu grows out of the click
+        move(POS[0] + 70, POS[1] + 22, 500)    # Add Widget, the menu's first row
+        click()
+        pause(800)                             # the submenu expands under it
+        move(POS[0] + 10, POS[1] + 34, 500)    # its first entry: Analog Clock
+        pause(300)
+        click()
+        settle(900)
+        new = [b for b in widget_boxes() if b not in before]
+        if new:
+            x, y, w, h = new[0]
+            move(x + w // 2, y + h // 2, 900)  # to the clock that just appeared
+            pause(1200)
+        log(new_widget=list(new[0]) if new else None)
+        move(*HOME_XY, 700)
+
+
+def s_dock_menu():
+    """right-click an app in the dock: its glass menu grows out of the icon; glide over its rows"""
+    with Clip('dock-menu'):
+        x, y = center('dock:org.gnome.Nautilus')
+        move(x, y - 260, 500)
+        move(x, y, 700)
+        pause(500)                             # the glass name label
+        click(button=3)
+        pause(900)
+        move(x + 20, y - 150, 800)             # up over the menu's rows
+        pause(900)
+        close_all()
+        move(*HOME_XY, 700)
+
+
+def s_search_click():
+    """the overview opens, the cursor glides up to its search bar and clicks it, then types: the
+    results pop up on raised glass (user, 2026-10-21: show the cursor going up and clicking it)"""
+    with Clip('search-click'):
+        move(1280, 700, 500)
+        pause(400)
+        press('Super_L')
+        settle(900)                            # the overview opens
+        move(1280, 78, 900)                    # up to the search bar
+        pause(300)
+        click()
+        settle(400)
+        type_('calc')
+        settle(1600)                           # the results pop up
+        press('Escape')
+        settle(300)
+        press('Escape')
+        settle(900)
+        move(*HOME_XY, 600)
 
 
 def s_overview_search():
@@ -502,9 +645,11 @@ def s_settings_window():
         move(*HOME_XY, 900)
 
 
-# in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left
-SHOTS = [s_home, s_widget_drag, s_desktop_menu, s_quick_settings, s_files_window, s_window_menu, s_settings_window,
-         s_overview_search, s_app_grid, s_calendar, s_volume, s_music, s_home_end]
+# in the order of the cut (docs/showcase/montage/edit.json), so each shot starts near where the last left;
+# the user's 2026-10-21 notes: the OS's own animations (the top bar menus, the control centre) instead
+# of the desktop menu, window menu and volume shots
+SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
+         s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click]
 
 
 def main():
@@ -523,33 +668,50 @@ def main():
     try:
         driver_on()
         setup()
-        for shot in shots:
-            try:
-                shot()
-                log(done=shot.__name__[2:])
-            except Exception as e:  # noqa: BLE001  one failed shot never stops the rest
-                log(failed=shot.__name__[2:], error=f'{type(e).__name__}: {e}')
-                try:
-                    close_all()
-                except GLib.Error:
-                    pass
+        if ONE_TAKE:
+            shots = [s for s in shots if s not in (s_home, s_home_end)]
+            with Clip('tour'):
+                move(*HOME_XY, 300)
+                pause(1600)                   # the home screen, still: where the title hands over
+                run_shots(shots)
+                move(*HOME_XY, 600)
+                settle(1800)                  # and where the lock screen takes over
+            return
+        run_shots(shots)
     finally:
         restore()
         log(restored=True)
 
 
+def run_shots(shots):
+    for shot in shots:
+        try:
+            shot()
+            log(done=shot.__name__[2:])
+        except Exception as e:  # noqa: BLE001  one failed shot never stops the rest
+            log(failed=shot.__name__[2:], error=f'{type(e).__name__}: {e}')
+            try:
+                close_all()
+            except GLib.Error:
+                pass
+
+
+DRIVER = 'showcase@local'
+
+
 def driver_on():
     """the driver is on only for the shoot (it can move the pointer and press keys)"""
-    installed = os.path.expanduser('~/.local/share/gnome-shell/extensions/showcase@local')
+    installed = os.path.expanduser(f'~/.local/share/gnome-shell/extensions/{DRIVER}')
     if not os.path.isdir(installed):
         shutil.copytree(os.path.join(os.path.dirname(HERE), 'showcase@local'), installed)
         STATE['driver_copied'] = installed
-    if 'Enabled: Yes' not in subprocess.run(['gnome-extensions', 'info', 'showcase@local'], capture_output=True, text=True).stdout:
-        subprocess.run(['gnome-extensions', 'enable', 'showcase@local'], check=True)
+        pause(1500)                           # the shell notices the new folder
+    if 'Enabled: Yes' not in subprocess.run(['gnome-extensions', 'info', DRIVER], capture_output=True, text=True).stdout:
+        subprocess.run(['gnome-extensions', 'enable', DRIVER], check=True)
         STATE['driver'] = True
     for _ in range(40):
         try:
-            log(driver=call('Ping', out='(s)'))
+            log(driver=call('Ping', out='(s)'), moves='out-quart (stepped here)', drags='driver in-out')
             return
         except GLib.Error:
             pause(500)
