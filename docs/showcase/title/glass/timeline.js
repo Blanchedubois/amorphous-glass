@@ -18,7 +18,8 @@ export const SEQ = {
     drop: 0.45,            // the drop appears above the line and starts to fall
     dropIn: 0.11,          // fading in as it starts (Now Playing: DROP_IN_MS)
     fall: 0.42,            // the fall, accelerating
-    morph: 1.10,           // the blend into the word begins
+    morph: 1.10,           // the spread into a bar begins
+    rise: 1.22,            // the letters start to rise out of it, from the middle
     fadeOut: [3.4, 4.0],   // the glass fades out
     uiIn: [3.4, 4.0],      // bar, dock and widgets fade back in
     end: 5.6,              // the plate, still, until the montage cuts in
@@ -35,8 +36,15 @@ export const SPREAD_H = { damping: 0.66, stiffness: 320 };
 // scaled to keep the overshoot a small fraction of the drop (about 10 %: 0.2 read as timid)
 export const LAND_W = 0.9 * 0.3;
 export const LAND_H = -0.35 * 0.3;
-/// the morph's spring: the word fills in, with Material 3's default spatial feel
-export const MORPH = EXPRESSIVE.spatial.default;
+/// the spread and the rise: the first title's "follow" spring (../timeline.js FOLLOW), softer
+/// than the OS tokens, which settle in a fraction of a second, too fast to read across a 1500 px
+/// word; under-damped, so the bar overshoots its length and swings back (inertia)
+export const SPREAD = { damping: 0.55, stiffness: 90 };
+/// the rise: the same damping, a third of the stiffness: the front crosses the word in about
+/// half a second (at 90 the word was whole 0.2 s after the bar, too quick to read as rising)
+export const MORPH = { damping: 0.55, stiffness: 30 };
+const BAR_H = 110;        // px: the bar's height (about the x-height; the letters rise above it)
+const BAND = 300;         // px: how wide the rise is at any moment
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
 export const smooth = (a, b, x) => {
@@ -46,11 +54,11 @@ export const smooth = (a, b, x) => {
 
 /// the state of frame `t`. `word`: { cx, cy, w, h, d } (px): the word's ink box and the drop's
 /// diameter (its area is the word's ink area)
-export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, morph = MORPH } = {}) {
+export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, spread = SPREAD, morph = MORPH } = {}) {
     const s = {
         wallpaper: smooth(SEQ.uiOut[0], SEQ.uiOut[1], t) * (1 - smooth(SEQ.uiIn[0], SEQ.uiIn[1], t)),
         plateOut: t > (SEQ.morph + SEQ.fadeOut[0]) / 2,
-        fade: 0, morph: 0,
+        fade: 0, morph: 0, front: -BAND, band: BAND,
         cx: word.cx, cy: word.cy, w: word.d, h: word.d,
     };
     if (t < SEQ.drop)
@@ -78,14 +86,19 @@ export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, morp
     w.retarget(word.d, word.d);
     h.retarget(word.d, word.d);
     const tl = SEQ.drop + SEQ.fall;
-    let spreading = false;
+    let spreading = false, rising = false;
     for (let k = 0; tl + k * DT < t; k++) {
         const now = tl + k * DT;
         if (!spreading && now >= SEQ.morph) {
-            // the spread: the same body pulled out to the word's extent, the velocity kept
+            // the spread: the same body pulled out into a bar the word's length, the velocity kept
             spreading = true;
-            w.retarget(word.w + 40, word.w);
-            h.retarget(word.h + 20, word.d);
+            w.setToken(spread);
+            h.setToken(spread);
+            w.retarget(word.w + 60, word.w);
+            h.retarget(BAR_H, word.d);
+        }
+        if (!rising && now >= SEQ.rise) {
+            rising = true;
             m.retarget(1, 1);
         }
         w.step(DT);
@@ -94,6 +107,8 @@ export function timeline(t, word, { spreadW = SPREAD_W, spreadH = SPREAD_H, morp
     }
     s.w = Math.max(10, w.value);
     s.h = Math.max(10, h.value);
-    s.morph = clamp01(m.value);
+    s.morph = 1;
+    // the front starts a band before the middle (nothing has risen) and ends a band past the end
+    s.front = m.value * (word.w / 2 + 2 * BAND) - BAND;
     return s;
 }

@@ -5,7 +5,7 @@
 //   theme=dark|light        the wallpaper and the stand-in plates
 //   plateIn=URL, plateOut=URL   the montage's last frame (the clip starts on it) and first frame
 //   shadow=0, bright=0.14, milk=0.16, hair=2.5, hairAlpha=0.4   the material's dials
-//   spreadW=D,S spreadH=D,S morph=D,S   other springs (timeline.js)
+//   spreadW=D,S spreadH=D,S spread=D,S morph=D,S   other springs (timeline.js)
 //   morphAt=SECONDS         when the blend into the word begins (SEQ.morph; 99: never)
 //   t=SECONDS               draw one frame and stop
 //   render=1&fps=N&blur=M&from=S&to=S   render.py: every frame POSTed to /frame/<n>, then /done; M moments
@@ -30,7 +30,7 @@ const spring = key => {
     const [damping, stiffness] = (Q.get(key) ?? '').split(',').map(Number);
     return stiffness > 0 ? { damping, stiffness } : undefined;
 };
-const SPRINGS = { spreadW: spring('spreadW'), spreadH: spring('spreadH'), morph: spring('morph') };
+const SPRINGS = { spreadW: spring('spreadW'), spreadH: spring('spreadH'), spread: spring('spread'), morph: spring('morph') };
 const W = 1920;
 const H = 1080;
 
@@ -242,6 +242,8 @@ function drawMoment(t, gain) {
     gl.uniform2f(glass.u.res, W, H);
     gl.uniform4f(glass.u.blob, s.cx, s.cy, s.w, s.h);
     gl.uniform1f(glass.u.morph, s.morph);
+    gl.uniform1f(glass.u.front, s.front);
+    gl.uniform1f(glass.u.band, s.band);
     gl.uniform1f(glass.u.fade, s.fade);
     gl.uniform1f(glass.u.shadow, SHADOW);
     for (const [k, v] of Object.entries(LOOK))
