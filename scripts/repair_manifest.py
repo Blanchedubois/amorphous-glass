@@ -333,7 +333,8 @@ for key, uuid, script in [('widgets', 'tahoe-widgets@cachyos-tahoe', 'tahoe-widg
                           ('motion', 'tahoe-motion@cachyos-tahoe', 'tahoe-motion.sh'),
                           ('lockscreen', 'tahoe-lockscreen@cachyos-tahoe', 'tahoe-lockscreen.sh'),
                           ('controlcenter', 'tahoe-control-center@cachyos-tahoe', 'tahoe-control-center.sh'),
-                          ('menubar', 'tahoe-menu-bar@cachyos-tahoe', 'tahoe-menu-bar.sh')]:
+                          ('menubar', 'tahoe-menu-bar@cachyos-tahoe', 'tahoe-menu-bar.sh'),
+                          ('nowplaying', 'tahoe-nowplaying@cachyos-tahoe', 'tahoe-nowplaying.sh')]:
     item(f'F-{key}', f'{uuid} installed (switched on)', {'type': 'tahoe-installed', 'uuid': uuid},
          run(script, 'on', logout=True), {key: 'on'}, guard='tested')
 
@@ -356,7 +357,8 @@ MANIFEST = {
     'switched_extensions': {'widgets': ['tahoe-widgets@cachyos-tahoe'], 'motion': ['tahoe-motion@cachyos-tahoe'],
                             'lockscreen': ['tahoe-lockscreen@cachyos-tahoe'],
                             'controlcenter': ['tahoe-control-center@cachyos-tahoe'],
-                            'menubar': ['tahoe-menu-bar@cachyos-tahoe', KIWI]},
+                            'menubar': ['tahoe-menu-bar@cachyos-tahoe', KIWI],
+                            'nowplaying': ['tahoe-nowplaying@cachyos-tahoe']},
     'patched_extensions': [BMS, RWC, KIWI],
     'validation_needed_by': [OPENBAR, RWC],
     'items': items,

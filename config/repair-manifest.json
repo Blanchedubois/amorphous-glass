@@ -32,6 +32,9 @@
   "menubar": [
    "tahoe-menu-bar@cachyos-tahoe",
    "kiwimenu@kemma"
+  ],
+  "nowplaying": [
+   "tahoe-nowplaying@cachyos-tahoe"
   ]
  },
  "patched_extensions": [
@@ -3226,6 +3229,26 @@
    },
    "when": {
     "menubar": "on"
+   },
+   "guard": "tested"
+  },
+  {
+   "id": "F-nowplaying",
+   "feature": "tahoe-nowplaying@cachyos-tahoe installed (switched on)",
+   "check": {
+    "type": "tahoe-installed",
+    "uuid": "tahoe-nowplaying@cachyos-tahoe"
+   },
+   "fix": {
+    "type": "run",
+    "cmd": [
+     "tahoe-nowplaying.sh",
+     "on"
+    ],
+    "logout": true
+   },
+   "when": {
+    "nowplaying": "on"
    },
    "guard": "tested"
   },
