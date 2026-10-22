@@ -4,18 +4,28 @@
 //
 //   theme=dark|light        the wallpaper and the stand-in plates
 //   plateIn=URL, plateOut=URL   the montage's last frame (the clip starts on it) and first frame
-//   shadow=0.2              the drop shadow's strength (0: none, as the lock clock)
+//   shadow=0, bright=0.14, milk=0.16, hair=2.5, hairAlpha=0.4   the material's dials
 //   spreadW=D,S spreadH=D,S morph=D,S   other springs (timeline.js)
+//   morphAt=SECONDS         when the blend into the word begins (SEQ.morph; 99: never)
 //   t=SECONDS               draw one frame and stop
-//   render=1&fps=N&blur=M   render.py: every frame POSTed to /frame/<n>, then /done; M moments
+//   render=1&fps=N&blur=M&from=S&to=S   render.py: every frame POSTed to /frame/<n>, then /done; M moments
 //                           per frame across half its time (motion blur)
 
 import { SEQ, timeline } from './timeline.js';
 import { signedDistance } from './sdf.js';
 
 const Q = new URLSearchParams(location.search);
+if (Q.has('morphAt'))
+    SEQ.morph = parseFloat(Q.get('morphAt'));
 const THEME = Q.get('theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-const SHADOW = parseFloat(Q.get('shadow') ?? '0.2');
+const SHADOW = parseFloat(Q.get('shadow') ?? '0');
+// the material's dials (glass.glsl): the light, the line
+const LOOK = {
+    brightness: parseFloat(Q.get('bright') ?? '0.14'),
+    milk: parseFloat(Q.get('milk') ?? '0.16'),
+    hair: parseFloat(Q.get('hair') ?? '2.5'),
+    hairAlpha: parseFloat(Q.get('hairAlpha') ?? '0.40'),
+};
 const spring = key => {
     const [damping, stiffness] = (Q.get(key) ?? '').split(',').map(Number);
     return stiffness > 0 ? { damping, stiffness } : undefined;
@@ -234,6 +244,8 @@ function drawMoment(t, gain) {
     gl.uniform1f(glass.u.morph, s.morph);
     gl.uniform1f(glass.u.fade, s.fade);
     gl.uniform1f(glass.u.shadow, SHADOW);
+    for (const [k, v] of Object.entries(LOOK))
+        gl.uniform1f(glass.u[k], v);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
@@ -262,8 +274,10 @@ if (Q.has('render')) {
     // render.py: every frame, in order, POSTed as PNG
     const fps = parseFloat(Q.get('fps') ?? '60');
     const moments = parseInt(Q.get('blur') ?? '6');
-    const frames = Math.round(SEQ.end * fps);
-    for (let n = 0; n < frames; n++) {
+    // from=S&to=S: a part of the clip (a phase's preview)
+    const first = Math.round(parseFloat(Q.get('from') ?? '0') * fps);
+    const frames = Math.round(parseFloat(Q.get('to') ?? SEQ.end) * fps);
+    for (let n = first; n < frames; n++) {
         draw(n / fps, moments, 0.5 / fps);
         const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
         await fetch(`/frame/${n}`, { method: 'POST', body: png });

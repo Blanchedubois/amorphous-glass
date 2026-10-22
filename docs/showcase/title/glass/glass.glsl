@@ -14,20 +14,24 @@ uniform vec2 res;
 uniform vec4 blob;         // the drop: centre x, centre y, width, height (px, y down)
 uniform float morph;       // 0: the drop, 1: the word
 uniform float fade;        // the glass's presence
-uniform float shadow;      // the drop shadow's strength (0.20 on the desktop, 0 on the lock clock)
+uniform float shadow;      // a drop shadow's strength (0: liquid glass casts none, the user)
 uniform float gain;        // this moment's share of the frame (motion blur)
 
 out vec4 fragColor;
 
-// clockpanes.js CLOCK_VARIANTS.B2
-const float BRIGHTNESS = 0.10;
-const float MILK = 0.10;
+// clockpanes.js CLOCK_VARIANTS.B2, made a little lighter (the user, 2026-10-22), with the
+// desktop widgets' edge (paneglass.js DESKTOP: the rim band, its light, the inner shade and
+// the hairline), the line thicker than the clock's: a thicker outline, as the widgets' (user)
+uniform float brightness;      // 0.14
+uniform float milk;            // 0.16
 const float SATURATION = 1.1;
-const float BAND = 8.0;            // px: the edge band
-const float RIM_LIGHT = 0.35;
+const float BAND = 12.6;           // px: the edge band (edge_size 12 x 0.35 x rim_width 3)
+const float RIM_LIGHT = 0.55;
 const float RIM_LIGHT_WIDTH = 0.45;
-const float HAIR = 1.0;            // px
-const float HAIR_ALPHA = 0.16;
+const float AO = 0.30;             // the inner shade inside the line
+const float AO_WIDTH = 0.20;
+uniform float hair;            // px: the line (2.5)
+uniform float hairAlpha;       // 0.40
 const float SMOOTH_K = 60.0;       // px: how roundly the letters bud out of the drop
 
 // the desktop's rim light (paneglass.js tahoe_lens_slope, from the Blur My Shell patch)
@@ -87,12 +91,14 @@ void main() {
 
     // the frosted backdrop, lighter, milkier, a touch more saturated
     vec3 c = texture(frost, fuv).rgb;
-    c += BRIGHTNESS;
+    c += brightness;
     float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
     c = mix(vec3(luma), c, SATURATION);
-    c = mix(c, vec3(1.0), MILK);
+    c = mix(c, vec3(1.0), milk);
 
-    // the desktop widgets' edge: rim light, then the hairline (paneglass.js, desk)
+    // the desktop widgets' edge: inner shade, rim light, then the line (paneglass.js, desk)
+    float aow = max(BAND * AO_WIDTH, 0.5);
+    c *= 1.0 - (1.0 - smoothstep(0.0, aow, inside)) * AO;
     float w = max(BAND * RIM_LIGHT_WIDTH, 1.0);
     float t = clamp(inside / w, 0.0, 1.0);
     vec3 nn = normalize(vec3(-n * lensSlope(t) * 2.5, 1.0));
@@ -102,8 +108,8 @@ void main() {
     float eb = 1.0 - smoothstep(0.0, w, inside);
     float glow = clamp(mix(pow(eb, 0.85), fres, 0.55) * eb * lit * RIM_LIGHT, 0.0, 1.0);
     c = 1.0 - (1.0 - c) * (1.0 - glow);
-    float hl = clamp((HAIR - inside) + 0.5, 0.0, 1.0);
-    c = mix(c, vec3(1.0), hl * HAIR_ALPHA);
+    float hl = clamp((hair - inside) + 0.5, 0.0, 1.0);
+    c = mix(c, vec3(1.0), hl * hairAlpha);
     c = clamp(c, 0.0, 1.0);
 
     fragColor = vec4(mix(base, c, cov) * gain, gain);

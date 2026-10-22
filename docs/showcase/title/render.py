@@ -97,7 +97,8 @@ def clip(args):
         frames.mkdir()
         done = threading.Event()
         server = serve(frames, done)
-        url = page_url(server, args, {'render': 1, 'fps': args.fps, 'blur': args.blur})
+        part = {k: v for k, v in (('from', args.start), ('to', args.end)) if v is not None}
+        url = page_url(server, args, {'render': 1, 'fps': args.fps, 'blur': args.blur, **part})
         browser = subprocess.Popen([CHROMIUM, *CHROMIUM_FLAGS, f'--user-data-dir={tmp}/chromium', url],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -109,9 +110,10 @@ def clip(args):
             server.shutdown()
 
         pattern = str(frames / '%05d.png')
+        first = ['-start_number', str(round((args.start or 0) * args.fps))]
         scale = f'scale={args.width}:-2:flags=lanczos'
         if args.output:
-            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(args.fps), '-i', pattern,
+            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(args.fps), *first, '-i', pattern,
                             '-vf', scale, '-c:v', 'libx264', '-preset', 'slow', '-crf', '18',
                             '-pix_fmt', 'yuv420p', '-movflags', '+faststart', args.output], check=True)
             print(args.output, os.path.getsize(args.output))
@@ -174,6 +176,8 @@ def main():
             p.add_argument('-o', '--output', help='MP4')
             p.add_argument('--webp', help='looping animated WebP')
             p.add_argument('--fps', type=int, default=60)
+            p.add_argument('--start', type=float, help='render from this second (a preview)')
+            p.add_argument('--end', type=float, help='to this second')
             p.add_argument('--blur', type=int, default=6, help='moments added up per frame (motion blur)')
             p.add_argument('--width', type=int, default=1920, help='MP4 width')
             p.add_argument('--webp-width', type=int, default=1280)
