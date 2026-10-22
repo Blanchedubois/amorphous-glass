@@ -348,11 +348,18 @@ Amorphous Glass stands on other people's work. Thank you.
 
 **In the clips**
 
-- The music is *To Pimp a Butterfly* by Kendrick Lamar, *In Rainbows* by Radiohead and *DeBÍ TiRAR MáS FOToS* by Bad Bunny, played in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
+- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
 
 **Inspirations**
 
-- Apple's macOS Tahoe and its Liquid Glass design language: the look this recreates (measured values in `docs/liquid-glass.md`).
+- **Apple** and its designers: macOS Tahoe and the Liquid Glass design language are the look this recreates, from the
+  glass and its rim light to the widget sizes and the lock screen (measured values in
+  `docs/liquid-glass.md`). SF Pro and SF Symbols are Apple's type and symbols.
+- **Google's Material Design**: Material's icon design, the base of the Tahoe-Material icon theme; and Material 3
+  Expressive's motion, whose spring tokens drive every animation here (`spring.js`), with the press squish after
+  [material-web](https://github.com/material-components/material-web)'s switch (Apache-2.0). No code is taken from it.
+- [line-md](https://github.com/cyberalien/line-md) by Vjacheslav Trushkin (MIT): the idea of icons that draw themselves,
+  such as the Wi-Fi slash. Redrawn in a shader here; no files are taken from it.
 - [liquidglass-kde-widgets](https://github.com/jaxparrow07/liquidglass-kde-widgets) by jaxparrow07 (GPL-3.0): the designs of Clock II and III, Glass Text, Weather and Music, redrawn for GNOME Shell. No code, fonts or icons are taken from it.
 - [applemusic-like-lyrics](https://github.com/Steve-xmh/applemusic-like-lyrics) by Steve-xmh (AGPL-3.0) and [Adaptive Palette](https://pub.dev/documentation/adaptive_palette/latest/) (MIT): the technique behind the album-colour swirl. The shader and colour code here are written for this repo; no code is taken from either.
 
@@ -360,4 +367,4 @@ Amorphous Glass stands on other people's work. Thank you.
 
 GPL-3.0, as Blur My Shell and cachyos-tahoe-theme. Glyphs, fonts and brand marks keep their upstream
 licences. The title animation's images and videos (`docs/showcase/media/title-*`) show the Fold
-wallpaper and are shared under CC BY-SA 3.0. macOS, Liquid Glass and SF Pro are Apple's; this project is not affiliated with Apple.
+wallpaper and are shared under CC BY-SA 3.0. macOS, Liquid Glass and SF Pro are Apple's, and Material Design is Google's; this project is not affiliated with Apple or Google.
