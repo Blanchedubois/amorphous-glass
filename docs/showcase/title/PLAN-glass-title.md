@@ -20,10 +20,10 @@ drawn by `widgets/paneglass.js`). Its material, ported to the title's WebGL2 sha
 |---|---|---|
 | Type | Space Grotesk SemiBold | the same: `600 184px`, tracking -4 px, one line, centred (the old title's metrics) |
 | Backdrop | the wallpaper, frosted: `Shell.BlurEffect` radius 18 | a Gaussian blur of pass 1 (wallpaper + plate), sigma ≈ 18 px, half-res two-pass |
-| Colour | brightness +0.10, milk 0.10 (white over it), saturation 1.1, no tint | the same numbers |
+| Colour | brightness +0.10, milk 0.10 (white over it), saturation 1.1, no tint | +0.14, milk 0.16 (the user, phase 1: "slightly tinted lighter") |
 | Bend | 0 (no refraction) | 0: the user asked for glass **without refraction** |
-| Edge | the desktop widgets' edge model: band 8, rim light 0.35 (width 0.45 of the band, lit from the top left, `tahoe_lens_slope`), no inner shadow, a 1 px hairline at alpha 0.16 | the same, from the text's signed distance field (section 3) |
-| Shadow | none on the clock | a soft drop shadow (0.20, as every desktop glass; the brief asks for "a soft shadow"); shown with and without in phase 1 |
+| Edge | the desktop widgets' edge model: band 8, rim light 0.35 (width 0.45 of the band, lit from the top left, `tahoe_lens_slope`), no inner shadow, a 1 px hairline at alpha 0.16 | the widgets' own values (paneglass.js DESKTOP: band 12.6, rim light 0.55, inner shade 0.30) and a 2.5 px line at alpha 0.40: "a slightly thicker outline, look at the widgets" (the user, phase 1); from the text's signed distance field (section 3) |
+| Shadow | none on the clock | none: "there shouldn't really be a shadow if it's liquid glass" (the user, phase 1; `shadow=` stays as a dial) |
 | Anti-aliasing | cairo mask | exact from the SDF: coverage = clamp(0.5 - sd) |
 
 The signed distance field of the word is computed once at load in JS (`sdf.js`): the text canvas
@@ -40,8 +40,9 @@ exact damped oscillator), with the tokens the desktop already uses. No new easin
 | Beat | Source of the feel | Numbers |
 |---|---|---|
 | The fall | the Now Playing cover's drop (`tahoe-nowplaying@cachyos-tahoe/view.js`, 2bd1046): accelerating under its weight, `y = -fall · (1 - t²)`, stretched along its speed with the volume kept (`w = d / sqrt(1 + s)`, `h = d · sqrt(1 + s)`, s = speed · 0.00045, max 0.45), fading in as it starts (110 ms) | the circle appears above the word's line and falls to it; FALL 0.42 s (the Now Playing's 0.26 s, scaled to a fall about 1.6x longer in px) |
-| The landing | the Now Playing's spread: width on `{damping 0.62, stiffness 420}` with velocity +0.9 × the landing speed, height on `{0.66, 320}` with -0.35 × it: the width leads and overshoots (~7 %), the height squashes first, both settle out of phase | the circle lands as a squashed ellipse that wobbles back round, then wider |
-| The spread and the morph | the blob widens toward the word's extent on the same width spring (retargeted, velocity kept: inertia) while the field blends from the ellipse's SDF into the word's: `sd = mix(sd_blob, sd_text, m)` with a smooth union so the letters bud out of the blob rather than cut in; `m` on `EXPRESSIVE.spatial.default {0.8, 380}` (spring.js), from the moment the landing has peaked | the word is whole about 0.9 s after the landing; the width's overshoot carries into the word (a last elastic settle of the letters' outline) |
+| The landing | the Now Playing's spread: width on `{damping 0.62, stiffness 420}` with velocity +0.9 × the landing speed, height on `{0.66, 320}` with -0.35 × it: the width leads and overshoots, the height squashes first, both settle out of phase | the title's drop is 4x bigger and falls 4x farther than the cover's, so the springs get 0.3 of those shares (0.2 read as timid): about 10 % overshoot |
+| The spread | the landed drop (a capsule) is pulled out into a bar the word's length and about an x-height tall, width and height on the first title's "follow" spring `{0.55, 90}` (../timeline.js FOLLOW: softer than the OS tokens, which settle too fast to read across a 1500 px word; under-damped, so the bar overshoots its length and swings back), the landing's velocity kept | the bar is formed about 0.25 s after it sets off |
+| The rise | the letters rise out of the bar from the middle to the ends: a front travels outward on `{0.55, 30}` (the same damping, a third of the stiffness: about half a second across the word), and behind it, over a 300 px band, the field blends from the capsule's SDF into the word's: `sd = mix(sd_bar, sd_word, m(p))` | a straight blend over the whole word at once (the first try) popped the word in a tenth of a second and looked like a mess; the front makes it a rise |
 | Volume | the circle's area equals the word's ink area, measured from the text canvas at load (the diameter is not a guess), so what drops is what the letters are made of; the spread is the same area pulled wide | |
 | Hold | still | ~1.1 s |
 | The fade | the glass's coverage and the shadow fade out (0.55 s, `smooth`); the plate's bar, dock and widgets fade back in over the same beat (as the old title's `uiIn`) | ends on the montage's first frame |
@@ -54,8 +55,8 @@ Timeline (about 5.6 s; to be tuned in phase 5):
 | 0.05 – 0.55 | bar, dock and widgets fade out: the bare wallpaper (no camera zoom: the montage's camera is locked, REWRITE.md "Joins") |
 | 0.45 | the circle appears above the line and starts to fall |
 | 0.87 | it lands; the elastic landing |
-| 1.10 – 2.1 | spread and morph into "amorphous glass" |
-| 2.1 – 3.4 | hold (the overshoot's last settle during the first 0.3 s) |
+| 1.10 – 1.7 | the spread into a bar (1.10), the rise of the letters (from 1.22) |
+| 1.7 – 3.4 | hold |
 | 3.4 – 4.0 | the glass fades; bar, dock and widgets fade back in |
 | 4.0 – 5.6 | the montage's first frame (`plateOut`), whole: the hard cut into the montage. (Trimmed in phase 5 so the clip is about 5–6 s with the plate held at least 0.5 s at each end.) |
 
@@ -78,6 +79,8 @@ docs/showcase/title/glass/
 
 `render.py`: `--scene glass` picks `glass/index.html`; everything else (still, clip, webp, plates,
 motion blur) is reused. Served from the repository root (spring.js is imported from extensions/).
+
+Found on the way: headless Chromium's virtual time never finished `Image.decode()` (or a fetch) once the page had done the SDF's work first, so the loads start first and the SDF waits for them; `createImageBitmap` must be given `colorSpaceConversion: 'none'`, or the plates come out 8 to 12 levels darker than the montage's frames and the hard cut would show.
 
 Risks: WebGL2 float textures under SwiftShader (fallback: the SDF packed into two 8-bit channels);
 the SDF mix of a circle and letters can pinch where letters are thin (the smooth union's radius and
