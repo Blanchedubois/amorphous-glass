@@ -12,7 +12,9 @@ uniform sampler2D frost;   // pass 2: the same, frosted (half res)
 uniform sampler2D sdf;     // the word's signed distance, px, < 0 inside (y down)
 uniform vec2 res;
 uniform vec4 blob;         // the drop: centre x, centre y, width, height (px, y down)
-uniform float morph;       // 0: the drop, 1: the word
+uniform float morph;       // 0: the drop, 1: the word (where the front has passed)
+uniform float front;       // px from the middle: how far the letters have risen
+uniform float band;        // px: the width of the rise
 uniform float fade;        // the glass's presence
 uniform float shadow;      // a drop shadow's strength (0: liquid glass casts none, the user)
 uniform float gain;        // this moment's share of the frame (motion blur)
@@ -32,7 +34,6 @@ const float AO = 0.30;             // the inner shade inside the line
 const float AO_WIDTH = 0.20;
 uniform float hair;            // px: the line (2.5)
 uniform float hairAlpha;       // 0.40
-const float SMOOTH_K = 60.0;       // px: how roundly the letters bud out of the drop
 
 // the desktop's rim light (paneglass.js tahoe_lens_slope, from the Blur My Shell patch)
 float lensSlope(float t) {
@@ -42,26 +43,20 @@ float lensSlope(float t) {
     return pow(inner, 1.0 / n - 1.0) * pow(u, n - 1.0);
 }
 
-float sdEllipse(vec2 p, vec2 r) {
-    // a scaled circle: exact for a circle, close enough for the drop's slight squash
-    float k = min(r.x, r.y);
-    return (length(p / r) - 1.0) * k;
+// the drop and the bar it spreads into: a capsule (a circle while it is round)
+float sdCapsule(vec2 p, vec2 half_) {
+    float r = min(half_.x, half_.y);
+    vec2 q = abs(p) - half_ + r;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-float smin(float a, float b, float k) {
-    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
-    return mix(b, a, h) - k * h * (1.0 - h);
-}
-
-// the shape at `p` (px, y down)
+// the shape at `p` (px, y down): the capsule becomes the word behind a front that travels out
+// from the middle (the letters rise out of the bar from the centre to the ends)
 float sd(vec2 p) {
-    float drop = sdEllipse(p - blob.xy, blob.zw * 0.5);
+    float drop = sdCapsule(p - blob.xy, blob.zw * 0.5);
     float word = texture(sdf, p / res).r;
-    // the morph: the drop's field becomes the word's; a smooth union with the shrinking drop keeps
-    // the letters budding out of one body rather than cut by a straight blend
-    float between = mix(drop, word, morph);
-    float body = drop + morph * SMOOTH_K * 1.5;   // the drop drains as the word fills
-    return mix(smin(between, body, SMOOTH_K * (1.0 - morph) + 1.0), word, morph * morph);
+    float m = smoothstep(0.0, 1.0, (front - abs(p.x - blob.x)) / band + 1.0) * morph;
+    return mix(drop, word, m);
 }
 
 void main() {
