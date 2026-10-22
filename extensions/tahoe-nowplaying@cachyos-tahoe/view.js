@@ -26,7 +26,7 @@ import {geometry} from './layout.js';
 import {EXPRESSIVE} from './shared/spring.js';
 import {Motion} from './motion.js';
 import {Swirl} from './swirl.js';
-import {EdgeFade, GlassEdge, PourMask, RoundMask} from './effects.js';
+import {EdgeFade, GlassEdge, PourMask, RoundMask, Tilt} from './effects.js';
 import {WidgetGlass} from './widgetglass.js';
 import {setSymbol, symbolActor} from './symbols.js';
 
@@ -48,6 +48,7 @@ const POUR_DELAY = 90;            // ms after opening (the view is fading in)
 const POUR = {damping: 0.72, stiffness: 260};   // a liquid spring; the glass never passes the cover
 const FULL_AT = 0.995;            // of the way open: full size, the cover fades in
 const ART_FADE_MS = 360;
+const TILT_PAD = 24;              // px at 1440p of room around the cover for the leaning card
 const TILT_MAX = 3.5;             // degrees each way (8 was too dramatic, user 2026-10-21)
 const TILT_LIFT = 10;             // px toward the viewer while hovered
 const DISABLED = 0.4;             // a control the player does not offer
@@ -227,14 +228,25 @@ export class NowPlayingView {
         // toward the pointer and turns into a thick Liquid Glass tile lit from above the pointer: a soft
         // reflection on its face, a glint and shade on its bevel (effects.js GlassEdge; no ring, no
         // flat sheen; user, 2026-10-21).
-        // cover (takes the pointer, never moves) > tilt (turns) > the art or card (glass edge)
+        // cover (takes the pointer, never moves) > tilt (flat, TILT_PAD bigger all round: the Tilt
+        // shader draws the leaning card in it, anti-aliased) > card (the cover's box) > the glass
+        // behind, the art or card (glass edge), the enter's glass
         const cover = at(new St.Widget({reactive: true, track_hover: true, layout_manager: new Clutter.FixedLayout()}), b.cover, 'cover');
         const radius = g.coverRadius;
         const [cw, ch] = [b.cover.width, b.cover.height];
-        const tilt = new St.Widget({layout_manager: new Clutter.FixedLayout(), pivot_point: new Graphene.Point({x: 0.5, y: 0.5})});
-        tilt.set_size(cw, ch);
+        const room = Math.round(TILT_PAD * this._u);
+        const tilt = new St.Widget({layout_manager: new Clutter.FixedLayout()});
+        tilt.set_size(cw + 2 * room, ch + 2 * room);
+        tilt.set_position(-room, -room);
+        this._tiltFx = new Tilt();
+        this._tiltFx.enabled = false;
+        tilt.add_effect_with_name('tilt', this._tiltFx);
         cover.add_child(tilt);
-        this._tilt = tilt;
+        const card = new St.Widget({layout_manager: new Clutter.FixedLayout()});
+        card.set_size(cw, ch);
+        card.set_position(room, room);
+        tilt.add_child(card);
+        this._tilt = card;
 
         // the glass the cover is set in: the widgets' Liquid Glass, the cover's size, seen only
         // through the hovered cover's clear rim
@@ -246,11 +258,11 @@ export class NowPlayingView {
         this._edgeGlass.clip_to_allocation = true;
         this._edgeGlass.add_effect_with_name('round', new RoundMask(radius));
         this._edgeGlass.opacity = 0;
-        tilt.add_child(this._edgeGlass);
+        card.add_child(this._edgeGlass);
 
         const stack = new St.Widget({layout_manager: new Clutter.BinLayout()});
         stack.set_size(cw, ch);
-        tilt.add_child(stack);
+        card.add_child(stack);
         // the glass edge, over whichever art shows (0 at rest: the cover by itself)
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         this._edge = new GlassEdge(radius * scale, EDGE_BAND * this._u * scale, EDGE_BEND * this._u * scale);
@@ -502,9 +514,10 @@ export class NowPlayingView {
         const m = this.motion, t = this._tilt;
         const token = EXPRESSIVE.spatial.default;
         // the side under the pointer goes down, the far side comes up
-        m.spring('tilt-x', t.rotation_angle_x, (py - 0.5) * 2 * TILT_MAX, token, v => this._lean('x', v));
-        m.spring('tilt-y', t.rotation_angle_y, -(px - 0.5) * 2 * TILT_MAX, token, v => this._lean('y', v));
-        m.spring('tilt-z', t.translation_z, TILT_LIFT * this._u, token, v => (t.translation_z = v));
+        const fx = this._tiltFx;
+        m.spring('tilt-x', fx.tx ?? 0, (py - 0.5) * 2 * TILT_MAX, token, v => this._lean('x', v));
+        m.spring('tilt-y', fx.ty ?? 0, -(px - 0.5) * 2 * TILT_MAX, token, v => this._lean('y', v));
+        m.spring('tilt-z', fx.lift, TILT_LIFT * this._u, token, v => this._lean('z', v));
         // the light sits above the pointer
         this._edge.pointer = [px, py];
         this._edge.queue_repaint();
@@ -520,9 +533,10 @@ export class NowPlayingView {
             return Clutter.EVENT_PROPAGATE;
         const m = this.motion, t = this._tilt;
         const token = EXPRESSIVE.spatial.default;
-        m.spring('tilt-x', t.rotation_angle_x, 0, token, v => this._lean('x', v));
-        m.spring('tilt-y', t.rotation_angle_y, 0, token, v => this._lean('y', v));
-        m.spring('tilt-z', t.translation_z, 0, token, v => (t.translation_z = v));
+        const fx = this._tiltFx;
+        m.spring('tilt-x', fx.tx ?? 0, 0, token, v => this._lean('x', v));
+        m.spring('tilt-y', fx.ty ?? 0, 0, token, v => this._lean('y', v));
+        m.spring('tilt-z', fx.lift, 0, token, v => this._lean('z', v));
         this._hovered = false;
         this._edgeTo(0);
         this.tiltTarget = null;
@@ -531,10 +545,20 @@ export class NowPlayingView {
 
     // one axis of the lean
     _lean(axis, v) {
+        // tx, ty: the lean as the springs keep it (tx > 0: the top comes forward); the shader's
+        // angles are about its own axes (the side under the pointer goes away from the viewer)
+        const fx = this._tiltFx;
         if (axis === 'x')
-            this._tilt.rotation_angle_x = v;
+            fx.tx = v;
+        else if (axis === 'y')
+            fx.ty = v;
         else
-            this._tilt.rotation_angle_y = v;
+            fx.lift = v;
+        fx.ax = -(fx.tx ?? 0);
+        fx.ay = -(fx.ty ?? 0);
+        // off when flat (no offscreen pass, nothing resampled at rest)
+        fx.enabled = Math.abs(fx.ax) > 0.01 || Math.abs(fx.ay) > 0.01 || fx.lift > 0.05;
+        fx.queue_repaint();
     }
 
     // the cover's glass edge in (1) or out (0)
@@ -548,7 +572,8 @@ export class NowPlayingView {
 
     get tilt() {
         const t = this._tilt;
-        return {x: t.rotation_angle_x, y: t.rotation_angle_y, z: t.translation_z, edge: this._edge.strength, sheen: this._edge.strength, light: this._edge.pointer};
+        const fx = this._tiltFx;
+        return {x: fx.tx ?? 0, y: fx.ty ?? 0, z: fx.lift, edge: this._edge.strength, sheen: this._edge.strength, light: this._edge.pointer, shader: fx.enabled};
     }
 
     // a floating control: the symbol, no plate; hover is the widget's soft circle (stylesheet)

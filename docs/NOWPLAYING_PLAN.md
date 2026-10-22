@@ -478,6 +478,17 @@ Each phase is one commit or more on `claude/music-screensaver-257249`, and each 
   - A scripted tilt sweep: pointer motion across the cover, then leave, recorded. The glass outline must fade in and out with it, and the sweep must stay in the tilt budget.
 
 ### Phase 6: enter and exit animations
+- **Done so far (user's design, 2026-10-21).** The view fades in; the layout is decided first (the
+  opening song's lyrics, at most 0.7 s; a "no player" at opening waits for the asynchronous player
+  discovery when players are on the bus), then a circle of the widgets' glass at the cover's centre
+  springs open into the cover's shape (`PourMask` over a full-size glass card, never past the cover)
+  and only at full size the cover fades in on it, as one piece; no tilt during it.
+  `docs/nowplaying/shots/phase6-enter-cover.webp`. Still to do: the desktop snapshot's blur in and
+  out, the swirl taking over, the exit.
+- **The tilt, anti-aliased (user: it looked pixelated).** Rotating actors in 3D drew the outline
+  without anti-aliasing and resampled the art at an angle. Now the actors stay flat and one shader
+  (`Tilt` in effects.js) draws the leaning card with the stage's perspective, 4x supersampled, and
+  every shader samples with linear filtering. `docs/nowplaying/shots/phase5-tilt-antialiasing.png`.
 - **Enter.** The snapshot, the blur spring, tahoe-motion's `Drop` geometry driving the widgets' dark glass card,
   the cover fading in, the swirl taking over, the staggered content.
 - **Exit.** The modal released at once, the live backdrop clones, the swirl fading out, the blur
