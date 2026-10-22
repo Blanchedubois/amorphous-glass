@@ -567,6 +567,83 @@ def s_dock_search():
         settle(1200)                           # the home screen, still: where the title takes over
 
 
+def s_files_to_folder():
+    """one take (user, 2026-10-22: "the files window is closed then the utilities app is opened naturally
+    by actually clicking the buttons"): Files from the dock, a drag, Ctrl+W, the cursor to the dock's
+    grid button and a click, up to the Utilities folder and a click, the folder and the grid closed"""
+    folder = demo_folder()
+    with Clip('files-to-folder'):
+        move(*center('dock:org.gnome.Nautilus'), 900)
+        pause(250)
+        subprocess.Popen(['nautilus', '--new-window', folder], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        settle(1700)
+        move(*window_header('org.gnome.Nautilus'), 900)
+        pause(200)
+        drag(POS[0] + 440, POS[1] - 160, 1400)
+        pause(600)
+        press('Control_L', 'w')
+        settle(900)                            # the window shrinks away
+        move(*center('show-apps'), 1000)       # down to the dock's grid button
+        pause(400)
+        click()
+        settle(1300)                           # the grid opens
+        move(*center('folder:0'), 1000)
+        pause(300)
+        click()
+        pause(1800)                            # the folder, open
+        press('Escape')
+        pause(500)
+        press('Escape')
+        pause(500)
+        press('Escape')
+        pause(800)
+        move(*HOME_XY, 800)
+
+
+def s_widget_to_menu():
+    """one take (user, 2026-10-22: a seamless join between the clock widget being added and the top
+    menu): the desktop's right-click menu, Add Widget, Analog Clock, the cursor glides to the new clock,
+    then straight up to the date in the top bar: the calendar, the slow glide into quick settings and
+    back, as s_menu_slide (its slower tempo)"""
+    global TEMPO
+    before = set(widget_boxes())
+    with Clip('widget-to-menu'):
+        move(1700, 640, 700)
+        click(button=3)
+        pause(900)                             # the menu grows out of the click
+        move(POS[0] + 70, POS[1] + 22, 500)    # Add Widget, the menu's first row
+        click()
+        pause(800)                             # the submenu expands under it
+        move(POS[0] + 10, POS[1] + 34, 500)    # its first entry: Analog Clock
+        pause(300)
+        click()
+        settle(900)
+        new = [b for b in widget_boxes() if b not in before]
+        if new:
+            x, y, w, h = new[0]
+            move(x + w // 2, y + h // 2, 900)  # to the clock that just appeared
+            pause(1000)
+        log(new_widget=list(new[0]) if new else None)
+        tempo, TEMPO = TEMPO, 1.0
+        try:
+            dx, dy = center('date')
+            qx, qy = center('quick-settings')
+            move(dx, dy, 1100)                 # up to the date
+            pause(200)
+            click()
+            pause(1300)                        # the calendar grows out of the clock
+            move(qx - 300, qy, 1600)           # across the status icons: each hand-over shows
+            pause(700)
+            move(qx, qy, 900)
+            pause(1500)                        # quick settings, settled
+            move(dx, dy, 1800)                 # back: quick settings morphs into the calendar
+            pause(1300)
+            close_all()
+            move(*HOME_XY, 600)
+        finally:
+            TEMPO = tempo
+
+
 def s_overview_search():
     with Clip('overview-search'):
         press('Super_L')
@@ -817,7 +894,7 @@ def gset_mode():
 # of the desktop menu, window menu and volume shots
 SHOTS = [s_home, s_widget_drag, s_quick_settings, s_menu_slide, s_files_window, s_settings_window,
          s_overview_search, s_app_grid, s_music, s_home_end, s_desktop_widget, s_dock_menu, s_search_click,
-         s_dock_search]
+         s_dock_search, s_files_to_folder, s_widget_to_menu]
 # the README's rows: live blur, motion, spacing (the calendar), icons, widgets, modes
 FEATURE_SHOTS = [s_live_blur, s_files_window, s_menu_slide, s_quick_settings, s_desktop_widget, s_calendar,
                  s_icons, s_dock_menu, s_albums, s_modes]
