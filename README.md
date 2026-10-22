@@ -3,11 +3,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/showcase/media/title-still-dark.webp">
-    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="amorphous glass: a clear capsule of the desktop's glass glides over the words and refracts them; then the desktop, seen close up with the cursor always in the middle: a widget dragged, the desktop menu, quick settings, Files and Settings dragged as windows, a window menu, search and the app grid, the calendar, the volume, the music widgets and the lock screen, and back to the title">
+    <img src="docs/showcase/media/amorphous-glass.webp" width="100%" alt="Amorphous Glass: a tour of the desktop, following the cursor through widgets, menus, quick settings, windows, search, the calendar, music and the lock screen">
   </picture>
 </p>
 
-<p align="center"><sub>The title and a tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a></sub></p>
+<p align="center"><sub>A tour of the desktop, on a loop. <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-21/amorphous-glass.mp4">Full quality, 1080p 60 fps (MP4)</a></sub></p>
 
 **Amorphous Glass: macOS Tahoe's Liquid Glass look, rebuilt for GNOME 51 on Wayland.** Real refracting glass on the top bar,
 dock, every menu, quick settings, the calendar, GTK apps, desktop widgets and the lock screen, with
@@ -32,7 +32,7 @@ are of the real desktop, recorded with GNOME's own screencast. Other apps' notif
 
 ### One glass
 
-![The glass's anatomy, on the title's capsule: a rim light lit from the top left, a refraction band at the edge that bends the letters under it, clear glass with no tint, an edge shadow inside and a drop shadow under it](docs/showcase/media/design-glass.webp)
+![The glass's anatomy: a rim light lit from the top left, a refraction band at the edge that bends the letters under it, clear glass with no tint, an edge shadow inside and a drop shadow under it](docs/showcase/media/design-glass.webp)
 
 Every glass surface is the same material, drawn by one shader with one set of values
 (`glass_params()` in `scripts/glass-bar.sh`): blur, a refraction band at the edge, a rim light lit
@@ -385,7 +385,7 @@ Amorphous Glass stands on other people's work. Thank you.
 | `extensions/` | `tahoe-widgets`, `tahoe-motion`, `tahoe-lockscreen`, `tahoe-gdm` (login screen), `tahoe-menu-bar` and `tahoe-control-center` (built, off) |
 | `tokens/`, `docs/STANDARD.md` | The glass standard: radius, gap, tint and edge per surface |
 | `docs/` | Plans, measurements and workshop notes for every part |
-| `docs/showcase/title/`, `docs/showcase/montage/`, `docs/showcase/design/` | The video at the top and the design images |
+| `docs/showcase/` | The video at the top and the design images |
 | `tools/` | Headless test shells, stress tests, the repair's drift tests, the showcase shoot |
 
 ## Licence
