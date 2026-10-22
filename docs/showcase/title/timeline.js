@@ -13,17 +13,18 @@ const DT = 1 / 240;
 /// the beats of the loop, in seconds: in from the montage's last frame, the clearing pass, the
 /// logo, the dissolving pass back, out to the montage's first frame
 export const SEQ = {
-    zoomIn: [0, 1.8],        // the camera zooms in from the plate to the bare wallpaper
-    uiOut: [0.15, 1.2],      // bar, dock and widgets fade out as it moves
-    textIn: [1.4, 2.0],      // the word fades in, crisp, as the zoom settles
-    passA: 1.9,              // the clearing pass sets off, left to right
-    passADur: 2.3,           // how long its guide takes to reach "glass"
-    passB: 6.2,              // the dissolving pass sets off from "glass", right to left
-    passBDur: 1.6,
-    passBIn: 0.35,           // the melt eases in as it sets off (no jump on the letters under it)
-    zoomOut: [7.2, 9.0],     // the camera zooms back out to the plate as the glass leaves
-    uiIn: [7.9, 8.9],        // bar, dock and widgets fade back in
-    end: 9.4,                // the plate, still, until the montage takes over
+    // user, 2026-10-21: "the title card is too slow", then "a bit quicker to match": 5.3 s
+    zoomIn: [0, 0.9],        // the camera zooms in from the plate to the bare wallpaper
+    uiOut: [0.05, 0.6],      // bar, dock and widgets fade out as it moves
+    textIn: [0.6, 0.9],      // the word fades in, crisp, as the zoom settles
+    passA: 0.75,             // the clearing pass sets off, left to right
+    passADur: 1.35,          // how long its guide takes to reach "glass"
+    passB: 3.55,             // the dissolving pass sets off from "glass", right to left
+    passBDur: 1.0,
+    passBIn: 0.25,           // the melt eases in as it sets off (no jump on the letters under it)
+    zoomOut: [4.1, 5.1],     // the camera zooms back out to the plate as the glass leaves
+    uiIn: [4.55, 5.1],       // bar, dock and widgets fade back in
+    end: 5.3,                // the plate, still, until the montage takes over
 };
 
 /// how far the camera is zoomed into the wallpaper while the title is on
@@ -87,8 +88,8 @@ export function timeline(t, cap, springs = {}) {
         // the clearing pass: the letters melt under the lens and in its wake, and heal as it lands
         const ta = Math.max(0, t - SEQ.passA);
         g = glide(ta, -cap.w * 1.2, cap.cx, SEQ.passADur, springs);
-        s.melt = 1 - smooth(SEQ.passADur + 0.3, SEQ.passADur + 1.3, ta);
-        s.wake = 260 * (1 - smooth(SEQ.passADur - 0.3, SEQ.passADur + 0.5, ta)) + 1;
+        s.melt = 1 - smooth(SEQ.passADur + 0.15, SEQ.passADur + 0.7, ta);
+        s.wake = 260 * (1 - smooth(SEQ.passADur - 0.3, SEQ.passADur + 0.4, ta)) + 1;
     } else {
         // the dissolving pass: what it has passed is gone
         const tb = t - SEQ.passB;

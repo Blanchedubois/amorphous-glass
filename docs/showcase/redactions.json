@@ -1,42 +1,7 @@
 {
- "about": "tools/showcase/redact.py: OCR terms blurred everywhere, plus fixed boxes [x, y, w, h, from_s, to_s] per still or clip (2560x1440). The personal terms (names, places, networks) are kept outside the repo, in ~/.config/tahoe-glass/showcase-redact-terms.json, and added at run time. The city, the weather widget, the Wi-Fi name and the login name and picture are shown on purpose (user, 2026-10-21).",
- "terms": [
-  "/home/",
-  "greeter"
- ],
+ "about": "tools/showcase/redact.py: OCR terms blurred everywhere, plus fixed boxes [x, y, w, h, from_s, to_s] per still or clip (2560x1440). The personal terms (names, places, networks) are kept outside the repo, in ~/.config/tahoe-glass/showcase-redact-terms.json, and added at run time. The city, the weather widget, the Wi-Fi name and the login name and picture are shown on purpose (user, 2026-10-21), and so are notifications (user, same day: \"dont have to blur the notifications\"). File names and paths are shown too (user, same day: \"the file name blurs are not needed\"); what stays blurred: the user's real name (a private term), the password field (on the lock clips) and the user's own windows on other workspaces (the boxes here).",
+ "terms": [],
  "boxes": {
-  "calendar": [
-   [
-    950,
-    160,
-    380,
-    215
-   ]
-  ],
-  "calendar-open": [
-   [
-    950,
-    160,
-    380,
-    215
-   ]
-  ],
-  "menu-slide": [
-   [
-    950,
-    160,
-    380,
-    215
-   ]
-  ],
-  "search": [
-   [
-    800,
-    280,
-    980,
-    75
-   ]
-  ],
   "app-grid": [
    [
     860,
@@ -59,20 +24,6 @@
     190,
     180,
     1060
-   ],
-   [
-    1020,
-    288,
-    760,
-    48
-   ]
-  ],
-  "light-calendar": [
-   [
-    950,
-    50,
-    385,
-    120
    ]
   ],
   "overview-search": [
@@ -81,12 +32,24 @@
     190,
     180,
     1060
+   ]
+  ],
+  "tour": [
+   [
+    0,
+    190,
+    180,
+    1060,
+    43.3,
+    49.0
    ],
    [
-    1020,
-    288,
-    760,
-    48
+    860,
+    110,
+    420,
+    240,
+    48.8,
+    55.0
    ]
   ]
  }
