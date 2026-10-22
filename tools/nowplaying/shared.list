@@ -1,0 +1,19 @@
+# files tahoe-nowplaying carries as exact copies in its shared/ folder (an installed extension must
+# be self-contained): source (relative to extensions/), dest (in shared/). Sync with
+# sync-shared.sh after changing a source; check-shared.sh fails on drift.
+# the clock: the lock screen's glass clock (date and time panes, B2 clear blur), the login screen's
+tahoe-gdm@cachyos-tahoe/clockpanes.js clockpanes.js
+# its glass: the SDF Liquid Glass pane the clock's glyph panes are drawn with
+tahoe-gdm@cachyos-tahoe/glass.js paneglass.js
+# the player: MPRIS (with shuffle, repeat, seek), the cover's colours, the Music widget's lyrics view
+tahoe-widgets@cachyos-tahoe/mpris.js mpris.js
+tahoe-widgets@cachyos-tahoe/palette.js palette.js
+tahoe-widgets@cachyos-tahoe/music.js music.js
+# music.js's own imports and icons (its SF-like SVGs are the symbols' fallback)
+tahoe-widgets@cachyos-tahoe/glass.js glass.js
+tahoe-widgets@cachyos-tahoe/swirl.js swirl.js
+tahoe-widgets@cachyos-tahoe/icons icons
+# the album-colour swirl as a whole background (the lock screen's music mode)
+tahoe-lockscreen@cachyos-tahoe/bgswirl.js bgswirl.js
+# tahoe-motion's springs (the layout swap, the tilt, the enter and exit)
+tahoe-motion@cachyos-tahoe/spring.js spring.js

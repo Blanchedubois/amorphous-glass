@@ -180,8 +180,10 @@ class Player {
         return best;
     }
 
-    // {key, title, artist, album, artUrl, url, length, playing, canPrev, canNext, app} or null;
-    // app: {desktopEntry, identity, canRaise, pid} (filled in shortly after a player appears)
+    // {key, title, artist, album, artUrl, url, length, playing, canPrev, canNext, app, trackId,
+    // canSeek, shuffle, loop} or null; app: {desktopEntry, identity, canRaise, pid} (filled in
+    // shortly after a player appears); shuffle (boolean) and loop ('None' | 'Track' | 'Playlist')
+    // are undefined when the player has no such setting
     get state() {
         const proxy = this.current;
         if (!proxy)
@@ -203,6 +205,10 @@ class Player {
             canPrev: prop('CanGoPrevious') ?? true,
             canNext: prop('CanGoNext') ?? true,
             app: proxy._app ?? null,
+            trackId: `${unpack(md['mpris:trackid']) ?? ''}`,
+            canSeek: prop('CanSeek') ?? false,
+            shuffle: prop('Shuffle'),
+            loop: prop('LoopStatus'),
         };
     }
 
@@ -268,6 +274,55 @@ class Player {
                 p.call_finish(res);
             } catch {}
         });
+    }
+
+    // a player setting (Shuffle, LoopStatus), as a GLib.Variant
+    setProperty(name, value) {
+        const proxy = this.current;
+        if (!proxy)
+            return;
+        Gio.DBus.session.call(proxy.g_name, PATH, 'org.freedesktop.DBus.Properties', 'Set',
+            new GLib.Variant('(ssv)', [IFACE, name, value]), null, Gio.DBusCallFlags.NONE, 3000, null,
+            (bus, res) => {
+                try {
+                    bus.call_finish(res);
+                } catch {}
+            });
+    }
+
+    // seconds forward (or back, negative) in the current track; counted on locally at once
+    seek(offset) {
+        const proxy = this.current;
+        if (!proxy || !this.state?.canSeek)
+            return;
+        this._setPosition(Math.max(0, this.position() + offset) * 1e6);
+        proxy.call('Seek', new GLib.Variant('(x)', [Math.round(offset * 1e6)]), Gio.DBusCallFlags.NONE, 3000, null, (p, res) => {
+            try {
+                p.call_finish(res);
+            } catch {}
+        });
+        this._listeners.forEach(fn => fn());
+    }
+
+    // to this many seconds into the current track
+    setPosition(seconds) {
+        const proxy = this.current;
+        const state = this.state;
+        if (!proxy || !state?.canSeek || !state.trackId)
+            return;
+        let args;
+        try {   // a track id that is not a valid object path cannot be sent
+            args = new GLib.Variant('(ox)', [state.trackId, Math.round(Math.max(0, seconds) * 1e6)]);
+        } catch {
+            return;
+        }
+        this._setPosition(Math.max(0, seconds) * 1e6);
+        proxy.call('SetPosition', args, Gio.DBusCallFlags.NONE, 3000, null, (p, res) => {
+            try {
+                p.call_finish(res);
+            } catch {}
+        });
+        this._listeners.forEach(fn => fn());
     }
 
     // ---- album art: a file uri St can draw ----

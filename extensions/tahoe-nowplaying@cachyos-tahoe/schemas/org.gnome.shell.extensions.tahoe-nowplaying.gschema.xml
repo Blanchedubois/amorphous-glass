@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tahoe Now Playing (docs/NOWPLAYING_PLAN.md) -->
+<schemalist>
+  <schema id="org.gnome.shell.extensions.tahoe-nowplaying" path="/org/gnome/shell/extensions/tahoe-nowplaying/">
+    <key name="toggle" type="as">
+      <default><![CDATA[['<Super><Shift>m']]]></default>
+      <summary>Open or close the Now Playing view</summary>
+      <description>The hotkey. GNOME uses Super+M and Super+V for the calendar, so the default adds Shift.</description>
+    </key>
+    <key name="idle-start" type="u">
+      <range min="0" max="3600"/>
+      <default>0</default>
+      <summary>Open by itself after this many seconds idle (0: never)</summary>
+      <description>Only while music plays, never over a fullscreen window or an idle-inhibited session. Keep it below GNOME's own idle delay.</description>
+    </key>
+    <key name="when-nothing-plays" type="s">
+      <choices>
+        <choice value="placeholder"/>
+        <choice value="stay-closed"/>
+      </choices>
+      <default>'placeholder'</default>
+      <summary>What the hotkey does when nothing plays</summary>
+      <description>placeholder: open with "Not Playing"; stay-closed: the hotkey does nothing.</description>
+    </key>
+  </schema>
+</schemalist>

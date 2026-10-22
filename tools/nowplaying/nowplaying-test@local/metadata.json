@@ -1,0 +1,1 @@
+{ "uuid": "nowplaying-test@local", "name": "nowplaying test", "description": "headless tests of tahoe-nowplaying", "shell-version": ["51"] }
