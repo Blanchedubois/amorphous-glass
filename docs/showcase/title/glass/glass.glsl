@@ -15,7 +15,9 @@ uniform vec4 blob;         // the drop: centre x, centre y, width, height (px, y
 uniform float morph;       // 0: the drop, 1: the word (where the front has passed)
 uniform float front;       // px from the middle: how far the letters have risen
 uniform float band;        // px: the width of the rise
-const float RISE_OVER = 0.18;   // how far the letters overshoot as they rise
+const float RISE_OVER = 0.05;   // how far the letters overshoot as they inflate (of REVEAL; 0.1 read as bold)
+const float REVEAL = 120.0;     // px: how far out of existence the letters are before the front
+const float MERGE = 40.0;       // px: how roundly the letters merge with the drop
 uniform float fade;        // the glass's presence
 uniform float shadow;      // a drop shadow's strength (0: liquid glass casts none, the user)
 uniform float gain;        // this moment's share of the frame (motion blur)
@@ -51,17 +53,24 @@ float sdCapsule(vec2 p, vec2 half_) {
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-// the shape at `p` (px, y down): the capsule becomes the word behind a front that travels out
-// from the middle (the letters rise out of the bar from the centre to the ends)
+float smin(float a, float b, float k) {
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// the shape at `p` (px, y down): the drop, and the word inflating out of it behind a front that
+// travels from the middle to the ends. Ahead of the front the letters are pushed out of
+// existence (their distance raised by REVEAL px); as the front passes, each letter grows from
+// its spine to its full stroke, a little past it, and settles. Where the drop and the letters
+// meet they merge (a smooth union), so the letters come out of the drop, not beside it.
 float sd(vec2 p) {
     float drop = sdCapsule(p - blob.xy, blob.zw * 0.5);
     float word = texture(sdf, p / res).r;
-    // behind the front each point rises over a band, overshoots (the letters a little taller
-    // and fatter than they end up: the blend past 1 extrapolates) and settles over another
     float u = (front - abs(p.x - blob.x)) / band + 1.0;
     float m = u < 1.0 ? (1.0 + RISE_OVER) * smoothstep(0.0, 1.0, u)
                       : 1.0 + RISE_OVER * (1.0 - smoothstep(1.0, 2.0, u));
-    return mix(drop, word, m * morph);
+    float letters = word + (1.0 - m * morph) * REVEAL;
+    return smin(drop, letters, MERGE);
 }
 
 void main() {
