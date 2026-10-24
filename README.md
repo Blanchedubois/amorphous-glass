@@ -394,7 +394,7 @@ Amorphous Glass stands on other people's work. Thank you.
 
 **In the clips**
 
-- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify; the Now Playing clips show *Hey Ladies* and *5-Piece Chicken Dinner* from *Paul's Boutique* by the Beastie Boys, also in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
+- The music is *How Much A Dollar Cost* from *To Pimp a Butterfly* and *m.A.A.d city* from *good kid, m.A.A.d city* by Kendrick Lamar, *Nude* from *In Rainbows* by Radiohead, *BAILE INoLVIDABLE* from *DeBÍ TiRAR MáS FOToS* by Bad Bunny and *The Place Where He Inserted the Blade* from *Ants From Up There* by Black Country, New Road, played in Spotify; the Now Playing clips show *Hey Ladies* and *5-Piece Chicken Dinner* from *Paul's Boutique* by the Beastie Boys, also in Spotify. The album artwork and the lyrics belong to their artists, writers and labels.
 
 **Inspirations**
 
