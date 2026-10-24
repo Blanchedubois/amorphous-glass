@@ -8,9 +8,19 @@
 </p>
 
 <p align="center"><b>macOS Tahoe's Liquid Glass look, rebuilt for GNOME 51 on Wayland.</b><br>
-Live, refracting glass on the bar, dock, menus, widgets and lock screen, moving on springs.</p>
+Live glass on the bar, dock, menus, widgets and lock screen, moving on springs.</p>
 
 <p align="center"><a href="#install"><b>Install</b></a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/download/video-2026-10-22/amorphous-glass.mp4">Watch the tour (1080p)</a> &nbsp;·&nbsp; <a href="https://github.com/Blanchedubois/amorphous-glass/releases/latest">Download</a> &nbsp;·&nbsp; <a href="#more">Docs</a></p>
+
+## About this project
+
+Being upfront: most of this is vibe-coded, largely through Claude Code. I'm new to Linux, and over
+fall break I wanted to make it feel familiar, so I went down a design rabbit hole. The main thing I
+workshopped was a liquid glass look that isn't flashy, which is how a lot of the liquid glass takes
+out there feel to me, while still reading as glass. There's no real refraction under the hood; the
+shading sells the 3D feel without being render-heavy. I also put a lot of work into the icons, logos
+and widget mechanics to follow macOS Tahoe's design language. It is a working prototype, and
+thoughts are welcome.
 
 ---
 
@@ -18,7 +28,7 @@ Live, refracting glass on the bar, dock, menus, widgets and lock screen, moving 
 
 ### Live glass
 
-Every surface blurs what is behind it at every frame, even while it moves. One shader draws all of it: blur, a refraction band that bends the edge, a rim light from the top left and a soft shadow.
+Every surface blurs what is behind it at every frame, even while it moves. One shader draws all of it: blur, a shaded band at the edge that suggests a bent rim, a rim light from the top left and a soft shadow. No real refraction: the shading sells the 3D feel without the render cost.
 
 </td></tr></table>
 
@@ -184,16 +194,16 @@ Switch any piece off and on later:
 
 ### One glass
 
-![The glass's anatomy: a rim light lit from the top left, a refraction band at the edge that bends the letters under it, clear glass with no tint, an edge shadow inside and a drop shadow under it](docs/showcase/media/design-glass.webp)
+![The glass's anatomy: a rim light lit from the top left, a shaded band at the edge that suggests a bent rim, clear glass with no tint, an edge shadow inside and a drop shadow under it](docs/showcase/media/design-glass.webp)
 
 Every glass surface is the same material, drawn by one shader with one set of values
-(`glass_params()` in `scripts/glass-bar.sh`): blur, a refraction band at the edge, a rim light lit
+(`glass_params()` in `scripts/glass-bar.sh`): blur, a shaded band at the edge, a rim light lit
 from the top left, an edge shadow just inside the rim and a soft drop shadow. Only the blur
 strength and the tint change, per surface and per mode (light, dark, milky).
 
 | | Value |
 |---|---|
-| Refraction | strength 0.8, edge 12 px, chromatic dispersion 0.06 |
+| Edge band | strength 0.8, edge 12 px, colour fringe 0.06 |
 | Rim light | 0.55, over 0.45 of the edge band, light at 45° |
 | Edge shadow / drop shadow | 0.30 over 0.20 of the band / 0.20 |
 | Tint | light: white 0.18 · dark: rgb(34, 34, 38) 0.42 · milky: white 0.12 |
@@ -216,7 +226,7 @@ Motion is physics: a damped spring with a mass, a stiffness and a damping ratio 
 Expressive's tokens), advanced by real elapsed time (`extensions/tahoe-motion@cachyos-tahoe/spring.js`).
 An interrupted popup carries on from where, and how fast, it was moving; small things move fast and
 large things slow; a dropped frame does not change the path. Popups open as a circle of glass
-growing out of the icon you clicked, and the glass's own edge, rim and refraction follow the shape
+growing out of the icon you clicked, and the glass's own edge, rim and shading follow the shape
 at every frame.
 
 | Token | Damping | Stiffness | Used for |
@@ -337,7 +347,7 @@ Details, the switches and the drift test results: `docs/REPAIR.md`.
 | Path | What it is |
 |---|---|
 | `install.sh` | Install, check and uninstall |
-| `config/bms-tahoe-glass.patch` | The Blur My Shell patch: refraction, rim light and edge shadow, per-piece quick settings, popup and app glass, the motion API |
+| `config/bms-tahoe-glass.patch` | The Blur My Shell patch: edge band, rim light and edge shadow, per-piece quick settings, popup and app glass, the motion API |
 | `config/gnome-shell-overrides.css` | Shell CSS over MacTahoe, rendered with `tokens/` |
 | `scripts/glass-bar.sh` | Apply, rebuild and switch every glass surface and mode |
 | `scripts/tahoe-repair.sh`, `scripts/tahoe_repair.py`, `scripts/repair_manifest.py` | The repair and its manifest (`docs/REPAIR.md`) |
@@ -404,3 +414,7 @@ Amorphous Glass stands on other people's work. Thank you.
 GPL-3.0, as Blur My Shell and cachyos-tahoe-theme. Glyphs, fonts and brand marks keep their upstream
 licences. The title animation's images and videos (`docs/showcase/media/title-*`) show the Fold
 wallpaper and are shared under CC BY-SA 3.0. macOS, Liquid Glass and SF Pro are Apple's, and Material Design is Google's; this project is not affiliated with Apple or Google.
+
+## License
+
+GPL-3.0. See [LICENSE](LICENSE). The themes, icons, fonts and extensions it builds on keep their own licences, listed above.
